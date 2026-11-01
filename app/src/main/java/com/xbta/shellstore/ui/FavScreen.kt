@@ -44,6 +44,9 @@ private sealed interface FavDialog {
     data class MoveTo(val item: FavItem) : FavDialog
     data class EditNote(val item: FavItem) : FavDialog
     data class EditTags(val item: FavItem) : FavDialog
+    data class BatchMove(val ids: Set<String>) : FavDialog
+    data class TagActions(val id: String) : FavDialog
+    data class RenameTag(val id: String) : FavDialog
 }
 
 @Composable
@@ -53,12 +56,57 @@ fun FavScreen(onOpen: (Page) -> Unit) {
     var currentFolder by remember { mutableStateOf<String?>(null) }
     var dialog by remember { mutableStateOf<FavDialog?>(null) }
     var input by remember { mutableStateOf("") }
+    var searchMode by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var multiMode by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val q = query.trim()
+    fun hit(fi: FavItem): Boolean {
+        if (q.isEmpty()) return true
+        val e = fi.entry
+        return e.title.contains(q, true) || e.body.contains(q, true) ||
+            fi.note.contains(q, true) || e.tags.any { it.contains(q, true) }
+    }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar(
-            title = "收藏",
-            actions = { IconBtn("+") { input = ""; dialog = FavDialog.NewFolder(currentFolder) } }
-        )
+        if (searchMode) {
+            Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                SearchField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    placeholder = "搜索标题、命令、备注、标签",
+                    autoFocus = true,
+                    onCancel = { searchMode = false; query = "" }
+                )
+            }
+        } else if (multiMode) {
+            TopBar(
+                title = "已选 ${selected.size}",
+                onBack = { multiMode = false; selected = emptySet() },
+                actions = {
+                    Text(
+                        "全选",
+                        fontSize = TypeScale.body,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable {
+                                selected = if (selected.size == favs.items.size) emptySet()
+                                else favs.items.map { it.entryId }.toSet()
+                            }
+                            .padding(horizontal = Space.sm, vertical = Space.xs)
+                    )
+                }
+            )
+        } else {
+            TopBar(
+                title = "收藏",
+                actions = {
+                    IconBtn("⌕") { searchMode = true }
+                    IconBtn("☑") { multiMode = true; selected = emptySet() }
+                    IconBtn("+") { input = ""; dialog = FavDialog.NewFolder(currentFolder) }
+                }
+            )
+        }
         Row(Modifier.padding(horizontal = 14.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             FilterChip("文件夹", view == 0) { view = 0; currentFolder = null }
             FilterChip("标签", view == 1) { view = 1 }
@@ -66,7 +114,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
         }
 
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
@@ -105,7 +153,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                         onMenu = { dialog = FavDialog.FolderActions(f.id) }
                     )
                 }
-                val here = favs.itemsIn(currentFolder)
+                val here = favs.itemsIn(currentFolder).filter { hit(it) }
                 if (children.isNotEmpty() && here.isNotEmpty()) {
                     item {
                         Text(
@@ -125,7 +173,16 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     }
                 }
                 items(here, key = { it.entryId }) { fi ->
-                    FavRow(fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = { dialog = FavDialog.FavActions(fi) })
+                    FavRow(
+                        fi,
+                        onOpen = {
+                            if (multiMode) selected = if (fi.entryId in selected) selected - fi.entryId else selected + fi.entryId
+                            else onOpen(Page.Detail(fi.entryId))
+                        },
+                        onMenu = { dialog = FavDialog.FavActions(fi) },
+                        multiMode = multiMode,
+                        checked = fi.entryId in selected
+                    )
                 }
             }
 
@@ -167,13 +224,34 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    items(favs.items.sortedByDescending { it.savedAt }, key = { it.entryId }) { fi ->
+                    items(favs.items.sortedByDescending { it.savedAt }.filter { hit(it) }, key = { it.entryId }) { fi ->
                         FavRow(
                             fi,
-                            onOpen = { onOpen(Page.Detail(fi.entryId)) },
-                            onMenu = { dialog = FavDialog.FavActions(fi) }
+                            onOpen = {
+                                if (multiMode) selected = if (fi.entryId in selected) selected - fi.entryId else selected + fi.entryId
+                                else onOpen(Page.Detail(fi.entryId))
+                            },
+                            onMenu = { dialog = FavDialog.FavActions(fi) },
+                            multiMode = multiMode,
+                            checked = fi.entryId in selected
                         )
                     }
+                }
+            }
+        }
+        if (multiMode) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(Space.sm)
+            ) {
+                BatchBtn("移动到", selected.isNotEmpty()) { dialog = FavDialog.BatchMove(selected) }
+                BatchBtn("取消收藏", selected.isNotEmpty(), danger = true) {
+                    Store.removeFavs(selected)
+                    selected = emptySet()
+                    multiMode = false
                 }
             }
         }
@@ -268,6 +346,60 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 )
             }
 
+            is FavDialog.TagActions -> {
+                val t = favs.tags.firstOrNull { it.id == d.id }
+                AlertDialog(
+                    onDismissRequest = { dialog = null },
+                    title = { Text(t?.name ?: "标签", fontSize = TypeScale.title) },
+                    text = {
+                        Column {
+                            MenuItem("重命名") { dialog = FavDialog.RenameTag(d.id) }
+                            MenuItem("删除标签", danger = true) { Store.deleteTag(d.id); dialog = null }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { dialog = null }) { Text("关闭") } }
+                )
+            }
+
+            is FavDialog.RenameTag -> {
+                val t = favs.tags.firstOrNull { it.id == d.id }
+                InputDialog(
+                    title = "重命名标签",
+                    label = "新名称",
+                    initial = t?.name ?: "",
+                    onConfirm = { name ->
+                        if (name.isNotBlank()) Store.renameTag(d.id, name.trim())
+                        dialog = null
+                    },
+                    onDismiss = { dialog = null }
+                )
+            }
+
+            is FavDialog.BatchMove -> {
+                AlertDialog(
+                    onDismissRequest = { dialog = null },
+                    title = { Text("移动 ${d.ids.size} 条到", fontSize = TypeScale.title) },
+                    text = {
+                        LazyColumn(Modifier.heightIn(max = 320.dp)) {
+                            item {
+                                MenuItem("根目录（不分类）") {
+                                    Store.moveFavs(d.ids, null)
+                                    selected = emptySet(); multiMode = false; dialog = null
+                                }
+                            }
+                            val all = favs.folders.sortedBy { favs.depthOf(it.id) }
+                            items(all, key = { it.id }) { f ->
+                                MenuItem("　".repeat(favs.depthOf(f.id)) + f.name) {
+                                    Store.moveFavs(d.ids, f.id)
+                                    selected = emptySet(); multiMode = false; dialog = null
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { dialog = null }) { Text("取消") } }
+                )
+            }
+
             is FavDialog.EditTags -> TagPickerDialog(
                 item = d.item,
                 allTags = favs.tags,
@@ -328,7 +460,13 @@ private fun FolderRow(folder: Folder, count: Int, onClick: () -> Unit, onMenu: (
 }
 
 @Composable
-fun FavRow(item: FavItem, onOpen: () -> Unit, onMenu: () -> Unit) {
+fun FavRow(
+    item: FavItem,
+    onOpen: () -> Unit,
+    onMenu: () -> Unit,
+    multiMode: Boolean = false,
+    checked: Boolean = false
+) {
     val e: Entry = item.entry
     Column(
         Modifier
@@ -541,4 +679,29 @@ private fun TagPickerDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
+}
+
+
+@Composable
+private fun BatchBtn(text: String, enabled: Boolean, danger: Boolean = false, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .weight(1f)
+            .height(40.dp)
+            .clip(RoundedCornerShape(Radius.md))
+            .background(if (danger) Tones.dangerBg else MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            fontSize = TypeScale.body,
+            fontWeight = FontWeight.Medium,
+            color = when {
+                !enabled -> MaterialTheme.colorScheme.outline
+                danger -> Tones.danger
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+    }
 }

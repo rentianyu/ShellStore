@@ -461,6 +461,33 @@ object Store {
         return null
     }
 
+    fun removeFavs(ids: Collection<String>) {
+        val c = ctx ?: return
+        if (ids.isEmpty()) return
+        _favs.value = _favs.value.copy(items = _favs.value.items.filterNot { it.entryId in ids })
+        Repo.saveFavs(c, _favs.value)
+    }
+
+    fun moveFavs(ids: Collection<String>, folderId: String?) {
+        val c = ctx ?: return
+        if (ids.isEmpty()) return
+        _favs.value = _favs.value.copy(
+            items = _favs.value.items.map {
+                if (it.entryId in ids) it.copy(folderId = folderId) else it
+            }
+        )
+        Repo.saveFavs(c, _favs.value)
+    }
+
+    fun setTagsFor(ids: Collection<String>, tags: List<String>) {
+        val c = ctx ?: return
+        if (ids.isEmpty()) return
+        _favs.value = _favs.value.copy(
+            items = _favs.value.items.map { if (it.entryId in ids) it.copy(tags = tags) else it }
+        )
+        Repo.saveFavs(c, _favs.value)
+    }
+
     /** 给收藏条目设置标签集合 */
     fun setFavTags(entryId: String, tags: List<String>) {
         val c = ctx ?: return
