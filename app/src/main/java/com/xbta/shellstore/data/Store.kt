@@ -419,4 +419,54 @@ object Store {
         o.put("settings", _settings.value.toJson())
         return o.toString(2)
     }
+
+    /**
+     * 导入备份。overwrite=true 清空后重建；false 按 id 去重合并（本地优先）。
+     * 返回 null 表示成功，否则返回错误原因。
+     */
+    fun importBackup(json: String, overwrite: Boolean): String? {
+        val c = ctx ?: return "未初始化"
+        val root = runCatching { org.json.JSONObject(json) }.getOrNull()
+            ?: return "不是合法的 JSON"
+        val favObj = root.optJSONObject("favorites") ?: return "备份里没有收藏数据"
+        val incoming = runCatching { Repo.favFromJson(favObj) }.getOrNull()
+            ?: return "收藏数据结构无法识别"
+
+        if (overwrite) {
+            _favs.value = incoming
+        } else {
+            val cur = _favs.value
+            val folderIds = cur.folders.map { it.id }.toSet()
+            val tagIds = cur.tags.map { it.id }.toSet()
+            val itemIds = cur.items.map { it.entryId }.toSet()
+            _favs.value = FavData(
+                folders = cur.folders + incoming.folders.filterNot { it.id in folderIds },
+                tags = cur.tags + incoming.tags.filterNot { it.id in tagIds },
+                items = cur.items + incoming.items.filterNot { it.entryId in itemIds }
+            )
+        }
+        Repo.saveFavs(c, _favs.value)
+
+        root.optJSONObject("settings")?.let { s ->
+            val st = AppSettings.fromJson(s)
+            // 只合并可迁移的偏好，字体路径这类本机相关的不覆盖
+            _settings.value = _settings.value.copy(
+                theme = st.theme,
+                fontScale = st.fontScale,
+                copyPrefix = st.copyPrefix,
+                confirmDanger = st.confirmDanger
+            )
+            Repo.saveSettings(c, _settings.value)
+        }
+        return null
+    }
+
+    /** 给收藏条目设置标签集合 */
+    fun setFavTags(entryId: String, tags: List<String>) {
+        val c = ctx ?: return
+        _favs.value = _favs.value.copy(
+            items = _favs.value.items.map { if (it.entryId == entryId) it.copy(tags = tags) else it }
+        )
+        Repo.saveFavs(c, _favs.value)
+    }
 }

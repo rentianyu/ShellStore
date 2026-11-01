@@ -43,6 +43,7 @@ private sealed interface FavDialog {
     data class FavActions(val item: FavItem) : FavDialog
     data class MoveTo(val item: FavItem) : FavDialog
     data class EditNote(val item: FavItem) : FavDialog
+    data class EditTags(val item: FavItem) : FavDialog
 }
 
 @Composable
@@ -233,6 +234,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     text = {
                         Column {
                             MenuItem("移动到…") { dialog = FavDialog.MoveTo(d.item) }
+                            MenuItem("打标签") { dialog = FavDialog.EditTags(d.item) }
                             MenuItem("写备注") { dialog = FavDialog.EditNote(d.item) }
                             MenuItem("取消收藏", danger = true) {
                                 Store.removeFav(d.item.entryId); dialog = null
@@ -265,6 +267,21 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     confirmButton = { TextButton(onClick = { dialog = null }) { Text("取消") } }
                 )
             }
+
+            is FavDialog.EditTags -> TagPickerDialog(
+                item = d.item,
+                allTags = favs.tags,
+                onSave = { ids, newName ->
+                    if (newName.isNotBlank()) {
+                        val nid = Store.createTag(newName.trim(), favs.tags.size % TAG_COLORS.size)
+                        Store.setFavTags(d.item.entryId, ids + nid)
+                    } else {
+                        Store.setFavTags(d.item.entryId, ids)
+                    }
+                    dialog = null
+                },
+                onDismiss = { dialog = null }
+            )
 
             is FavDialog.EditNote -> InputDialog(
                 title = "备注",
@@ -459,4 +476,69 @@ fun AllFavScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun TagPickerDialog(
+    item: FavItem,
+    allTags: List<com.xbta.shellstore.data.Tag>,
+    onSave: (List<String>, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selected by remember(item.entryId) { mutableStateOf(item.tags.toSet()) }
+    var newName by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("打标签", fontSize = TypeScale.title) },
+        text = {
+            Column {
+                if (allTags.isEmpty()) {
+                    Text(
+                        "还没有标签，在下方输入名称即可新建",
+                        fontSize = TypeScale.small,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    allTags.chunked(2).forEach { row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                            modifier = Modifier.padding(bottom = Space.sm)
+                        ) {
+                            row.forEach { t ->
+                                FilterChip(t.name, t.id in selected) {
+                                    selected = if (t.id in selected) selected - t.id else selected + t.id
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(Space.md))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = Space.md, vertical = 10.dp)
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        if (newName.isBlank()) {
+                            Text("新建标签…", fontSize = TypeScale.body, color = MaterialTheme.colorScheme.outline)
+                        }
+                        BasicTextField(
+                            value = newName,
+                            onValueChange = { newName = it },
+                            singleLine = true,
+                            textStyle = TextStyle(fontSize = TypeScale.body, color = MaterialTheme.colorScheme.onSurface),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(selected.toList(), newName) }) { Text("保存") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
 }

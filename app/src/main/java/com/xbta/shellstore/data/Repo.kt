@@ -250,7 +250,7 @@ object Repo {
         })
     }
 
-    private fun favFromJson(o: JSONObject): FavData {
+    fun favFromJson(o: JSONObject): FavData {
         val folders = mutableListOf<Folder>()
         o.optJSONArray("folders")?.let { a ->
             for (i in 0 until a.length()) {

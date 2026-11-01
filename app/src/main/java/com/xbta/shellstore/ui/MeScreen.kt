@@ -698,35 +698,111 @@ private fun Field(label: String, value: String, onChange: (String) -> Unit) {
 @Composable
 fun BackupScreen(onBack: () -> Unit) {
     val favs by Store.favs.collectAsState()
-    val settings by Store.settings.collectAsState()
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pending by remember { mutableStateOf<String?>(null) }
+    var pendingName by remember { mutableStateOf("") }
+
+    val importer = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val text = withContext(Dispatchers.IO) {
+                    runCatching {
+                        ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    }.getOrNull()
+                }
+                if (text.isNullOrBlank()) {
+                    Toast.makeText(ctx, "读取文件失败", Toast.LENGTH_SHORT).show()
+                } else {
+                    pending = text
+                    pendingName = "文件"
+                }
+            }
+        }
+    }
+
+    fun doImport(json: String, overwrite: Boolean) {
+        scope.launch {
+            val err = withContext(Dispatchers.IO) { Store.importBackup(json, overwrite) }
+            Toast.makeText(ctx, if (err == null) "导入完成" else "导入失败：$err", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("备份与恢复", onBack = onBack)
-        Column(Modifier.padding(horizontal = 14.dp).verticalScroll(rememberScrollState())) {
-            Spacer(Modifier.height(4.dp))
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp)
+                .padding(bottom = 20.dp)
+        ) {
+            GroupTitle("导出")
             GroupCard {
-                SettingRow("⇧", "导出到剪贴板", "${favs.items.size} 条收藏 · JSON", onClick = {
+                SettingRow("⇧", "复制到剪贴板", "${favs.items.size} 条收藏 · JSON", onClick = {
                     val json = Store.exportBackupJson()
                     val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     cm.setPrimaryClip(ClipData.newPlainText("shellstore-backup", json))
                     Toast.makeText(ctx, "已复制 ${json.length} 字符", Toast.LENGTH_SHORT).show()
                 })
             }
-            Spacer(Modifier.height(10.dp))
+
+            GroupTitle("导入")
             GroupCard {
-                SettingRow("⇩", "从剪贴板导入", "合并模式", enabled = false)
+                SettingRow("⇩", "从文件导入", "选择备份的 .json", onClick = {
+                    importer.launch(arrayOf("*/*"))
+                })
+                Divider()
+                SettingRow("⧉", "从剪贴板导入", "粘贴备份 JSON", onClick = {
+                    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val text = cm.primaryClip?.getItemAt(0)?.text?.toString()
+                    if (text.isNullOrBlank() || !text.contains("shellstore-backup")) {
+                        Toast.makeText(ctx, "剪贴板里没有备份数据", Toast.LENGTH_SHORT).show()
+                    } else {
+                        pending = text
+                        pendingName = "剪贴板"
+                    }
+                })
             }
-            Spacer(Modifier.height(14.dp))
+
+            Spacer(Modifier.height(Space.lg))
             Text(
-                "当前备份包含：收藏（含快照）、文件夹、标签、设置。\n" +
-                    "内置源由 App 自带，不进入备份；在线源的地址与本地导入源的原文会一并保存。\n" +
-                    "导入支持「合并」（按 id 去重）与「覆盖」两种模式。",
-                fontSize = TypeScale.caption,
-                lineHeight = 17.sp,
+                "备份包含：收藏（含快照）、文件夹、标签、备注，以及主题/字号/复制前缀等偏好。\n" +
+                    "内置源由 App 自带，不进备份；在线源只保存地址，恢复后重新拉取。\n" +
+                    "合并 = 按 id 去重、保留本地；覆盖 = 清空现有收藏后重建。",
+                fontSize = TypeScale.small,
+                lineHeight = 20.sp,
                 color = MaterialTheme.colorScheme.outline
             )
         }
+    }
+
+    pending?.let { json ->
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text("导入备份", fontSize = TypeScale.title) },
+            text = {
+                Text(
+                    "来源：$pendingName（${json.length} 字符）\n\n" +
+                        "合并：保留现有数据，只补充没有的条目\n" +
+                        "覆盖：清空现有收藏与文件夹后重建",
+                    fontSize = TypeScale.small,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { val j = json; pending = null; doImport(j, overwrite = false) }) {
+                    Text("合并")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { val j = json; pending = null; doImport(j, overwrite = true) }) {
+                    Text("覆盖", color = Tones.danger)
+                }
+            }
+        )
     }
 }
 
