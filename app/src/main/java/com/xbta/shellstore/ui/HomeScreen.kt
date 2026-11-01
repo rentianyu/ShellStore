@@ -102,7 +102,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     )
                 }
                 if (results.isEmpty()) {
-                    item { EmptyState("没有找到匹配的命令", "换个关键词，或去「我的 › 数据源」添加更多来源") }
+                    item { EmptyState("没有找到匹配的命令", "换个关键词，或去「我的 › 订阅源」添加更多来源") }
                 }
                 items(results, key = { it.id }) { e ->
                     EntryRow(

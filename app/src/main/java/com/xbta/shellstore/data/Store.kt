@@ -7,6 +7,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
+/** 启动时检测到的订阅源更新。text 是拉到的新内容，用户点确定才真正写入 */
+data class SourceDiff(
+    val id: String,
+    val name: String,
+    val oldCount: Int,
+    val newCount: Int,
+    val text: String,
+    val via: String = ""
+) {
+    val delta: Int get() = newCount - oldCount
+    val countChanged: Boolean get() = newCount != oldCount
+}
+
 /**
  * 全局状态。单例 object + StateFlow，不引 ViewModel。
  * 所有磁盘 IO 走 Repo，调用方负责切线程（首版数据量小，主线程读 30 条 < 5ms）。
@@ -40,6 +53,11 @@ object Store {
 
     private val _settings = MutableStateFlow(AppSettings())
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    private val _pendingUpdates = MutableStateFlow<List<SourceDiff>>(emptyList())
+    val pendingUpdates: StateFlow<List<SourceDiff>> = _pendingUpdates.asStateFlow()
+
+    @Volatile private var updatesChecked = false
 
     private val _warnings = MutableStateFlow<List<ParseWarning>>(emptyList())
     val warnings: StateFlow<List<ParseWarning>> = _warnings.asStateFlow()
@@ -219,6 +237,56 @@ object Store {
         _sources.value = _sources.value.map { if (it.id == id) it.copy(enabled = on) else it }
         Repo.saveSourceConfigs(c, _sources.value)
         reloadAll()
+    }
+
+    /**
+     * 启动时检查订阅源是否有新版本：拉下来先不写入，只算出差异，等用户确认。
+     * 阻塞调用，放 IO 线程。
+     */
+    fun checkSourceUpdates() {
+        if (updatesChecked) return
+        updatesChecked = true
+        val c = ctx ?: return
+        val diffs = mutableListOf<SourceDiff>()
+        _sources.value
+            .filter { it.enabled && it.type == SourceType.REMOTE && it.url.isNotBlank() }
+            .forEach { cfg ->
+                val r = Mirrors.fetch(
+                    cfg.url,
+                    prefer = _settings.value.sourceMirror,
+                    validate = { looksLikeSmd(it) }
+                )
+                if (!r.ok) return@forEach
+                val newText = r.text.orEmpty()
+                if (newText.isBlank()) return@forEach
+                val oldText = SourceCache.read(c, cfg.id)
+                if (newText == oldText) return@forEach
+                val newCount = SmdParser.parse(newText, cfg.id, cfg.name).source.entries.size
+                val oldCount = if (oldText.isBlank()) 0
+                else SmdParser.parse(oldText, cfg.id, cfg.name).source.entries.size
+                diffs.add(SourceDiff(cfg.id, cfg.name, oldCount, newCount, newText, r.via))
+                if (r.via.isNotBlank()) rememberMirror(r.via)
+            }
+        _pendingUpdates.value = diffs
+    }
+
+    /** 用户点了确定：把候选内容写进缓存并重新解析 */
+    fun applySourceUpdates() {
+        val c = ctx ?: return
+        val list = _pendingUpdates.value
+        if (list.isEmpty()) return
+        list.forEach { SourceCache.write(c, it.id, it.text) }
+        _pendingUpdates.value = emptyList()
+        reloadAll()
+    }
+
+    /** 用户点了取消：丢弃候选内容，不写任何文件 */
+    fun dismissSourceUpdates() {
+        _pendingUpdates.value = emptyList()
+    }
+
+    fun resetSourceCheck() {
+        updatesChecked = false
     }
 
     private fun rememberMirror(via: String) {

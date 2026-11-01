@@ -186,7 +186,7 @@ object Repo {
         runCatching { file(ctx, "settings.json").writeText(s.toJson().toString()) }
     }
 
-    // -- 数据源配置 --
+    // -- 订阅源配置 --
     fun loadSourceConfigs(ctx: Context): List<SourceConfig> = try {
         val f = file(ctx, "sources.json")
         if (!f.exists()) emptyList() else SourceConfig.listFromJson(f.readText())

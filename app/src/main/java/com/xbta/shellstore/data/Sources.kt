@@ -8,7 +8,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
-/** 一个数据源的配置与状态（内容存在 files/sources/<id>.md 缓存里） */
+/** 一个订阅源的配置与状态（内容存在 files/sources/<id>.md 缓存里） */
 data class SourceConfig(
     val id: String,
     val name: String,

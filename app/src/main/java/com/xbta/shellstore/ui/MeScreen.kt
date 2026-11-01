@@ -48,6 +48,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun MeScreen(onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
+    val srcList by Store.sources.collectAsState()
     val favs by Store.favs.collectAsState()
     val cats by Store.categories.collectAsState()
     val ctx = LocalContext.current
@@ -97,7 +98,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     Text("Shell 商店", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        "v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE}) · 1 个源 · ${entries.size} 条",
+                        "v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE}) · ${srcList.count { it.enabled }} 个源 · ${entries.size} 条",
                         fontSize = TypeScale.small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -120,7 +121,11 @@ fun MeScreen(onOpen: (Page) -> Unit) {
 
             GroupTitle("内容")
             GroupCard {
-                SettingRow("▤", "数据源", "1 个 · 内置", onClick = { onOpen(Page.Sources) })
+                SettingRow(
+                    "▤", "订阅源",
+                    "${srcList.count { it.enabled }} 个启用 · 共 ${srcList.size} 个",
+                    onClick = { onOpen(Page.Sources) }
+                )
                 Divider()
                 SettingRow("⇅", "备份与恢复", "导出收藏与设置", onClick = { onOpen(Page.Backup) })
             }
@@ -401,7 +406,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             title = { Text("清除收藏数据", fontSize = 15.sp) },
             text = {
                 Text(
-                    "将删除全部收藏、文件夹与标签，此操作不可恢复。\n数据源与设置不受影响。",
+                    "将删除全部收藏、文件夹与标签，此操作不可恢复。\n订阅源与设置不受影响。",
                     fontSize = 12.sp, lineHeight = 19.sp
                 )
             },
@@ -467,7 +472,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 }
 
-// ---------------- 数据源 ----------------
+// ---------------- 订阅源 ----------------
 
 @Composable
 fun SourcesScreen(onBack: () -> Unit) {
@@ -512,7 +517,7 @@ fun SourcesScreen(onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("数据源", onBack = onBack)
+        TopBar("订阅源", onBack = onBack)
         Column(
             Modifier
                 .fillMaxSize()
@@ -672,7 +677,7 @@ fun SourcesScreen(onBack: () -> Unit) {
     pendingDelete?.let { id ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除数据源", fontSize = 15.sp) },
+            title = { Text("删除订阅源", fontSize = 15.sp) },
             text = { Text("将移除该源及其缓存，收藏里的快照不受影响。", fontSize = 12.sp, lineHeight = 19.sp) },
             confirmButton = {
                 TextButton(onClick = {
@@ -870,7 +875,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(14.dp))
             Text(
-                "命令与脚本均来自数据源，App 自身不做任何联网上传。\n" +
+                "命令与脚本均来自订阅源，App 自身不做任何联网上传。\n" +
                     "标注为「危险」的条目在执行前请自行确认内容，误操作造成的后果由使用者承担。",
                 fontSize = TypeScale.caption,
                 lineHeight = 17.sp,

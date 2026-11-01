@@ -8,20 +8,28 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xbta.shellstore.BuildConfig
 import com.xbta.shellstore.data.Store
+import com.xbta.shellstore.data.UpdateCenter
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.ui.theme.AppTheme
 import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.LocalCodeFont
 import com.xbta.shellstore.ui.theme.resolveCodeFont
 import com.xbta.shellstore.ui.theme.resolveUiFont
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface Page {
     data object AllCats : Page
@@ -82,6 +90,21 @@ private fun Root() {
     var stack by remember { mutableStateOf<List<Page>>(emptyList()) }
     val current = stack.lastOrNull()
 
+    val ctx = LocalContext.current
+    val upState by UpdateCenter.state.collectAsState()
+    val srcDiffs by Store.pendingUpdates.collectAsState()
+    val holder = rememberSaveableStateHolder()
+
+    // 启动后静默检查：先看自身有没有新版本（下完再弹窗），再看订阅源有没有变化
+    LaunchedEffect(Unit) {
+        delay(2000)
+        withContext(Dispatchers.IO) { UpdateCenter.checkAndDownload(ctx, BuildConfig.APP_VERSION) }
+    }
+    LaunchedEffect(Unit) {
+        delay(3500)
+        withContext(Dispatchers.IO) { Store.checkSourceUpdates() }
+    }
+
     fun push(p: Page) { stack = stack + p }
     fun pop() { if (stack.isNotEmpty()) stack = stack.dropLast(1) }
 
@@ -93,7 +116,14 @@ private fun Root() {
             .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        val downloading = upState as? UpdateCenter.State.Downloading
+        if (downloading != null) {
+            DownloadBar(downloading.pct)
+        }
+
         Box(Modifier.weight(1f).fillMaxWidth()) {
+            // 记住每页的滚动位置与临时状态：从详情返回列表不会跳回顶部
+            holder.SaveableStateProvider(current?.toString() ?: "tab$tab") {
             if (current == null) {
                 when (tab) {
                     0 -> HomeScreen(onOpen = ::push)
@@ -114,11 +144,33 @@ private fun Root() {
                     is Page.About -> AboutScreen(onBack = ::pop)
                 }
             }
+            }
         }
         TabBar(current = tab, hasOverlay = stack.isNotEmpty()) {
             tab = it
             stack = emptyList()
         }
+    }
+
+    // 启动检查的两个提示：先自身更新，再订阅源差异
+    val st = upState
+    if (st is UpdateCenter.State.Ready) {
+        UpdateReadyDialog(
+            tag = st.tag,
+            currentVersion = BuildConfig.APP_VERSION,
+            onInstall = {
+                val err = UpdateCenter.install(ctx)
+                if (err != null) android.widget.Toast.makeText(ctx, err, android.widget.Toast.LENGTH_LONG).show()
+                UpdateCenter.dismiss()
+            },
+            onLater = { UpdateCenter.dismiss() }
+        )
+    } else if (srcDiffs.isNotEmpty()) {
+        SourceUpdateDialog(
+            diffs = srcDiffs,
+            onConfirm = { Store.applySourceUpdates() },
+            onCancel = { Store.dismissSourceUpdates() }
+        )
     }
 }
 
