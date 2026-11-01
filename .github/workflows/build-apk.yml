@@ -138,6 +138,20 @@ jobs:
           gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1 || \
             gh release create "$TAG" --repo "$REPO" --prerelease \
               --title "最新开发构建" --notes "CI 自动更新，文件名固定、内容覆盖"
+          # --clobber 只覆盖同名文件，而带版本号的名字每次都不同 -> 不清理会一直累积，
+          # App 端页面解析可能先拿到旧版本。这里只保留本次版本的带版本号 asset。
+          V=$(grep -E '^VERSION_NAME=' gradle.properties | head -1 | cut -d= -f2 | tr -d ' \r')
+          gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[].name' 2>/dev/null | \
+          while read -r n; do
+            case "$n" in
+              ShellStore-*-debug.apk)
+                if [ "$n" != "ShellStore-$V-debug.apk" ]; then
+                  echo "remove old asset: $n"
+                  gh release delete-asset "$TAG" "$n" --repo "$REPO" --yes || true
+                fi
+                ;;
+            esac
+          done
           gh release upload "$TAG" out/*.apk --repo "$REPO" --clobber
           echo "下载直链（代理前缀 + 下列地址）："
           for f in out/*.apk; do

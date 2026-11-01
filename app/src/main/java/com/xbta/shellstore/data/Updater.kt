@@ -92,6 +92,11 @@ object Updater {
      * debug 通道。dev-latest 的 tag 永远不变（CI 用 --clobber 覆盖 asset），
      * 所以版本号只能从 asset 文件名里取：ShellStore-0.12.0-debug.apk。
      */
+    /** dev-latest 里可能堆积多个历史版本（--clobber 只覆盖同名文件），取最大的 */
+    private fun bestDevVersion(text: String): String? =
+        DEV_ASSET_RE.findAll(text).map { it.groupValues[1] }.toList()
+            .reduceOrNull { acc, v -> if (isNewer(v, acc)) v else acc }
+
     private fun checkDev(): CheckResult {
         // 1) 页面通道：release 主页面（154KB）里不含 asset 名，必须抓 expanded_assets 片段
         //    （10KB，纯 HTML，asset 名后跟 " 或 <，正好配合上面的边界断言）
@@ -100,7 +105,7 @@ object Updater {
             if (!r.ok) continue
             val html = r.text.orEmpty()
             if (html.isBlank()) continue
-            val ver = DEV_ASSET_RE.find(html)?.groupValues?.get(1)
+            val ver = bestDevVersion(html)
             if (!ver.isNullOrBlank()) {
                 return CheckResult(Info(ver, TAG_DEV, devUrl(ver)))
             }
@@ -110,7 +115,7 @@ object Updater {
             val r = Net.get(p + "https://api.github.com/repos/$REPO/releases/tags/$TAG_DEV", timeoutMs = 20000)
             if (!r.ok) continue
             val text = r.text.orEmpty()
-            val ver = DEV_ASSET_RE.find(text)?.groupValues?.get(1)
+            val ver = bestDevVersion(text)
             if (!ver.isNullOrBlank()) {
                 return CheckResult(Info(ver, TAG_DEV, devUrl(ver)))
             }
