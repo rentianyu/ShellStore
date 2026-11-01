@@ -467,8 +467,6 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 }
 
-@Composable
-
 // ---------------- 数据源 ----------------
 
 @Composable
