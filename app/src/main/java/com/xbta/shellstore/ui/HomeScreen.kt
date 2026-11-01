@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.data.Store
+import com.xbta.shellstore.ui.theme.Dimen
 import com.xbta.shellstore.ui.theme.Radius
 import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.TypeScale
@@ -33,6 +34,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
     val cats by Store.categories.collectAsState()
     val favs by Store.favs.collectAsState()
+    val collapsedIds by Store.collapsed.collectAsState()
 
     var searchMode by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -104,7 +106,9 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                         e,
                         fav = favs.isFav(e.id),
                         onClick = { onOpen(Page.Detail(e.id)) },
-                        onToggleFav = { Store.toggleFav(e) }
+                        onToggleFav = { Store.toggleFav(e) },
+                        collapsed = e.id in collapsedIds,
+                        onToggleCollapse = { Store.toggleCollapse(e.id) }
                     )
                 }
             } else {
@@ -134,6 +138,23 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                         Text("全部命令", fontSize = TypeScale.title, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.weight(1f))
                         Text("${entries.size} 条", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(Space.xs))
+                        val allCollapsed = entries.isNotEmpty() && entries.all { it.id in collapsedIds }
+                        Box(
+                            Modifier
+                                .size(Dimen.iconButton)
+                                .clip(RoundedCornerShape(Radius.sm))
+                                .clickable {
+                                    Store.setCollapseAll(entries.map { it.id }, !allCollapsed)
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                if (allCollapsed) "▸" else "▾",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
                 items(entries, key = { it.id }) { e ->
@@ -141,7 +162,9 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                         e,
                         fav = favs.isFav(e.id),
                         onClick = { onOpen(Page.Detail(e.id)) },
-                        onToggleFav = { Store.toggleFav(e) }
+                        onToggleFav = { Store.toggleFav(e) },
+                        collapsed = e.id in collapsedIds,
+                        onToggleCollapse = { Store.toggleCollapse(e.id) }
                     )
                 }
             }
@@ -263,6 +286,7 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
 fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
     val favs by Store.favs.collectAsState()
+    val collapsedIds by Store.collapsed.collectAsState()
     val list = remember(cat, entries) { entries.filter { it.categoryId == cat } }
     var query by remember { mutableStateOf("") }
 
@@ -292,7 +316,9 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
                     fav = favs.isFav(e.id),
                     onClick = { onOpen(Page.Detail(e.id)) },
                     onToggleFav = { Store.toggleFav(e) },
-                    showCategory = false
+                    showCategory = false,
+                    collapsed = e.id in collapsedIds,
+                    onToggleCollapse = { Store.toggleCollapse(e.id) }
                 )
             }
         }

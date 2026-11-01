@@ -154,7 +154,9 @@ fun EntryRow(
     fav: Boolean,
     onClick: () -> Unit,
     onToggleFav: () -> Unit,
-    showCategory: Boolean = true
+    showCategory: Boolean = true,
+    collapsed: Boolean = false,
+    onToggleCollapse: (() -> Unit)? = null
 ) {
     Column(
         Modifier
@@ -176,6 +178,25 @@ fun EntryRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+            if (collapsed) {
+                RiskBadge(entry.risk)
+                Spacer(Modifier.width(Space.xs))
+            }
+            if (onToggleCollapse != null) {
+                Box(
+                    Modifier
+                        .size(Dimen.iconButton)
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .clickable { onToggleCollapse() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (collapsed) "▸" else "▾",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
             Box(
                 Modifier
                     .size(Dimen.iconButton)
@@ -198,6 +219,8 @@ fun EntryRow(
             entry.intent?.component?.isNotBlank() == true -> entry.intent!!.component
             else -> ""
         }
+        if (collapsed) return@Column
+
         if (preview.isNotBlank()) {
             Spacer(Modifier.height(Space.sm))
             CodeBlock(preview, maxLines = 1, fontSize = 12)
