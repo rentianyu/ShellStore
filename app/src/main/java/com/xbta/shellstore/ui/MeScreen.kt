@@ -605,9 +605,8 @@ fun SourcesScreen(onBack: () -> Unit) {
                             },
                             contentAlignment = Alignment.Center
                         ) { Text("✕", fontSize = 13.sp, color = MaterialTheme.colorScheme.outline) }
-                    } else {
-                        Toggle(s.enabled) { Store.toggleSource(s.id, it) }
                     }
+                    Toggle(s.enabled) { Store.toggleSource(s.id, it) }
                 }
                 Spacer(Modifier.height(8.dp))
             }
