@@ -153,8 +153,10 @@ private fun CategoryGrid(
     onOpen: (Page) -> Unit
 ) {
     val shown = cats.take(6)
+    // 分类少时用 2 列，避免第二行只剩一个卡片、右边留一大片空白
+    val cols = if (shown.size <= 4) 2 else 3
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        shown.chunked(3).forEach { rowCats ->
+        shown.chunked(cols).forEach { rowCats ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 rowCats.forEach { c ->
                     val idx = cats.indexOf(c)
@@ -187,7 +189,6 @@ private fun CategoryGrid(
                         Text("$count 条", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                repeat(3 - rowCats.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }

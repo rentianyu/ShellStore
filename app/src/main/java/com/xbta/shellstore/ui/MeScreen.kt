@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.BuildConfig
 import com.xbta.shellstore.data.AppSettings
 import com.xbta.shellstore.data.CopyPrefix
+import com.xbta.shellstore.data.FontChoice
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.ui.theme.Tones
@@ -152,6 +153,27 @@ fun SettingsScreen(onBack: () -> Unit) {
     val settings by Store.settings.collectAsState()
     val ctx = LocalContext.current
     var confirmClear by remember { mutableStateOf(false) }
+    var fontDialog by remember { mutableStateOf(0) }
+
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                val dir = java.io.File(ctx.filesDir, "fonts").apply { mkdirs() }
+                val dest = java.io.File(dir, "custom.ttf")
+                ctx.contentResolver.openInputStream(uri)?.use { input ->
+                    dest.outputStream().use { out -> input.copyTo(out) }
+                }
+                dest.absolutePath
+            }.onSuccess { path ->
+                Store.updateSettings(Store.settings.value.copy(customFontPath = path))
+                Toast.makeText(ctx, "字体已导入", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(ctx, "导入失败：${it.javaClass.simpleName}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     fun update(s: AppSettings) = Store.updateSettings(s)
 
@@ -186,6 +208,32 @@ fun SettingsScreen(onBack: () -> Unit) {
                             }
                         }
                     }
+                }
+            }
+
+            GroupTitle("字体")
+            GroupCard {
+                SettingRow(
+                    "字", "界面字体", settings.uiFont.label,
+                    onClick = { fontDialog = 1 }
+                )
+                Divider()
+                SettingRow(
+                    ">_", "代码字体", settings.codeFont.label,
+                    onClick = { fontDialog = 2 }
+                )
+                Divider()
+                SettingRow(
+                    "⇩", "导入字体文件",
+                    if (settings.customFontPath.isBlank()) "支持 .ttf / .otf"
+                    else java.io.File(settings.customFontPath).name,
+                    onClick = { picker.launch(arrayOf("*/*")) }
+                )
+                if (settings.customFontPath.isNotBlank()) {
+                    Divider()
+                    SettingRow("✕", "清除自定义字体", "", danger = true, onClick = {
+                        update(settings.copy(customFontPath = ""))
+                    })
                 }
             }
 
@@ -250,6 +298,56 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }) { Text("确认删除", color = Tones.danger) }
             },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("取消") } }
+        )
+    }
+
+    if (fontDialog != 0) {
+        val isUi = fontDialog == 1
+        AlertDialog(
+            onDismissRequest = { fontDialog = 0 },
+            title = { Text(if (isUi) "界面字体" else "代码字体", fontSize = 15.sp) },
+            text = {
+                Column {
+                    FontChoice.entries.forEach { fc ->
+                        val cur = if (isUi) settings.uiFont else settings.codeFont
+                        val usable = fc != FontChoice.CUSTOM || settings.customFontPath.isNotBlank()
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(enabled = usable) {
+                                    if (isUi) update(settings.copy(uiFont = fc))
+                                    else update(settings.copy(codeFont = fc))
+                                    fontDialog = 0
+                                }
+                                .padding(vertical = 11.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                fc.label,
+                                fontSize = 13.sp,
+                                color = if (usable) MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.outline
+                            )
+                            if (fc == FontChoice.CUSTOM && settings.customFontPath.isBlank()) {
+                                Spacer(Modifier.width(8.dp))
+                                Text("未导入", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                            }
+                            Spacer(Modifier.weight(1f))
+                            if (cur == fc) Text("✓", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (isUi) "「系统默认」用手机自带字体，中文显示最稳；导入的字体对中英文同时生效。"
+                        else "代码块使用等宽字体。「系统等宽」跟随系统，字形各家差异较大。",
+                        fontSize = 10.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { fontDialog = 0 }) { Text("关闭") } }
         )
     }
 }

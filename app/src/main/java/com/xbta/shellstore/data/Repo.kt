@@ -9,6 +9,13 @@ import java.io.File
 // ---------------- 设置 ----------------
 
 enum class ThemeMode(val label: String) { LIGHT("浅色"), DARK("深色"), SYSTEM("跟随系统") }
+
+enum class FontChoice(val label: String) {
+    SYSTEM("系统默认"),
+    JETBRAINS("JetBrains Mono"),
+    CUSTOM("自定义字体")
+}
+
 enum class CopyPrefix(val label: String, val fn: (String) -> String) {
     NONE("无", { it }),
     ADB_SHELL("adb shell", { "adb shell ${if (it.contains('\n')) "\"$it\"" else it}" }),
@@ -18,6 +25,9 @@ enum class CopyPrefix(val label: String, val fn: (String) -> String) {
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.LIGHT,
     val fontScale: Float = 1.0f,
+    val uiFont: FontChoice = FontChoice.SYSTEM,
+    val codeFont: FontChoice = FontChoice.JETBRAINS,
+    val customFontPath: String = "",
     val copyPrefix: CopyPrefix = CopyPrefix.NONE,
     val confirmDanger: Boolean = true,
     val checkUpdateOnStart: Boolean = true,
@@ -26,6 +36,9 @@ data class AppSettings(
     fun toJson(): JSONObject = JSONObject().apply {
         put("theme", theme.name)
         put("fontScale", fontScale.toDouble())
+        put("uiFont", uiFont.name)
+        put("codeFont", codeFont.name)
+        put("customFontPath", customFontPath)
         put("copyPrefix", copyPrefix.name)
         put("confirmDanger", confirmDanger)
         put("checkUpdateOnStart", checkUpdateOnStart)
@@ -40,6 +53,9 @@ data class AppSettings(
             return AppSettings(
                 theme = e(o.optString("theme"), ThemeMode.LIGHT, ThemeMode.entries.toTypedArray()),
                 fontScale = o.optDouble("fontScale", 1.0).toFloat().coerceIn(0.8f, 1.5f),
+                uiFont = e(o.optString("uiFont"), FontChoice.SYSTEM, FontChoice.entries.toTypedArray()),
+                codeFont = e(o.optString("codeFont"), FontChoice.JETBRAINS, FontChoice.entries.toTypedArray()),
+                customFontPath = o.optString("customFontPath"),
                 copyPrefix = e(o.optString("copyPrefix"), CopyPrefix.NONE, CopyPrefix.entries.toTypedArray()),
                 confirmDanger = o.optBoolean("confirmDanger", true),
                 checkUpdateOnStart = o.optBoolean("checkUpdateOnStart", true),

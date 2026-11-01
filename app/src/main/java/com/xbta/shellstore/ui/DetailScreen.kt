@@ -255,6 +255,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
         }
 
         // 底部操作栏
+        val openable = IntentLauncher.canOpen(entry)
         Row(
             Modifier
                 .fillMaxWidth()
@@ -262,22 +263,60 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                 .padding(horizontal = 14.dp, vertical = 9.dp),
             horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.primary)
-                    .clickable { copy() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    if (settings.copyPrefix == CopyPrefix.NONE) entry.primaryActionLabel
-                    else "${entry.primaryActionLabel}（${settings.copyPrefix.label}）",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
+            if (openable) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable {
+                            val err = IntentLauncher.open(ctx, entry, values)
+                            if (err != null) Toast.makeText(ctx, err, Toast.LENGTH_SHORT).show()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "打开",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+                Box(
+                    Modifier
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { copy() }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "复制",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable { copy() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (settings.copyPrefix == CopyPrefix.NONE) entry.primaryActionLabel
+                        else "${entry.primaryActionLabel}（${settings.copyPrefix.label}）",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
             Box(
                 Modifier

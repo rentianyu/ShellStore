@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.ui.theme.AppTheme
+import com.xbta.shellstore.ui.theme.LocalCodeFont
+import com.xbta.shellstore.ui.theme.resolveCodeFont
+import com.xbta.shellstore.ui.theme.resolveUiFont
 
 sealed interface Page {
     data object AllCats : Page
@@ -40,12 +43,20 @@ fun App() {
         ThemeMode.DARK -> true
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
-    AppTheme(darkTheme = dark) {
-        val d = LocalDensity.current
-        CompositionLocalProvider(
-            LocalDensity provides Density(d.density, d.fontScale * settings.fontScale)
-        ) {
-            Root()
+    val uiFont = remember(settings.uiFont, settings.customFontPath) {
+        resolveUiFont(settings.uiFont, settings.customFontPath)
+    }
+    val codeFont = remember(settings.codeFont, settings.customFontPath) {
+        resolveCodeFont(settings.codeFont, settings.customFontPath)
+    }
+    CompositionLocalProvider(LocalCodeFont provides codeFont) {
+        AppTheme(darkTheme = dark, fontFamily = uiFont) {
+            val d = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(d.density, d.fontScale * settings.fontScale)
+            ) {
+                Root()
+            }
         }
     }
 }

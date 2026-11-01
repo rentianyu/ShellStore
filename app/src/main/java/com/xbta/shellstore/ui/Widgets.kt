@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.*
+import com.xbta.shellstore.ui.theme.LocalCodeFont
 import com.xbta.shellstore.ui.theme.Tones
 
 // ---------------- 类型图标 ----------------
@@ -113,9 +114,9 @@ fun CodeBlock(
     ) {
         Text(
             text,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalCodeFont.current,
             fontSize = fontSize.sp,
-            lineHeight = (fontSize + 5).sp,
+            lineHeight = (fontSize + 6).sp,
             color = Tones.codeFg,
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis
