@@ -34,7 +34,9 @@ data class AppSettings(
     /** 列表只显示标题、收起命令预览 */
     val foldPreview: Boolean = false,
     /** 是否已经走过首次欢迎页（引导启用官方源） */
-    val onboarded: Boolean = false
+    val onboarded: Boolean = false,
+    /** 上次拉取成功的线路名，空串表示直连。下次优先用它 */
+    val sourceMirror: String = ""
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("theme", theme.name)
@@ -48,6 +50,7 @@ data class AppSettings(
         put("copyAndReturn", copyAndReturn)
         put("foldPreview", foldPreview)
         put("onboarded", onboarded)
+        put("sourceMirror", sourceMirror)
     }
 
     companion object {
@@ -66,7 +69,8 @@ data class AppSettings(
                 checkUpdateOnStart = o.optBoolean("checkUpdateOnStart", true),
                 copyAndReturn = o.optBoolean("copyAndReturn", false),
                 foldPreview = o.optBoolean("foldPreview", false),
-                onboarded = o.optBoolean("onboarded", false)
+                onboarded = o.optBoolean("onboarded", false),
+                sourceMirror = o.optString("sourceMirror", "")
             )
         }
     }

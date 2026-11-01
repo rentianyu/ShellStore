@@ -115,8 +115,13 @@ object Store {
         val c = ctx ?: return "未初始化"
         if (!url.startsWith("http://") && !url.startsWith("https://")) return "地址必须以 http:// 或 https:// 开头"
         val id = "r" + UUID.randomUUID().toString().replace("-", "").take(8)
-        val r = Net.get(url)
+        val r = if (Mirrors.isGitHub(url)) {
+            Mirrors.fetch(url, prefer = _settings.value.sourceMirror, validate = { looksLikeSmd(it) })
+        } else {
+            Net.get(url)
+        }
         if (!r.ok) return r.error ?: "拉取失败"
+        if (r.via.isNotBlank()) rememberMirror(r.via)
         val text = r.text.orEmpty()
         if (text.isBlank()) return "服务器返回空内容"
         val parsed = SmdParser.parse(text, id, name)
@@ -144,7 +149,13 @@ object Store {
         if (cfg.type != SourceType.REMOTE) {
             reloadAll(); return null
         }
-        val r = Net.get(cfg.url, cfg.etag)
+        val r = if (Mirrors.isGitHub(cfg.url) && cfg.etag.isBlank()) {
+            val f = Mirrors.fetch(cfg.url, prefer = _settings.value.sourceMirror, validate = { looksLikeSmd(it) })
+            if (f.ok) rememberMirror(f.via)
+            f
+        } else {
+            Net.get(cfg.url, cfg.etag)
+        }
         if (r.notModified) {
             _sources.value = _sources.value.map {
                 if (it.id == id) it.copy(lastFetch = System.currentTimeMillis(), error = "") else it
@@ -210,7 +221,22 @@ object Store {
         reloadAll()
     }
 
+    private fun rememberMirror(via: String) {
+        if (_settings.value.sourceMirror == via) return
+        updateSettings(_settings.value.copy(sourceMirror = via))
+    }
+
     fun sourceOf(id: String): SourceConfig? = _sources.value.firstOrNull { it.id == id }
+
+
+    /** 判断一份内容是不是完整的 SMD 源，避免代理返回半截 HTML */
+    private fun looksLikeSmd(text: String): Boolean {
+        if (text.length < 80) return false
+        val head = text.take(400)
+        if (head.contains("<html", true) || head.contains("<!doctype", true)) return false
+        if (!text.contains("### ") && !text.contains("● ") && !text.contains("• ")) return false
+        return SmdParser.parse(text, "_probe", "_probe").source.entries.isNotEmpty()
+    }
 
     fun hasOfficial(): Boolean = _sources.value.any { it.id == OFFICIAL_ID }
 
@@ -221,8 +247,13 @@ object Store {
     fun enableOfficial(): String? {
         val c = ctx ?: return "未初始化"
         val existing = _sources.value.firstOrNull { it.id == OFFICIAL_ID }
-        val r = Net.getWithFallback(OFFICIAL_URL)
-        if (!r.ok) return r.error ?: "拉取失败，请检查网络"
+        val r = Mirrors.fetch(
+            OFFICIAL_URL,
+            prefer = _settings.value.sourceMirror,
+            validate = { looksLikeSmd(it) }
+        )
+        if (!r.ok) return r.error ?: "所有线路都拉取失败，请检查网络"
+        rememberMirror(r.via)
         val text = r.text.orEmpty()
         if (text.isBlank()) return "服务器返回了空内容"
         val parsed = SmdParser.parse(text, OFFICIAL_ID, "官方命令库")
