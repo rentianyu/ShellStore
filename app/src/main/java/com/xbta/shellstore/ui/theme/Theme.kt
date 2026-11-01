@@ -1,7 +1,6 @@
 package com.xbta.shellstore.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.LocalTextStyle
@@ -24,7 +23,6 @@ fun AppTheme(
     CompositionLocalProvider(LocalTextStyle provides textStyle) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColors else LightColors,
-            typography = if (fontFamily != null) Typography(defaultFontFamily = fontFamily) else Typography(),
             content = content,
         )
     }
