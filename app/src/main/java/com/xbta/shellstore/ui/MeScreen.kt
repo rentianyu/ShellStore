@@ -533,7 +533,7 @@ fun SourcesScreen(onBack: () -> Unit) {
                         .padding(horizontal = 12.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("$busy中…", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text("${busy}中…", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
                 Spacer(Modifier.height(10.dp))
             }
