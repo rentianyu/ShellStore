@@ -13,7 +13,10 @@ import java.util.UUID
  */
 object Store {
 
-    const val BUILTIN_ID = "builtin"
+    const val OFFICIAL_ID = "official"
+
+    /** 官方命令库。直连不通时自动走 p.xbta.cc 反代，国内也能拉。 */
+    const val OFFICIAL_URL = "https://raw.githubusercontent.com/rentianyu/ShellStore/main/sources/official.md"
 
     private var ctx: Context? = null
 
@@ -53,11 +56,8 @@ object Store {
 
         _settings.value = Repo.loadSettings(c)
 
-        // 首次启动写入内置源配置
-        val saved = Repo.loadSourceConfigs(c)
-        val list = if (saved.none { it.id == BUILTIN_ID }) listOf(builtinConfig()) + saved else saved
-        _sources.value = list
-        Repo.saveSourceConfigs(c, list)
+        // 不再有内置源：内容全部来自在线 / 本地源，首次启动由欢迎页引导启用官方源
+        _sources.value = Repo.loadSourceConfigs(c)
 
         reloadAll()
 
@@ -67,24 +67,13 @@ object Store {
         _loaded.value = true
     }
 
-    private fun builtinConfig() = SourceConfig(
-        id = BUILTIN_ID,
-        name = "内置命令集",
-        type = SourceType.BUILTIN,
-        enabled = true
-    )
-
-    private fun readBuiltin(c: Context): String = runCatching {
-        c.assets.open("seed.md").bufferedReader().readText()
-    }.getOrDefault("")
-
     /** 重新解析所有启用的源，合并成一份条目与分类 */
     fun reloadAll() {
         val c = ctx ?: return
         val allEntries = mutableListOf<Entry>()
         val allCats = LinkedHashMap<String, Category>()
         val warns = mutableListOf<ParseWarning>()
-        var mainName = "内置命令集"
+        var mainName = "命令库"
         var mainVer = ""
         val updated = mutableListOf<SourceConfig>()
 
@@ -93,9 +82,9 @@ object Store {
                 updated.add(cfg.copy(count = 0))
                 return@forEach
             }
-            val text = if (cfg.type == SourceType.BUILTIN) readBuiltin(c) else SourceCache.read(c, cfg.id)
+            val text = SourceCache.read(c, cfg.id)
             if (text.isBlank()) {
-                updated.add(cfg.copy(count = 0, error = if (cfg.type == SourceType.BUILTIN) "" else "内容为空，请刷新"))
+                updated.add(cfg.copy(count = 0, error = "内容为空，请刷新"))
                 return@forEach
             }
             val r = SmdParser.parse(text, cfg.id, cfg.name)
@@ -104,7 +93,7 @@ object Store {
                 if (!allCats.containsKey(cat.name)) allCats[cat.name] = cat
             }
             warns.addAll(r.warnings)
-            if (cfg.type == SourceType.BUILTIN) {
+            if (mainVer.isBlank()) {
                 mainName = r.source.name
                 mainVer = r.source.meta.version
             }
@@ -208,7 +197,6 @@ object Store {
 
     fun removeSource(id: String) {
         val c = ctx ?: return
-        if (id == BUILTIN_ID) return
         _sources.value = _sources.value.filterNot { it.id == id }
         SourceCache.remove(c, id)
         Repo.saveSourceConfigs(c, _sources.value)
@@ -217,15 +205,44 @@ object Store {
 
     fun toggleSource(id: String, on: Boolean) {
         val c = ctx ?: return
-        if (id == BUILTIN_ID && !on) {
-            // 内置源也允许停用，但保留配置
-        }
         _sources.value = _sources.value.map { if (it.id == id) it.copy(enabled = on) else it }
         Repo.saveSourceConfigs(c, _sources.value)
         reloadAll()
     }
 
     fun sourceOf(id: String): SourceConfig? = _sources.value.firstOrNull { it.id == id }
+
+    fun hasOfficial(): Boolean = _sources.value.any { it.id == OFFICIAL_ID }
+
+    /**
+     * 启用（或刷新）官方命令库。返回 null 表示成功，否则是给用户看的失败原因。
+     * 纯阻塞实现，调用方自己切到 IO 线程。
+     */
+    fun enableOfficial(): String? {
+        val c = ctx ?: return "未初始化"
+        val existing = _sources.value.firstOrNull { it.id == OFFICIAL_ID }
+        val r = Net.getWithFallback(OFFICIAL_URL)
+        if (!r.ok) return r.error ?: "拉取失败，请检查网络"
+        val text = r.text.orEmpty()
+        if (text.isBlank()) return "服务器返回了空内容"
+        val parsed = SmdParser.parse(text, OFFICIAL_ID, "官方命令库")
+        if (parsed.source.entries.isEmpty()) return "解析后没有条目，源格式可能不对"
+        SourceCache.write(c, OFFICIAL_ID, text)
+
+        val cfg = (existing ?: SourceConfig(id = OFFICIAL_ID, name = "官方命令库", type = SourceType.REMOTE, url = OFFICIAL_URL))
+            .copy(
+                enabled = true,
+                url = OFFICIAL_URL,
+                lastFetch = System.currentTimeMillis(),
+                count = parsed.source.entries.size,
+                etag = r.etag
+            )
+        _sources.value = if (existing == null) _sources.value + cfg
+        else _sources.value.map { if (it.id == OFFICIAL_ID) cfg else it }
+        Repo.saveSourceConfigs(c, _sources.value)
+        reloadAll()
+        return null
+    }
 
     fun isAlive(entryId: String): Boolean = _entries.value.any { it.id == entryId }
 

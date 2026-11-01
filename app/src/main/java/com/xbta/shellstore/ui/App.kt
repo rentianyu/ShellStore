@@ -64,6 +64,20 @@ fun App() {
 
 @Composable
 private fun Root() {
+    // 首次安装（或还没走过欢迎页）先让用户明确启用官方源，不再是内置命令集
+    val appSettings by Store.settings.collectAsState()
+    val sourceList by Store.sources.collectAsState()
+    LaunchedEffect(appSettings.onboarded, sourceList.size) {
+        // 老用户已有自己的源，直接放行，不打扰
+        if (!appSettings.onboarded && sourceList.isNotEmpty()) {
+            Store.updateSettings(Store.settings.value.copy(onboarded = true))
+        }
+    }
+    if (!appSettings.onboarded && sourceList.isEmpty()) {
+        WelcomeScreen(onDone = { Store.updateSettings(Store.settings.value.copy(onboarded = true)) })
+        return
+    }
+
     var tab by remember { mutableIntStateOf(0) }
     var stack by remember { mutableStateOf<List<Page>>(emptyList()) }
     val current = stack.lastOrNull()

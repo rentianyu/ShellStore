@@ -1,5 +1,6 @@
 package com.xbta.shellstore.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,6 +63,19 @@ fun FavScreen(onOpen: (Page) -> Unit) {
     var query by remember { mutableStateOf("") }
     var multiMode by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var viewOptions by remember { mutableStateOf(false) }
+    val settings by Store.settings.collectAsState()
+
+    // 返回键优先退选择模式 / 关弹窗 / 退搜索，最后才交给系统
+    BackHandler(enabled = multiMode) {
+        multiMode = false
+        selected = emptySet()
+    }
+    BackHandler(enabled = !multiMode && dialog != null) { dialog = null }
+    BackHandler(enabled = !multiMode && dialog == null && searchMode) {
+        searchMode = false
+        query = ""
+    }
     val q = query.trim()
     fun hit(fi: FavItem): Boolean {
         if (q.isEmpty()) return true
@@ -113,6 +127,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             TopBar(
                 title = "收藏",
                 actions = {
+                    IconBtn("☰") { viewOptions = true }
                     IconBtn("⌕") { searchMode = true }
                     IconBtn("☑") { multiMode = true; selected = emptySet() }
                     IconBtn("+") { input = ""; dialog = FavDialog.NewFolder(currentFolder) }
@@ -193,7 +208,8 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                         },
                         onMenu = { dialog = FavDialog.FavActions(fi) },
                         multiMode = multiMode,
-                        checked = fi.entryId in selected
+                        checked = fi.entryId in selected,
+                        folded = settings.foldPreview
                     )
                 }
             }
@@ -245,7 +261,8 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                             },
                             onMenu = { dialog = FavDialog.FavActions(fi) },
                             multiMode = multiMode,
-                            checked = fi.entryId in selected
+                            checked = fi.entryId in selected,
+                            folded = settings.foldPreview
                         )
                     }
                 }
@@ -267,6 +284,14 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 }
             }
         }
+    }
+
+    if (viewOptions) {
+        ViewOptionsDialog(
+            foldPreview = settings.foldPreview,
+            onFoldChange = { Store.updateSettings(settings.copy(foldPreview = it)) },
+            onDismiss = { viewOptions = false }
+        )
     }
 
     val d = dialog
@@ -477,7 +502,8 @@ fun FavRow(
     onOpen: () -> Unit,
     onMenu: () -> Unit,
     multiMode: Boolean = false,
-    checked: Boolean = false
+    checked: Boolean = false,
+    folded: Boolean = false
 ) {
     val e: Entry = item.entry
     Column(
@@ -508,6 +534,10 @@ fun FavRow(
                 e.title, fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
             )
+            if (folded && !multiMode) {
+                RiskBadge(e.risk)
+                Spacer(Modifier.width(Space.xs))
+            }
             if (!multiMode) {
                 Box(
                     Modifier
@@ -520,6 +550,7 @@ fun FavRow(
                 }
             }
         }
+        if (folded) return@Column
         val preview = if (e.body.isNotBlank()) e.body.replace("\n", " ⏎ ")
         else if (e.adb.isNotBlank()) e.adb else e.intent?.action ?: ""
         if (preview.isNotBlank()) {

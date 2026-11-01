@@ -9,6 +9,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
@@ -23,7 +25,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.xbta.shellstore.core.*
+import com.xbta.shellstore.data.ShellExec
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Radius
@@ -31,6 +36,9 @@ import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
 import com.xbta.shellstore.ui.theme.TypeScale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun DetailScreen(entryId: String, onBack: () -> Unit) {
@@ -51,6 +59,9 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
         mutableStateOf(entry.params.associate { it.key to it.default })
     }
     var variantIndex by remember(entry.id) { mutableIntStateOf(-1) }
+    val scope = rememberCoroutineScope()
+    var running by remember { mutableStateOf(false) }
+    var execResult by remember { mutableStateOf<ShellExec.Result?>(null) }
 
     val text = remember(entry, values, variantIndex) {
         CommandRenderer.primaryText(entry, values, variantIndex)
@@ -259,8 +270,14 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
             }
         }
 
-        // 底部操作栏
-        val openable = IntentLauncher.canOpen(entry)
+        // 底部操作栏：能执行的给「执行」，能触发的给「打开 / 发送 / 启动」，其余只有复制
+        val runnable = entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT
+        val triggerable = IntentLauncher.canTrigger(entry)
+        val primary = MaterialTheme.colorScheme.primary
+        val onPrimary = MaterialTheme.colorScheme.onPrimary
+        val variant = MaterialTheme.colorScheme.surfaceVariant
+        val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
         Row(
             Modifier
                 .fillMaxWidth()
@@ -268,73 +285,224 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                 .padding(horizontal = 14.dp, vertical = 9.dp),
             horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            if (openable) {
+            if (runnable) {
                 Box(
                     Modifier
                         .weight(1f)
-                        .height(40.dp)
+                        .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
-                        .background(MaterialTheme.colorScheme.primary)
-                        .clickable {
-                            val err = IntentLauncher.open(ctx, entry, values)
-                            if (err != null) Toast.makeText(ctx, err, Toast.LENGTH_SHORT).show()
+                        .background(if (running) variant else primary)
+                        .clickable(enabled = !running) {
+                            scope.launch {
+                                running = true
+                                val r = withContext(Dispatchers.IO) { ShellExec.run(ctx, text) }
+                                running = false
+                                execResult = r
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "打开",
-                        fontSize = 13.sp,
+                        if (running) "执行中…" else "执行",
+                        fontSize = TypeScale.body,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = if (running) onVariant else onPrimary
                     )
                 }
                 Box(
                     Modifier
-                        .height(40.dp)
+                        .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(variant)
                         .clickable { copy() }
                         .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
+                }
+            } else if (triggerable) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(Radius.md))
+                        .background(primary)
+                        .clickable {
+                            val err = IntentLauncher.trigger(ctx, entry, values)
+                            if (err != null) Toast.makeText(ctx, err, Toast.LENGTH_LONG).show()
+                            else Toast.makeText(ctx, "${IntentLauncher.actionLabel(entry)}成功", Toast.LENGTH_SHORT).show()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        "复制",
-                        fontSize = 13.sp,
+                        IntentLauncher.actionLabel(entry),
+                        fontSize = TypeScale.body,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = onPrimary
                     )
+                }
+                Box(
+                    Modifier
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(Radius.md))
+                        .background(variant)
+                        .clickable { copy() }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
                 }
             } else {
                 Box(
                     Modifier
                         .weight(1f)
-                        .height(40.dp)
+                        .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(primary)
                         .clickable { copy() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         if (settings.copyPrefix == CopyPrefix.NONE) entry.primaryActionLabel
                         else "${entry.primaryActionLabel}（${settings.copyPrefix.label}）",
-                        fontSize = 13.sp,
+                        fontSize = TypeScale.body,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = onPrimary
                     )
                 }
             }
             Box(
                 Modifier
-                    .size(40.dp)
+                    .size(42.dp)
                     .clip(RoundedCornerShape(Radius.md))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(variant)
                     .clickable { Store.toggleFav(entry) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     if (fav) "★" else "☆",
                     fontSize = IconSize.action,
-                    color = if (fav) androidx.compose.ui.graphics.Color(0xFFF2A93B) else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (fav) androidx.compose.ui.graphics.Color(0xFFF2A93B) else onVariant
+                )
+            }
+        }
+    }
+
+    val r = execResult
+    if (r != null) {
+        ExecResultDialog(
+            result = r,
+            command = text,
+            onCopy = {
+                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("输出", listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n")))
+                Toast.makeText(ctx, "输出已复制", Toast.LENGTH_SHORT).show()
+            },
+            onOpenTermux = { ShellExec.openTermux(ctx) },
+            onDismiss = { execResult = null }
+        )
+    }
+}
+
+/** 执行结果。输出可能很长，内部滚动，不撑破屏幕。 */
+@Composable
+private fun ExecResultDialog(
+    result: ShellExec.Result,
+    command: String,
+    onCopy: () -> Unit,
+    onOpenTermux: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val ok = result.ok
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(Radius.lg))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(Space.lg)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (ok) "执行完成" else "执行失败",
+                    fontSize = TypeScale.title,
+                    fontWeight = FontWeight.Bold,
+                    color = if (ok) Tones.safe else Tones.danger
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "通道 ${result.channel.label}" + if (!ok) " · 返回码 ${result.code}" else "",
+                    fontSize = TypeScale.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (result.note.isNotBlank()) {
+                Spacer(Modifier.height(Space.sm))
+                Text(
+                    result.note,
+                    fontSize = TypeScale.small,
+                    lineHeight = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (result.out.isNotBlank()) {
+                Spacer(Modifier.height(Space.md))
+                SectionLabel("标准输出")
+                Spacer(Modifier.height(Space.xs))
+                Box(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
+                    CodeBlock(result.out, fontSize = 12)
+                }
+            }
+
+            if (result.err.isNotBlank()) {
+                Spacer(Modifier.height(Space.md))
+                SectionLabel(if (result.out.isBlank()) "输出" else "错误输出")
+                Spacer(Modifier.height(Space.xs))
+                Box(Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState())) {
+                    CodeBlock(result.err, fontSize = 12, background = Tones.dangerBg)
+                }
+            }
+
+            if (result.out.isBlank() && result.err.isBlank() && result.note.isBlank()) {
+                Spacer(Modifier.height(Space.md))
+                Text("命令没有任何输出。", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            Spacer(Modifier.height(Space.lg))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                if (!ok) {
+                    Text(
+                        "打开 Termux",
+                        fontSize = TypeScale.body,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(Radius.sm))
+                            .clickable { onOpenTermux() }
+                            .padding(horizontal = Space.sm, vertical = Space.xs)
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "复制输出",
+                    fontSize = TypeScale.body,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .clickable { onCopy() }
+                        .padding(horizontal = Space.sm, vertical = Space.xs)
+                )
+                Text(
+                    "关闭",
+                    fontSize = TypeScale.body,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .clickable { onDismiss() }
+                        .padding(horizontal = Space.sm, vertical = Space.xs)
                 )
             }
         }

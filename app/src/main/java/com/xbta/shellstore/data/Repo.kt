@@ -32,7 +32,9 @@ data class AppSettings(
     val checkUpdateOnStart: Boolean = true,
     val copyAndReturn: Boolean = false,
     /** 列表只显示标题、收起命令预览 */
-    val foldPreview: Boolean = false
+    val foldPreview: Boolean = false,
+    /** 是否已经走过首次欢迎页（引导启用官方源） */
+    val onboarded: Boolean = false
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("theme", theme.name)
@@ -45,6 +47,7 @@ data class AppSettings(
         put("checkUpdateOnStart", checkUpdateOnStart)
         put("copyAndReturn", copyAndReturn)
         put("foldPreview", foldPreview)
+        put("onboarded", onboarded)
     }
 
     companion object {
@@ -62,7 +65,8 @@ data class AppSettings(
                 confirmDanger = o.optBoolean("confirmDanger", true),
                 checkUpdateOnStart = o.optBoolean("checkUpdateOnStart", true),
                 copyAndReturn = o.optBoolean("copyAndReturn", false),
-                foldPreview = o.optBoolean("foldPreview", false)
+                foldPreview = o.optBoolean("foldPreview", false),
+                onboarded = o.optBoolean("onboarded", false)
             )
         }
     }
@@ -165,16 +169,6 @@ object Repo {
         File(ctx.filesDir, "data").apply { if (!exists()) mkdirs() }
 
     private fun file(ctx: Context, name: String) = File(dir(ctx), name)
-
-    // -- 内置源 --
-    fun loadBuiltin(ctx: Context): ParseResult {
-        val text = try {
-            ctx.assets.open("seed.md").bufferedReader().readText()
-        } catch (e: Exception) {
-            ""
-        }
-        return SmdParser.parse(text, "builtin", "内置命令集")
-    }
 
     // -- 设置 --
     fun loadSettings(ctx: Context): AppSettings = try {

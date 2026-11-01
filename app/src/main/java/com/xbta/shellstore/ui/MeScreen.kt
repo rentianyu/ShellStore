@@ -534,6 +534,32 @@ fun SourcesScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(10.dp))
             }
 
+            if (!Store.hasOfficial()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radius.md))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = .5f))
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .3f), RoundedCornerShape(Radius.md))
+                        .clickable(enabled = busy.isBlank()) {
+                            runAsync("启用") { Store.enableOfficial()?.let { "启用失败：$it" } ?: "官方命令库已启用" }
+                        }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("启用官方命令库", fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "${Store.OFFICIAL_URL.takeLast(28)} · 按分类整理，支持刷新",
+                            fontSize = TypeScale.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+
             sources.forEach { s ->
                 Row(
                     Modifier
@@ -562,7 +588,7 @@ fun SourcesScreen(onBack: () -> Unit) {
                             maxLines = 2
                         )
                     }
-                    if (s.id != Store.BUILTIN_ID) {
+                    run {
                         Box(
                             Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).clickable {
                                 if (s.type == com.xbta.shellstore.core.SourceType.REMOTE) {

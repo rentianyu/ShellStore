@@ -11,19 +11,75 @@ import com.xbta.shellstore.core.EntryType
 import com.xbta.shellstore.core.ExtraType
 
 /**
- * 把条目转成真实 Intent 并启动。
- * 只处理零权限可触发的类型：activity / urlscheme / intent。
- * broadcast / service 仍只提供复制（受系统后台限制，直接发大多会失败）。
+ * 把条目转成真实 Intent 并触发。
+ * activity / urlscheme / intent → startActivity
+ * broadcast → sendBroadcast（运行时接收者收得到；manifest 接收者受 Android 8 隐式广播限制）
+ * service → startService（App 在前台时可用，后台启动会被系统拒绝）
  */
 object IntentLauncher {
 
     private val OPENABLE = setOf(EntryType.ACTIVITY, EntryType.URLSCHEME, EntryType.INTENT)
+    private val TRIGGERABLE = setOf(
+        EntryType.ACTIVITY, EntryType.URLSCHEME, EntryType.INTENT,
+        EntryType.BROADCAST, EntryType.SERVICE
+    )
 
-    fun canOpen(entry: Entry): Boolean {
-        if (entry.type !in OPENABLE) return false
+    /** 这个条目能不能一键触发（打开 / 发送 / 启动） */
+    fun canTrigger(entry: Entry): Boolean {
+        if (entry.type !in TRIGGERABLE) return false
         if (entry.type == EntryType.URLSCHEME) return entry.body.isNotBlank() || entry.intent != null
         val spec = entry.intent ?: return false
-        return spec.isActionable
+        return when (entry.type) {
+            EntryType.BROADCAST -> spec.action.isNotBlank() || spec.component.isNotBlank()
+            EntryType.SERVICE -> spec.action.isNotBlank() || spec.component.isNotBlank()
+            else -> spec.isActionable
+        }
+    }
+
+    /** 按钮文案，按类型区分动作语义 */
+    fun actionLabel(entry: Entry): String = when (entry.type) {
+        EntryType.BROADCAST -> "发送广播"
+        EntryType.SERVICE -> "启动服务"
+        else -> "打开"
+    }
+
+    /** 返回 null 表示成功，否则返回给用户看的原因 */
+    fun trigger(ctx: Context, entry: Entry, values: Map<String, String>): String? = when (entry.type) {
+        EntryType.BROADCAST -> sendBroadcast(ctx, entry, values)
+        EntryType.SERVICE -> startService(ctx, entry, values)
+        else -> open(ctx, entry, values)
+    }
+
+    private fun sendBroadcast(ctx: Context, entry: Entry, values: Map<String, String>): String? {
+        val intent = build(ctx, entry, values) ?: return "这个条目没有可用的 action / component"
+        return try {
+            ctx.sendBroadcast(intent)
+            null
+        } catch (e: SecurityException) {
+            "系统拒绝了这次广播（缺少发送权限）"
+        } catch (e: Exception) {
+            "发送失败：${e.javaClass.simpleName}"
+        }
+    }
+
+    private fun startService(ctx: Context, entry: Entry, values: Map<String, String>): String? {
+        val intent = build(ctx, entry, values) ?: return "这个条目没有可用的 action / component"
+        if (intent.component == null && intent.action.isNullOrBlank()) return "启动服务至少要 action 或 component"
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                // App 在前台时走 startService；系统认为是后台启动会抛 IllegalStateException
+                ctx.startService(intent)
+            } else {
+                ctx.startService(intent)
+            }
+            null
+        } catch (e: SecurityException) {
+            "没有启动该服务的权限（多数系统服务不对第三方开放）"
+        } catch (e: IllegalStateException) {
+            "系统拒绝了本次启动（服务不允许从应用侧直接启动）"
+        } catch (e: Exception) {
+            "启动失败：${e.javaClass.simpleName}"
+        }
     }
 
     /** 返回 null 表示成功，否则返回给用户看的原因 */

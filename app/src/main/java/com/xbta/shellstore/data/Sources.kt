@@ -67,6 +67,18 @@ object Net {
         val ok: Boolean get() = error == null
     }
 
+    /**
+     * 直连失败时自动改走 p.xbta.cc 反代（GitHub raw 在国内常被墙）。
+     * 反代只对 http(s) 有意义，其它协议原样返回第一次的结果。
+     */
+    fun getWithFallback(url: String, timeoutMs: Int = 15000): Result {
+        val direct = get(url, "", timeoutMs)
+        if (direct.ok) return direct
+        if (!url.startsWith("http://") && !url.startsWith("https://")) return direct
+        val viaProxy = get("https://p.xbta.cc/" + url, "", timeoutMs)
+        return if (viaProxy.ok) viaProxy else direct
+    }
+
     fun get(url: String, etag: String = "", timeoutMs: Int = 15000): Result {
         var conn: HttpURLConnection? = null
         return try {
