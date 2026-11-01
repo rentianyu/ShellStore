@@ -27,27 +27,27 @@ object UpdateCenter {
     /** 本次启动是否已经检查过，避免每次回到前台重复跑 */
     @Volatile private var checkedOnce = false
 
-    /** 阻塞调用，务必在 IO 线程执行 */
-    fun checkAndDownload(ctx: Context, currentVersion: String) {
+    /** 阻塞调用，务必在 IO 线程执行。debug=true 时只查 dev-latest 的开发包 */
+    fun checkAndDownload(ctx: Context, currentVersion: String, debug: Boolean) {
         if (checkedOnce) return
         checkedOnce = true
         if (_state.value is State.Ready) return
 
         _state.value = State.Checking
-        val r = Updater.checkLatest()
+        val r = Updater.checkLatest(debug)
         val info = r.info
-        if (info == null || !Updater.isNewer(info.tag, currentVersion)) {
+        if (info == null || !Updater.isNewer(info.version, currentVersion)) {
             _state.value = State.Idle
             return
         }
 
-        _state.value = State.Downloading(info.tag, 0)
+        _state.value = State.Downloading(info.version, 0)
         val err = Updater.download(ctx, info) { pct ->
-            _state.value = State.Downloading(info.tag, pct)
+            _state.value = State.Downloading(info.version, pct)
         }
         if (err == null) {
             readyInfo = info
-            _state.value = State.Ready(info.tag)
+            _state.value = State.Ready(info.version)
         } else {
             _state.value = State.Failed(err)
         }

@@ -91,6 +91,15 @@ jobs:
         run: |
           mkdir -p out
           find app/build/outputs/apk -name '*.apk' -exec cp -v {} out/ \;
+          # 分支构建额外产出一个带版本号的 debug 包：debug 版自更新靠文件名判断版本
+          # （dev-latest 的 tag 固定不变，只能从 ShellStore-<版本>-debug.apk 里读）。
+          # 固定名 app-debug.apk 继续保留，作为人工下载的最新包入口。
+          if [ "${GITHUB_REF}" = "${GITHUB_REF#refs/tags/}" ]; then
+            V=$(grep -E '^VERSION_NAME=' gradle.properties | head -1 | cut -d= -f2 | tr -d ' \r')
+            if [ -f out/app-debug.apk ] && [ -n "$V" ]; then
+              cp -v out/app-debug.apk "out/ShellStore-$V-debug.apk"
+            fi
+          fi
           ls -l out
           [ -n "$(ls out/*.apk 2>/dev/null)" ] || { echo "没有产物"; exit 1; }
 

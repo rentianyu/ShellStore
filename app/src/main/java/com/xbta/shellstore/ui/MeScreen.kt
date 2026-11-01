@@ -133,11 +133,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
 
             GroupTitle("应用")
             GroupCard {
-                SettingRow("↻", "检查更新", if (BuildConfig.DEBUG) "DEBUG 版不检查" else updateSub, onClick = {
-                    if (BuildConfig.DEBUG) {
-                        Toast.makeText(ctx, "DEBUG 版不检查自身更新，请直接装正式 Release", Toast.LENGTH_SHORT).show()
-                        return@SettingRow
-                    }
+                SettingRow("↻", "检查更新", updateSub, onClick = {
                     showUpdate = true
                     if (!checking) {
                         checking = true
@@ -145,18 +141,19 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                         latest = null
                         downloaded = false
                         scope.launch {
-                            val r = withContext(Dispatchers.IO) { Updater.checkLatest() }
+                            // DEBUG 包查 dev-latest 的开发包，正式版查正式 Release
+                            val r = withContext(Dispatchers.IO) { Updater.checkLatest(BuildConfig.DEBUG) }
                             checking = false
                             val info = r.info
                             if (info == null) {
                                 updateMsg = r.error ?: "检查失败"
                                 updateSub = "检查失败"
-                            } else if (Updater.isNewer(info.tag, BuildConfig.APP_VERSION)) {
+                            } else if (Updater.isNewer(info.version, BuildConfig.APP_VERSION)) {
                                 latest = info
                                 updateMsg = ""
-                                updateSub = "发现 ${info.tag}"
+                                updateSub = "发现 v${info.version}"
                             } else {
-                                updateMsg = "已是最新版本（${info.tag}）"
+                                updateMsg = "已是最新版本（v${info.version}）"
                                 updateSub = "已是最新"
                             }
                         }
@@ -199,7 +196,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                         updateMsg.isNotBlank() -> Text(updateMsg, fontSize = 12.sp, lineHeight = 19.sp)
                         latest != null && !downloaded -> {
                             Text(
-                                "发现新版本 ${latest!!.tag}",
+                                "发现新版本 v${latest!!.version}",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
@@ -239,7 +236,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                                     progress = -1
                                     if (err == null) {
                                         downloaded = true
-                                        updateSub = "待安装 ${l.tag}"
+                                        updateSub = "待安装 v${l.version}"
                                     } else {
                                         updateMsg = err
                                     }
@@ -247,7 +244,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                             }
                         }
                     ) {
-                        Text(if (downloaded) "立即安装" else "下载（${latest!!.tag}）")
+                        Text(if (downloaded) "立即安装" else "下载（v${latest!!.version}）")
                     }
                 } else {
                     TextButton(onClick = { showUpdate = false }) { Text("关闭") }

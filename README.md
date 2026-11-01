@@ -9,7 +9,8 @@ Android 上的**命令与组件速查台**：把 shell 命令、脚本、URL Sch
 - **七种条目类型**：`shell` / `script` / `urlscheme` / `intent` / `activity` / `service` / `broadcast`
 - **分类货架**：按主题分类浏览，一屏放满，搜索全字段匹配
 - **参数模板**：`{占位符}` + 默认值，填完实时重算命令
-- **收藏**：多级文件夹 + 标签 + 个人备注，源失效后仍保留快照
+- **收藏**：多级文件夹 + 标签 + 个人备注，源失效后仍保留快照；支持按标签浏览、批量打标签
+- **收藏导出为 SMD**：按文件夹导出成订阅源文件，别人导入即可用
 - **两种详情形态**：命令类显示代码块，Intent 类显示字段表 + 自动生成的等价 adb 命令
 - **零权限**：首版只做复制，不申请任何执行权限
 
@@ -60,6 +61,15 @@ curl 'https://example.com/hook?key={key}' -H 'Content-Type: application/json' \
 或直接看 [Releases](../../releases) 里的构建产物。
 
 CI 由 GitHub Actions 负责：推送 `main` 更新 `dev-latest` 预发布，推 `v*` tag 出正式版。
+
+### 开发版（debug）
+
+推 `main` 出的包是 debug 版：包名 `com.xbta.shellstore.debug`、应用名「Shell 商店 DEBUG」，
+可以和正式版同时装在手机上。
+
+两条更新通道互相隔离：debug 版只从 `dev-latest` 取 `ShellStore-<版本>-debug.apk`，
+正式版只认 `v*` 正式 Release 的 `app-release.apk`。所以在 debug 版里点「检查更新」永远不会
+把你换成正式版，反之亦然。
 
 ## 技术栈
 

@@ -97,10 +97,11 @@ private fun Root() {
 
     // 启动后静默检查：先看自身有没有新版本（下完再弹窗），再看订阅源有没有变化
     LaunchedEffect(Unit) {
-        // DEBUG 包不检查自身更新：它和正式版是两个包名，装成正式版就串味了
-        if (BuildConfig.DEBUG) return@LaunchedEffect
+        // debug 包只查 dev-latest 的开发包，正式版只查正式 Release，两个包名互不串味
         delay(2000)
-        withContext(Dispatchers.IO) { UpdateCenter.checkAndDownload(ctx, BuildConfig.APP_VERSION) }
+        withContext(Dispatchers.IO) {
+            UpdateCenter.checkAndDownload(ctx, BuildConfig.APP_VERSION, BuildConfig.DEBUG)
+        }
     }
     LaunchedEffect(Unit) {
         delay(3500)
