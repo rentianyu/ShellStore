@@ -31,6 +31,9 @@ object Store {
     /** 官方命令库。直连不通时自动走 p.xbta.cc 反代，国内也能拉。 */
     const val OFFICIAL_URL = "https://raw.githubusercontent.com/rentianyu/ShellStore/main/sources/official.md"
 
+    /** 最近使用最多保留条数 */
+    private const val RECENT_MAX = 60
+
     private var ctx: Context? = null
 
     private val _entries = MutableStateFlow<List<Entry>>(emptyList())
@@ -65,6 +68,9 @@ object Store {
     private val _sources = MutableStateFlow<List<SourceConfig>>(emptyList())
     val sources: StateFlow<List<SourceConfig>> = _sources.asStateFlow()
 
+    private val _recent = MutableStateFlow<List<RecentItem>>(emptyList())
+    val recent: StateFlow<List<RecentItem>> = _recent.asStateFlow()
+
     // ---------------- 初始化 ----------------
 
     fun init(context: Context) {
@@ -82,7 +88,26 @@ object Store {
         val favData = Repo.loadFavs(c)
         _favs.value = favData
 
+        _recent.value = Repo.loadRecent(c)
+
         _loaded.value = true
+    }
+
+    // ---------------- 最近使用 ----------------
+
+    /** 复制 / 执行 / 发送成功后调用。同一条只保留最新一次，最多 60 条。 */
+    fun recordRecent(entryId: String) {
+        if (entryId.isBlank()) return
+        val now = System.currentTimeMillis()
+        val next = (listOf(RecentItem(entryId, now)) + _recent.value.filter { it.entryId != entryId })
+            .take(RECENT_MAX)
+        _recent.value = next
+        ctx?.let { Repo.saveRecent(it, next) }
+    }
+
+    fun clearRecent() {
+        _recent.value = emptyList()
+        ctx?.let { Repo.saveRecent(it, emptyList()) }
     }
 
     /** 重新解析所有启用的源，合并成一份条目与分类 */

@@ -165,6 +165,33 @@ data class FavData(
     fun isFav(entryId: String): Boolean = items.any { it.entryId == entryId }
 }
 
+// ---------------- 最近使用 ----------------
+
+/** 只存 id 与时间：条目本身随源刷新会变，展示时用当前的最新内容 */
+data class RecentItem(val entryId: String, val at: Long)
+
+fun recentFromJson(text: String): List<RecentItem> = try {
+    val a = JSONArray(text)
+    (0 until a.length()).mapNotNull { i ->
+        val o = a.optJSONObject(i) ?: return@mapNotNull null
+        val id = o.optString("id")
+        if (id.isBlank()) null else RecentItem(id, o.optLong("at"))
+    }
+} catch (e: Exception) {
+    emptyList()
+}
+
+fun recentToJson(list: List<RecentItem>): String {
+    val a = JSONArray()
+    list.forEach { r ->
+        a.put(JSONObject().apply {
+            put("id", r.entryId)
+            put("at", r.at)
+        })
+    }
+    return a.toString()
+}
+
 // ---------------- 读写 ----------------
 
 object Repo {
@@ -214,6 +241,18 @@ object Repo {
             if (dst.exists()) dst.delete()
             tmp.renameTo(dst)
         }
+    }
+
+    // -- 最近使用 --
+    fun loadRecent(ctx: Context): List<RecentItem> = try {
+        val f = file(ctx, "recent.json")
+        if (f.exists()) recentFromJson(f.readText()) else emptyList()
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    fun saveRecent(ctx: Context, list: List<RecentItem>) {
+        runCatching { file(ctx, "recent.json").writeText(recentToJson(list)) }
     }
 
     // ---------------- JSON 转换 ----------------

@@ -50,6 +50,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
     val srcList by Store.sources.collectAsState()
     val favs by Store.favs.collectAsState()
+    val recent by Store.recent.collectAsState()
     val cats by Store.categories.collectAsState()
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -59,7 +60,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
     var updateMsg by remember { mutableStateOf("") }
     var progress by remember { mutableIntStateOf(-1) }
     var downloaded by remember { mutableStateOf(false) }
-    var updateSub by remember { mutableStateOf("v${BuildConfig.APP_VERSION}") }
+    var updateSub by remember { mutableStateOf("v${BuildConfig.VERSION_NAME}") }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("我的")
@@ -128,6 +129,12 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     onClick = { onOpen(Page.Sources) }
                 )
                 Divider()
+                SettingRow(
+                    "◷", "最近使用",
+                    if (recent.isEmpty()) "复制、执行过的条目会记在这里" else "${recent.size} 条记录",
+                    onClick = { onOpen(Page.Recent) }
+                )
+                Divider()
                 SettingRow("⇅", "备份与恢复", "导出收藏与设置", onClick = { onOpen(Page.Backup) })
             }
 
@@ -187,7 +194,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
             text = {
                 Column {
                     Text(
-                        "当前版本 v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE})",
+                        "当前版本 v${BuildConfig.VERSION_NAME} (${BuildConfig.APP_VERSION_CODE})",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

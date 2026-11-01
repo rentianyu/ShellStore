@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -59,6 +61,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
         mutableStateOf(entry.params.associate { it.key to it.default })
     }
     var variantIndex by remember(entry.id) { mutableIntStateOf(-1) }
+    var menuOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var running by remember { mutableStateOf(false) }
     var execResult by remember { mutableStateOf<ShellExec.Result?>(null) }
@@ -73,6 +76,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
         val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("命令", out))
         Toast.makeText(ctx, if (settings.copyPrefix == CopyPrefix.NONE) "已复制" else "已复制（含 ${settings.copyPrefix.label} 前缀）", Toast.LENGTH_SHORT).show()
+        Store.recordRecent(entry.id)
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -80,6 +84,30 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
             title = entry.title,
             onBack = onBack,
             actions = {
+                Box {
+                    IconBtn("⋯") { menuOpen = true }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("复制为 SMD 片段", fontSize = TypeScale.body) },
+                            onClick = {
+                                menuOpen = false
+                                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                cm.setPrimaryClip(ClipData.newPlainText("SMD", SmdWriter.entry(entry)))
+                                Toast.makeText(ctx, "已复制 SMD 片段，可直接贴进订阅源", Toast.LENGTH_SHORT).show()
+                                Store.recordRecent(entry.id)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("复制标题", fontSize = TypeScale.body) },
+                            onClick = {
+                                menuOpen = false
+                                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                cm.setPrimaryClip(ClipData.newPlainText("标题", entry.title))
+                                Toast.makeText(ctx, "已复制标题", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                }
                 IconBtn(if (fav) "★" else "☆") { Store.toggleFav(entry) }
             }
         )
@@ -298,6 +326,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                                 val r = withContext(Dispatchers.IO) { ShellExec.run(ctx, text) }
                                 running = false
                                 execResult = r
+                                Store.recordRecent(entry.id)
                             }
                         },
                     contentAlignment = Alignment.Center
@@ -330,7 +359,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                         .clickable {
                             val err = IntentLauncher.trigger(ctx, entry, values)
                             if (err != null) Toast.makeText(ctx, err, Toast.LENGTH_LONG).show()
-                            else Toast.makeText(ctx, "${IntentLauncher.actionLabel(entry)}成功", Toast.LENGTH_SHORT).show()
+                            else {
+                                Toast.makeText(ctx, "${IntentLauncher.actionLabel(entry)}成功", Toast.LENGTH_SHORT).show()
+                                Store.recordRecent(entry.id)
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {

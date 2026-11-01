@@ -38,6 +38,7 @@ sealed interface Page {
     data class FavFolder(val folderId: String?) : Page
     data object TagView : Page
     data object AllFav : Page
+    data object Recent : Page
     data object Settings : Page
     data object Sources : Page
     data object Backup : Page
@@ -141,6 +142,7 @@ private fun Root() {
                     is Page.FavFolder -> FavFolderScreen(p.folderId, onBack = ::pop, onOpen = ::push)
                     is Page.TagView -> TagScreen(onBack = ::pop, onOpen = ::push)
                     is Page.AllFav -> AllFavScreen(onBack = ::pop, onOpen = ::push)
+                    is Page.Recent -> RecentScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Settings -> SettingsScreen(onBack = ::pop)
                     is Page.Sources -> SourcesScreen(onBack = ::pop)
                     is Page.Backup -> BackupScreen(onBack = ::pop)
