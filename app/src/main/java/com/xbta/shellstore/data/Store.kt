@@ -34,6 +34,9 @@ object Store {
     /** 最近使用最多保留条数 */
     private const val RECENT_MAX = 60
 
+    /** 搜索历史最多保留条数 */
+    private const val SEARCH_MAX = 10
+
     private var ctx: Context? = null
 
     private val _entries = MutableStateFlow<List<Entry>>(emptyList())
@@ -71,6 +74,9 @@ object Store {
     private val _recent = MutableStateFlow<List<RecentItem>>(emptyList())
     val recent: StateFlow<List<RecentItem>> = _recent.asStateFlow()
 
+    private val _searchHistory = MutableStateFlow<List<String>>(emptyList())
+    val searchHistory: StateFlow<List<String>> = _searchHistory.asStateFlow()
+
     // ---------------- 初始化 ----------------
 
     fun init(context: Context) {
@@ -89,6 +95,7 @@ object Store {
         _favs.value = favData
 
         _recent.value = Repo.loadRecent(c)
+        _searchHistory.value = Repo.loadSearchHistory(c)
 
         _loaded.value = true
     }
@@ -108,6 +115,29 @@ object Store {
     fun clearRecent() {
         _recent.value = emptyList()
         ctx?.let { Repo.saveRecent(it, emptyList()) }
+    }
+
+    // ---------------- 搜索历史 ----------------
+
+    /** 用户点开某条搜索结果时记一次，避免逐字输入把半截词写进历史 */
+    fun addSearchHistory(q: String) {
+        val kw = q.trim()
+        if (kw.length < 2) return
+        val next = (listOf(kw) + _searchHistory.value.filter { !it.equals(kw, ignoreCase = true) })
+            .take(SEARCH_MAX)
+        _searchHistory.value = next
+        ctx?.let { Repo.saveSearchHistory(it, next) }
+    }
+
+    fun removeSearchHistory(q: String) {
+        val next = _searchHistory.value.filter { it != q }
+        _searchHistory.value = next
+        ctx?.let { Repo.saveSearchHistory(it, next) }
+    }
+
+    fun clearSearchHistory() {
+        _searchHistory.value = emptyList()
+        ctx?.let { Repo.saveSearchHistory(it, emptyList()) }
     }
 
     /** 重新解析所有启用的源，合并成一份条目与分类 */
@@ -408,6 +438,8 @@ object Store {
     ) {
         val c = ctx ?: return
         val list = _favs.value.items.filterNot { it.entryId == entry.id }.toMutableList()
+        // 新收藏排在同级最前面：位次取同级最大值 +1（未手动排序过时 order 全是 0）
+        val top = list.filter { it.folderId == folderId }.maxOfOrNull { it.order } ?: 0
         list.add(
             FavItem(
                 entryId = entry.id,
@@ -417,9 +449,26 @@ object Store {
                 savedAt = System.currentTimeMillis(),
                 entry = entry,
                 sourceId = "builtin",
-                sourceName = _sourceName.value
+                sourceName = _sourceName.value,
+                order = top + 1
             )
         )
+        _favs.value = _favs.value.copy(items = list)
+        Repo.saveFavs(c, _favs.value)
+    }
+
+    /**
+     * 按给定顺序重排某个收藏夹。位次从大到小赋（第一个最大），与 itemsIn 的降序排序一致。
+     * 越界/不存在的 id 自动忽略。
+     */
+    fun reorderFavs(folderId: String?, orderedIds: List<String>) {
+        val c = ctx ?: return
+        if (orderedIds.isEmpty()) return
+        val pos = orderedIds.withIndex().associate { (i, id) -> id to (orderedIds.size - i) }
+        val list = _favs.value.items.map { fi ->
+            val p = pos[fi.entryId]
+            if (p != null && fi.folderId == folderId) fi.copy(order = p) else fi
+        }
         _favs.value = _favs.value.copy(items = list)
         Repo.saveFavs(c, _favs.value)
     }

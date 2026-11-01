@@ -4,9 +4,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -19,6 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -653,15 +659,104 @@ private fun InputDialog(
 @Composable
 fun FavFolderScreen(folderId: String?, onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val favs by Store.favs.collectAsState()
+    val items = favs.itemsIn(folderId)
+    // 拖动中列表会因为重排而重组，pointerInput 的闭包必须读到最新顺序，用这个兜住
+    val live by rememberUpdatedState(items)
+    val state = rememberLazyListState()
+    var dragId by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var lastDragEnd by remember { mutableLongStateOf(0L) }
+
+    fun move(from: Int, to: Int) {
+        val ids = live.map { it.entryId }.toMutableList()
+        if (from !in ids.indices || to !in ids.indices) return
+        ids.add(to, ids.removeAt(from))
+        Store.reorderFavs(folderId, ids)
+    }
+
     Column(Modifier.fillMaxSize()) {
-        TopBar(favs.folders.firstOrNull { it.id == folderId }?.name ?: "收藏", onBack = onBack)
+        TopBar(
+            favs.folders.firstOrNull { it.id == folderId }?.name ?: "收藏",
+            onBack = onBack,
+            actions = {
+                if (items.size > 1) {
+                    Text(
+                        "长按拖动排序",
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        )
+        if (items.isEmpty()) {
+            EmptyState("这里是空的", "在条目详情页点 ☆ 就能收藏到这里")
+            return@Column
+        }
         LazyColumn(
-            Modifier.fillMaxSize(),
+            state = state,
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(14.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            items(favs.itemsIn(folderId), key = { it.entryId }) { fi ->
-                FavRow(fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = {})
+            itemsIndexed(items, key = { _, fi -> fi.entryId }) { _, fi ->
+                val dragging = fi.entryId == dragId
+                Box(
+                    Modifier
+                        .zIndex(if (dragging) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = if (dragging) dragOffset else 0f
+                            alpha = if (dragging) 0.95f else 1f
+                            shadowElevation = if (dragging) 8f else 0f
+                        }
+                        .pointerInput(fi.entryId) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    dragId = fi.entryId
+                                    dragOffset = 0f
+                                },
+                                onDragCancel = {
+                                    dragId = null
+                                    dragOffset = 0f
+                                    lastDragEnd = System.currentTimeMillis()
+                                },
+                                onDragEnd = {
+                                    dragId = null
+                                    dragOffset = 0f
+                                    lastDragEnd = System.currentTimeMillis()
+                                },
+                                onDrag = { change, delta ->
+                                    change.consume()
+                                    dragOffset += delta.y
+                                    val cur = live.indexOfFirst { it.entryId == fi.entryId }
+                                    if (cur >= 0) {
+                                        val next = state.layoutInfo.visibleItemsInfo
+                                            .firstOrNull { it.index == cur + 1 }
+                                        val prev = state.layoutInfo.visibleItemsInfo
+                                            .firstOrNull { it.index == cur - 1 }
+                                        // 越过相邻项一半高度就交换，并把偏移补偿回来，视觉上保持连续
+                                        if (next != null && dragOffset > next.size / 2f) {
+                                            move(cur, cur + 1)
+                                            dragOffset -= next.size.toFloat()
+                                        } else if (prev != null && dragOffset < -prev.size / 2f) {
+                                            move(cur, cur - 1)
+                                            dragOffset += prev.size.toFloat()
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                ) {
+                    FavRow(
+                        fi,
+                        onOpen = {
+                            // 松手瞬间的那次抬起不要当成点击打开详情
+                            if (System.currentTimeMillis() - lastDragEnd > 300) {
+                                onOpen(Page.Detail(fi.entryId))
+                            }
+                        },
+                        onMenu = {}
+                    )
+                }
             }
         }
     }

@@ -3,6 +3,8 @@ package com.xbta.shellstore.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,6 +38,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
     val cats by Store.categories.collectAsState()
     val favs by Store.favs.collectAsState()
     val settings by Store.settings.collectAsState()
+    val history by Store.searchHistory.collectAsState()
 
     var searchMode by remember { mutableStateOf(false) }
     var viewOptions by remember { mutableStateOf(false) }
@@ -77,6 +80,37 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
             contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (searchMode && query.isBlank() && history.isNotEmpty()) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "最近搜索",
+                            fontSize = TypeScale.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "清空",
+                            fontSize = TypeScale.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .clickable { Store.clearSearchHistory() }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        history.forEach { h -> FilterChip(h, false) { query = h } }
+                    }
+                }
+            }
             if (searchMode) {
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 4.dp)) {
@@ -108,9 +142,14 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     EntryRow(
                         e,
                         fav = favs.isFav(e.id),
-                        onClick = { onOpen(Page.Detail(e.id)) },
+                        onClick = {
+                            // 点开某条结果才算一次「有效搜索」，避免逐字输入污染历史
+                            Store.addSearchHistory(query)
+                            onOpen(Page.Detail(e.id))
+                        },
                         onToggleFav = { Store.toggleFav(e) },
-                        folded = settings.foldPreview
+                        folded = settings.foldPreview,
+                        highlight = query
                     )
                 }
             } else {
@@ -310,7 +349,8 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
                     onClick = { onOpen(Page.Detail(e.id)) },
                     onToggleFav = { Store.toggleFav(e) },
                     showCategory = false,
-                    folded = settings.foldPreview
+                    folded = settings.foldPreview,
+                    highlight = query
                 )
             }
         }

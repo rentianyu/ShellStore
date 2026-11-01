@@ -17,7 +17,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -152,6 +156,40 @@ fun CodeBlock(
 
 // ---------------- 列表卡片 ----------------
 
+/**
+ * 把 text 里命中 keyword 的片段标成主色 + 淡底，用于搜索结果。
+ * 大小写不敏感，按下标切原串（不做 lowercase 后的下标换算，中文场景更安全）。
+ */
+@Composable
+fun highlightSpan(text: String, keyword: String): AnnotatedString {
+    val kw = keyword.trim()
+    if (kw.isEmpty() || text.isEmpty()) return AnnotatedString(text)
+    val lowerText = text.lowercase()
+    val lowerKw = kw.lowercase()
+    val hit = MaterialTheme.colorScheme.primary
+    return buildAnnotatedString {
+        var i = 0
+        while (i < text.length) {
+            val p = lowerText.indexOf(lowerKw, i)
+            if (p < 0) {
+                append(text.substring(i))
+                break
+            }
+            if (p > i) append(text.substring(i, p))
+            val end = (p + kw.length).coerceAtMost(text.length)
+            withStyle(
+                SpanStyle(
+                    color = hit,
+                    fontWeight = FontWeight.Bold,
+                    background = hit.copy(alpha = .14f)
+                )
+            ) { append(text.substring(p, end)) }
+            i = end
+        }
+    }
+}
+
+
 @Composable
 fun EntryRow(
     entry: Entry,
@@ -159,7 +197,8 @@ fun EntryRow(
     onClick: () -> Unit,
     onToggleFav: () -> Unit,
     showCategory: Boolean = true,
-    folded: Boolean = false
+    folded: Boolean = false,
+    highlight: String = ""
 ) {
     Column(
         Modifier
@@ -174,7 +213,7 @@ fun EntryRow(
             TypeBadge(entry.type)
             Spacer(Modifier.width(Space.sm))
             Text(
-                entry.title,
+                highlightSpan(entry.title, highlight),
                 fontSize = TypeScale.body,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,

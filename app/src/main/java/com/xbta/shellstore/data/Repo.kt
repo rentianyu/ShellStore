@@ -96,7 +96,9 @@ data class FavItem(
     /** 快照：源消失后仍能看 */
     val entry: Entry = Entry(id = "", type = EntryType.SHELL, title = ""),
     val sourceId: String = "",
-    val sourceName: String = ""
+    val sourceName: String = "",
+    /** 手动排序位次，越大越靠前；0 表示未手动排过（此时按 savedAt 排） */
+    val order: Int = 0
 ) {
     /** 当前源里还能不能找到（由 Store 在加载后回填） */
     var alive: Boolean = true
@@ -160,7 +162,10 @@ data class FavData(
     }
 
     fun itemsIn(folderId: String?): List<FavItem> =
-        items.filter { it.folderId == folderId }.sortedByDescending { it.savedAt }
+        items.filter { it.folderId == folderId }
+            .sortedWith(
+                compareByDescending<FavItem> { it.order }.thenByDescending { it.savedAt }
+            )
 
     fun isFav(entryId: String): Boolean = items.any { it.entryId == entryId }
 }
@@ -255,6 +260,25 @@ object Repo {
         runCatching { file(ctx, "recent.json").writeText(recentToJson(list)) }
     }
 
+    // -- 搜索历史 --
+    fun loadSearchHistory(ctx: Context): List<String> = try {
+        val f = file(ctx, "search.json")
+        if (!f.exists()) emptyList() else {
+            val a = JSONArray(f.readText())
+            (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() }
+        }
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    fun saveSearchHistory(ctx: Context, list: List<String>) {
+        runCatching {
+            val a = JSONArray()
+            list.forEach { a.put(it) }
+            file(ctx, "search.json").writeText(a.toString())
+        }
+    }
+
     // ---------------- JSON 转换 ----------------
 
     fun favToJson(d: FavData): JSONObject = JSONObject().apply {
@@ -285,6 +309,7 @@ object Repo {
                     put("savedAt", it.savedAt)
                     put("sourceId", it.sourceId)
                     put("sourceName", it.sourceName)
+                    put("order", it.order)
                     put("entry", entryToJson(it.entry))
                 })
             }
@@ -329,7 +354,8 @@ object Repo {
                         entry = it2.optJSONObject("entry")?.let { e -> entryFromJson(e) }
                             ?: Entry(id = it2.optString("entryId"), type = EntryType.SHELL, title = it2.optString("entryId")),
                         sourceId = it2.optString("sourceId"),
-                        sourceName = it2.optString("sourceName")
+                        sourceName = it2.optString("sourceName"),
+                        order = it2.optInt("order")
                     )
                 )
             }
