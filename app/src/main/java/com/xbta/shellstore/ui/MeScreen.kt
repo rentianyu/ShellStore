@@ -441,8 +441,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        if (isUi) "「系统默认」用手机自带字体，中文显示最稳；导入的字体对中英文同时生效。"
-                        else "代码块使用等宽字体。「系统等宽」跟随系统，字形各家差异较大。",
+                        if (isUi) "默认跟随手机系统字体，中文显示最稳。导入 .ttf 后界面对中英文同时生效。"
+                        else "代码块默认用系统等宽字体。可导入自己喜欢的等宽 ttf 替换。",
                         fontSize = TypeScale.caption,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.outline

@@ -120,7 +120,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                             .padding(horizontal = Space.md, vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("全部分类", fontSize = TypeScale.body, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        Text("全部分类", fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         Text("共 ${cats.size} 个分类", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(Space.xs))
                         Text("›", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
@@ -184,7 +184,7 @@ private fun CategoryGrid(
                         Text(
                             c.name,
                             fontSize = TypeScale.body,
-                            fontWeight = FontWeight.Medium,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -245,7 +245,7 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
                         )
                     }
                     Spacer(Modifier.width(Space.md))
-                    Text(c.name, fontSize = TypeScale.body, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    Text(c.name, fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                     Text(
                         "${entries.count { it.categoryId == c.name }}",
                         fontSize = TypeScale.small,

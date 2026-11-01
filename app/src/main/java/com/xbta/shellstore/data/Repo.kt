@@ -12,7 +12,6 @@ enum class ThemeMode(val label: String) { LIGHT("浅色"), DARK("深色"), SYSTE
 
 enum class FontChoice(val label: String) {
     SYSTEM("系统默认"),
-    JETBRAINS("JetBrains Mono"),
     CUSTOM("自定义字体")
 }
 
@@ -26,7 +25,7 @@ data class AppSettings(
     val theme: ThemeMode = ThemeMode.LIGHT,
     val fontScale: Float = 1.0f,
     val uiFont: FontChoice = FontChoice.SYSTEM,
-    val codeFont: FontChoice = FontChoice.JETBRAINS,
+    val codeFont: FontChoice = FontChoice.SYSTEM,
     val customFontPath: String = "",
     val copyPrefix: CopyPrefix = CopyPrefix.NONE,
     val confirmDanger: Boolean = true,
@@ -54,7 +53,7 @@ data class AppSettings(
                 theme = e(o.optString("theme"), ThemeMode.LIGHT, ThemeMode.entries.toTypedArray()),
                 fontScale = o.optDouble("fontScale", 1.0).toFloat().coerceIn(0.8f, 1.5f),
                 uiFont = e(o.optString("uiFont"), FontChoice.SYSTEM, FontChoice.entries.toTypedArray()),
-                codeFont = e(o.optString("codeFont"), FontChoice.JETBRAINS, FontChoice.entries.toTypedArray()),
+                codeFont = e(o.optString("codeFont"), FontChoice.SYSTEM, FontChoice.entries.toTypedArray()),
                 customFontPath = o.optString("customFontPath"),
                 copyPrefix = e(o.optString("copyPrefix"), CopyPrefix.NONE, CopyPrefix.entries.toTypedArray()),
                 confirmDanger = o.optBoolean("confirmDanger", true),

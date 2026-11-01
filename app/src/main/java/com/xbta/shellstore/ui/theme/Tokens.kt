@@ -22,35 +22,36 @@ object Radius {
     val lg = 16.dp
 }
 
+/** 字号六档：统一用系统字体，字号偏大以保证可读性 */
 object TypeScale {
     /** 徽章、脚注 */
-    val caption = 10.5.sp
+    val caption = 11.5.sp
 
     /** 次要说明、条数、元信息 */
-    val small = 12.sp
+    val small = 13.sp
 
     /** 正文、卡片标题、列表项 */
-    val body = 14.sp
+    val body = 15.sp
 
     /** 区块标题 */
-    val title = 15.sp
+    val title = 16.sp
 
     /** 顶栏标题 */
-    val headline = 18.sp
+    val headline = 19.sp
 
     /** 卡片内命令预览 */
-    val code = 12.sp
+    val code = 13.sp
 
     /** 详情页命令正文 */
-    val codeLarge = 13.sp
+    val codeLarge = 14.sp
 }
 
 object Dimen {
-    val topBar = 52.dp
-    val tabBar = 56.dp
-    val button = 40.dp
+    val topBar = 54.dp
+    val tabBar = 58.dp
+    val button = 42.dp
     val buttonSmall = 36.dp
-    val iconButton = 32.dp
+    val iconButton = 34.dp
     val badgeIcon = 20.dp
     val listIcon = 26.dp
 }

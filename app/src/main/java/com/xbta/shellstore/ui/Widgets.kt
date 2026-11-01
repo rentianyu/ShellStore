@@ -171,7 +171,7 @@ fun EntryRow(
             Text(
                 entry.title,
                 fontSize = TypeScale.body,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -412,6 +412,7 @@ fun SettingRow(
         Text(
             title,
             fontSize = TypeScale.body,
+            fontWeight = FontWeight.Medium,
             color = if (danger) Tones.danger else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )

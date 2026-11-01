@@ -112,7 +112,7 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(58.dp)
             .background(MaterialTheme.colorScheme.surface)
     ) {
         listOf("▦" to "商店", "☆" to "收藏", "◍" to "我的").forEachIndexed { i, pair ->
@@ -127,11 +127,11 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(pair.first, fontSize = 17.sp, color = color)
+                Text(pair.first, fontSize = 18.sp, color = color)
                 Spacer(Modifier.height(2.dp))
                 Text(
                     pair.second,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
                     color = color
                 )
