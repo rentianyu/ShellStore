@@ -202,7 +202,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(9.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         CopyPrefix.entries.forEach { p ->
-                            FilterChip(p.label, settings.copyPrefix == p) { update(settings.copyPrefix(p)) }
+                            FilterChip(p.label, settings.copyPrefix == p) { update(settings.copy(copyPrefix = p)) }
                         }
                     }
                 }
