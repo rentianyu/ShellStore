@@ -1,0 +1,136 @@
+name: build-apk
+
+# 沙箱无本地 Android SDK，出包完全依赖这条流水线。
+# 交付方式：产物直接挂 GitHub Release，下载链接 = 代理前缀 + release asset（不传 R2）。
+#   分支构建 -> 更新固定 tag 的 dev-latest（预发布，asset 覆盖）
+#   tag v*   -> 正式 Release
+# 前提：仓库必须 public，否则匿名下载拿不到（返回 9 字节错误体），代理也救不了。
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+    paths:
+      - 'app/**'
+      - 'build.gradle.kts'
+      - 'app/build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 缺这一行 action-gh-release / gh release 都会 403
+
+# 连续推送时取消上一次未完成的构建，省 Actions 分钟数
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 不要用 android-actions/setup-android@v3：新版 runner 上会报
+      # "Wrong version in preinstalled sdkmanager" 直接失败。
+      - name: Install Android SDK pieces
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          SDKM=$(command -v sdkmanager || echo "$SDK/cmdline-tools/latest/bin/sdkmanager")
+          yes 2>/dev/null | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          echo "SDK ready: $SDK"
+
+      # 从 secrets 还原 keystore。用 shell 判空而不是 if: secrets.X != ''（后者不被支持）。
+      # printf 而非 echo：echo 会补换行，破坏 base64。
+      # debug 包也用这把钥匙签（见 app/build.gradle.kts），避免迭代时反复卸载重装。
+      - name: Prepare signing config
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            cat > keystore.properties <<EOF
+          storeFile=$RUNNER_TEMP/release.keystore
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+            echo "=> signed build enabled"
+          else
+            echo "=> no secrets, unsigned debug only"
+          fi
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.6'
+          # 依赖与构建缓存默认开启，第二次起省掉约 2 分钟依赖下载
+
+      - name: Build
+        run: |
+          if [ -x ./gradlew ]; then G=./gradlew; else G=gradle; fi
+          # 分支构建出 debug（快、免混淆），tag 才出 release
+          if [ "${GITHUB_REF}" = "${GITHUB_REF#refs/tags/}" ]; then
+            "$G" assembleDebug --no-daemon --stacktrace
+          else
+            [ -f keystore.properties ] || { echo "tag 构建必须配置签名 secrets"; exit 1; }
+            "$G" assembleRelease --no-daemon --stacktrace
+          fi
+
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          find app/build/outputs/apk -name '*.apk' -exec cp -v {} out/ \;
+          ls -l out
+          [ -n "$(ls out/*.apk 2>/dev/null)" ] || { echo "没有产物"; exit 1; }
+
+      - name: Verify APK
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          BT=$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)
+          for f in out/*.apk; do
+            echo "===== $f"
+            "$BT/aapt2" dump badging "$f" | head -3 || true
+            "$BT/apksigner" verify --print-certs "$f" || echo "!! unsigned"
+          done
+
+      # artifact 只作 30 天备份，不作为交付物（下载常断流，且需要 token）
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ github.run_number }}
+          path: out/*.apk
+          retention-days: 30
+
+      - name: Publish tag release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
+          generate_release_notes: true
+
+      # 分支构建：更新固定 tag 的预发布 release，asset 名固定 -> --clobber 覆盖
+      - name: Publish dev-latest
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          TAG=dev-latest
+          gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$REPO" --prerelease \
+              --title "最新开发构建" --notes "CI 自动更新，文件名固定、内容覆盖"
+          gh release upload "$TAG" out/*.apk --repo "$REPO" --clobber
+          echo "下载直链（代理前缀 + 下列地址）："
+          for f in out/*.apk; do
+            echo "  https://github.com/$REPO/releases/download/$TAG/$(basename "$f")"
+          done
