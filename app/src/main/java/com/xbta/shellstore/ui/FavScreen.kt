@@ -683,7 +683,7 @@ private fun TagPickerDialog(
 
 
 @Composable
-private fun BatchBtn(text: String, enabled: Boolean, danger: Boolean = false, onClick: () -> Unit) {
+private fun RowScope.BatchBtn(text: String, enabled: Boolean, danger: Boolean = false, onClick: () -> Unit) {
     Box(
         Modifier
             .weight(1f)
