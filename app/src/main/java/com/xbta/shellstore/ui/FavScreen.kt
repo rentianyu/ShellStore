@@ -26,7 +26,10 @@ import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.data.FavItem
 import com.xbta.shellstore.data.Folder
 import com.xbta.shellstore.data.Store
+import com.xbta.shellstore.ui.theme.Radius
+import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
+import com.xbta.shellstore.ui.theme.TypeScale
 
 private val TAG_COLORS = listOf(
     Color(0xFF2F6BFF), Color(0xFF12854A), Color(0xFFA9660A), Color(0xFFC3271F),
@@ -74,16 +77,16 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 2.dp)) {
                             Text(
                                 "收藏",
-                                fontSize = 11.5.sp,
+                                fontSize = TypeScale.small,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.clickable { currentFolder = null }
                             )
                             tail.forEachIndexed { i, f ->
-                                Text(" / ", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.outline)
+                                Text(" / ", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.outline)
                                 val last = i == tail.lastIndex
                                 Text(
                                     f.name,
-                                    fontSize = 11.5.sp,
+                                    fontSize = TypeScale.small,
                                     color = if (last) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
                                     fontWeight = if (last) FontWeight.SemiBold else FontWeight.Normal,
                                     modifier = if (!last) Modifier.clickable { currentFolder = f.id } else Modifier
@@ -134,9 +137,9 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(Radius.md))
                                 .background(MaterialTheme.colorScheme.surface)
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(10.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                                 .padding(horizontal = 12.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -146,7 +149,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(t.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                            Text("$n", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("$n", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -159,7 +162,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     item {
                         Text(
                             "共 ${favs.items.size} 条",
-                            fontSize = 11.sp,
+                            fontSize = TypeScale.small,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -282,9 +285,9 @@ private fun FolderRow(folder: Folder, count: Int, onClick: () -> Unit, onMenu: (
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(10.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -299,7 +302,7 @@ private fun FolderRow(folder: Folder, count: Int, onClick: () -> Unit, onMenu: (
             folder.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis
         )
-        Text("$count", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("$count", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).clickable { onMenu() }, contentAlignment = Alignment.Center) {
             Text("⋯", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
@@ -313,9 +316,9 @@ fun FavRow(item: FavItem, onOpen: () -> Unit, onMenu: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(11.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(11.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
             .clickable { onOpen() }
             .padding(10.dp)
     ) {
@@ -348,7 +351,7 @@ fun FavRow(item: FavItem, onOpen: () -> Unit, onMenu: () -> Unit) {
             if (item.note.isNotBlank()) {
                 Spacer(Modifier.width(5.dp))
                 Text(
-                    "备注：${item.note}", fontSize = 9.5.sp,
+                    "备注：${item.note}", fontSize = TypeScale.caption,
                     color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
@@ -384,12 +387,12 @@ private fun InputDialog(
         title = { Text(title, fontSize = 15.sp) },
         text = {
             Column {
-                Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(label, fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(6.dp))
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(9.dp))
+                        .clip(RoundedCornerShape(Radius.sm))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(horizontal = 10.dp, vertical = 10.dp)
                 ) {

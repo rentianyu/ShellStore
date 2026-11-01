@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.data.Store
+import com.xbta.shellstore.ui.theme.Radius
+import com.xbta.shellstore.ui.theme.Space
+import com.xbta.shellstore.ui.theme.TypeScale
 
 private val CAT_GLYPHS = listOf(">_", "▤", "◍", "⚙", "▦", "▶", "⚡", "◔", "⌨", "⚿", "◎", "↗", "⌘", "↻")
 
@@ -88,7 +91,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     Text(
                         if (query.isBlank()) "共 ${entries.size} 条"
                         else "找到 ${results.size} 条",
-                        fontSize = 11.sp,
+                        fontSize = TypeScale.small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                     )
@@ -110,27 +113,27 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(Radius.md))
                             .background(MaterialTheme.colorScheme.surface)
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(10.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                             .clickable { onOpen(Page.AllCats) }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                            .padding(horizontal = Space.md, vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("全部分类", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        Text("共 ${cats.size} 个分类", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(6.dp))
-                        Text("›", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
+                        Text("全部分类", fontSize = TypeScale.body, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        Text("共 ${cats.size} 个分类", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(Space.xs))
+                        Text("›", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
                     }
                 }
                 item {
                     Row(
-                        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
+                        Modifier.fillMaxWidth().padding(top = Space.lg, bottom = Space.sm),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("全部命令", fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+                        Text("全部命令", fontSize = TypeScale.title, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.weight(1f))
-                        Text("${entries.size} 条", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${entries.size} 条", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 items(entries, key = { it.id }) { e ->
@@ -164,11 +167,11 @@ private fun CategoryGrid(
                     Column(
                         Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(11.dp))
+                            .clip(RoundedCornerShape(Radius.md))
                             .background(MaterialTheme.colorScheme.surface)
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(11.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                             .clickable { onOpen(Page.CatList(c.name)) }
-                            .padding(horizontal = 9.dp, vertical = 11.dp)
+                            .padding(horizontal = Space.md, vertical = Space.md)
                     ) {
                         Text(
                             catGlyph(idx),
@@ -177,16 +180,16 @@ private fun CategoryGrid(
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(Modifier.height(7.dp))
+                        Spacer(Modifier.height(Space.sm))
                         Text(
                             c.name,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontSize = TypeScale.body,
+                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(Modifier.height(2.dp))
-                        Text("$count 条", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("$count 条", fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -209,9 +212,9 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
             item {
                 Text(
                     "共 ${cats.size} 个分类 · ${entries.size} 条命令",
-                    fontSize = 10.5.sp,
+                    fontSize = TypeScale.small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
+                    modifier = Modifier.padding(bottom = Space.xs, start = Space.xs)
                 )
             }
             items(cats) { c ->
@@ -219,17 +222,17 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(10.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                         .clickable { onOpenCat(c.name) }
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                        .padding(horizontal = Space.md, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         Modifier
                             .size(26.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(Radius.sm))
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
@@ -241,15 +244,15 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Text(c.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(Space.md))
+                    Text(c.name, fontSize = TypeScale.body, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                     Text(
                         "${entries.count { it.categoryId == c.name }}",
-                        fontSize = 11.sp,
+                        fontSize = TypeScale.small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.width(6.dp))
-                    Text("›", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
+                    Spacer(Modifier.width(Space.xs))
+                    Text("›", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
                 }
             }
         }
@@ -281,7 +284,7 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                Text("${shown.size} 条", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${shown.size} 条", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             items(shown, key = { it.id }) { e ->
                 EntryRow(

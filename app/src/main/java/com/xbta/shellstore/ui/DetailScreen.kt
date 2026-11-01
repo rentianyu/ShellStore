@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.*
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.Store
+import com.xbta.shellstore.ui.theme.Radius
+import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
+import com.xbta.shellstore.ui.theme.TypeScale
 
 @Composable
 fun DetailScreen(entryId: String, onBack: () -> Unit) {
@@ -95,13 +98,13 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(9.dp))
+                            .clip(RoundedCornerShape(Radius.sm))
                             .background(Tones.dangerBg)
                             .padding(horizontal = 11.dp, vertical = 9.dp)
                     ) {
                         Text(
                             "⚠ 高风险操作。执行前请确认命令内容确实符合预期，误操作可能造成数据丢失或系统异常。",
-                            fontSize = 11.sp,
+                            fontSize = TypeScale.small,
                             color = Tones.danger,
                             lineHeight = 17.sp
                         )
@@ -133,9 +136,9 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(11.dp))
+                        .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(11.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                         .clickable { copy() }
                         .padding(12.dp)
                 ) {
@@ -143,7 +146,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                         Text(
                             text.ifBlank { "（无内容）" },
                             fontFamily = FontFamily.Monospace,
-                            fontSize = 12.5.sp,
+                            fontSize = TypeScale.codeLarge,
                             lineHeight = 19.sp,
                             color = Tones.codeFg
                         )
@@ -151,12 +154,12 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 "点击复制",
-                                fontSize = 10.sp,
+                                fontSize = TypeScale.caption,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(Modifier.weight(1f))
-                            Text("${text.lines().size} 行 · ${text.length} 字符", fontSize = 9.5.sp, color = MaterialTheme.colorScheme.outline)
+                            Text("${text.lines().size} 行 · ${text.length} 字符", fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.outline)
                         }
                     }
                 }
@@ -175,13 +178,13 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                             Row(
                                 Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(9.dp))
+                                    .clip(RoundedCornerShape(Radius.sm))
                                     .background(MaterialTheme.colorScheme.surface)
-                                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(9.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.sm))
                                     .padding(horizontal = 11.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(p.label, fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(p.label, fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.width(9.dp))
                                 BasicTextField(
                                     value = values[p.key] ?: "",
@@ -197,7 +200,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                                 if ((values[p.key] ?: "").isNotEmpty()) {
                                     Text(
                                         "✕",
-                                        fontSize = 11.sp,
+                                        fontSize = TypeScale.small,
                                         color = MaterialTheme.colorScheme.outline,
                                         modifier = Modifier.clickable { values = values + (p.key to "") }.padding(4.dp)
                                     )
@@ -206,7 +209,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                             if (p.note.isNotBlank()) {
                                 Text(
                                     p.note,
-                                    fontSize = 10.sp,
+                                    fontSize = TypeScale.caption,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     lineHeight = 15.sp,
                                     modifier = Modifier.padding(start = 4.dp, top = 4.dp)
@@ -248,7 +251,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                     "来源　$meta" + (if (ver.isNotBlank() && src?.type == com.xbta.shellstore.core.SourceType.BUILTIN) " · v$ver" else "") + "\n" +
                         "条目　${entry.id}" +
                         (if (entry.verifiedAt.isNotBlank()) "\n验证　${entry.verifiedAt}" else ""),
-                    fontSize = 10.5.sp,
+                    fontSize = TypeScale.caption,
                     lineHeight = 17.sp,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -269,7 +272,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                     Modifier
                         .weight(1f)
                         .height(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable {
                             val err = IntentLauncher.open(ctx, entry, values)
@@ -287,7 +290,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                 Box(
                     Modifier
                         .height(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { copy() }
                         .padding(horizontal = 14.dp),
@@ -305,7 +308,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                     Modifier
                         .weight(1f)
                         .height(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable { copy() },
                     contentAlignment = Alignment.Center
@@ -322,7 +325,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
             Box(
                 Modifier
                     .size(40.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(Radius.md))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable { Store.toggleFav(entry) },
                 contentAlignment = Alignment.Center
@@ -341,10 +344,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
 fun SectionLabel(text: String) {
     Text(
         text,
-        fontSize = 10.5.sp,
+        fontSize = TypeScale.caption,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 6.dp, start = 2.dp)
+        modifier = Modifier.padding(top = Space.md, start = Space.xs)
     )
 }
 
@@ -365,22 +368,22 @@ private fun IntentFieldTable(spec: IntentSpec) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(11.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(11.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
     ) {
         rows.forEachIndexed { i, pair ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 8.dp)) {
                 Text(
                     pair.first,
-                    fontSize = 11.sp,
+                    fontSize = TypeScale.small,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(72.dp)
                 )
                 Text(
                     pair.second.ifBlank { "—" },
-                    fontSize = 11.sp,
+                    fontSize = TypeScale.small,
                     fontFamily = FontFamily.Monospace,
                     color = if (pair.second.isBlank()) MaterialTheme.colorScheme.outline
                     else MaterialTheme.colorScheme.onSurface,

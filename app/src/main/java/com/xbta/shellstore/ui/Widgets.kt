@@ -25,7 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.*
 import com.xbta.shellstore.ui.theme.LocalCodeFont
+import com.xbta.shellstore.ui.theme.Radius
+import com.xbta.shellstore.ui.theme.Dimen
+import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
+import com.xbta.shellstore.ui.theme.TypeScale
 
 // ---------------- 类型图标 ----------------
 
@@ -54,13 +58,13 @@ fun TypeBadge(t: EntryType, size: Int = 20) {
     Box(
         Modifier
             .size(size.dp)
-            .clip(RoundedCornerShape((size / 3.2f).dp))
+            .clip(RoundedCornerShape((size / 3f).dp))
             .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center
     ) {
         Text(
             typeGlyph(t),
-            fontSize = (size / 2f).sp,
+            fontSize = (size / 2.1f).sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
             fontFamily = FontFamily.Monospace
@@ -76,9 +80,9 @@ fun Badge(text: String, fg: Color, bg: Color) {
         Modifier
             .clip(RoundedCornerShape(4.dp))
             .background(bg)
-            .padding(horizontal = 5.dp, vertical = 1.5.dp)
+            .padding(horizontal = 5.dp, vertical = 2.dp)
     ) {
-        Text(text, fontSize = 9.5.sp, color = fg, fontWeight = FontWeight.Medium)
+        Text(text, fontSize = TypeScale.caption, color = fg, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -95,6 +99,24 @@ fun RiskBadge(risk: Risk) {
 @Composable
 fun MutedBadge(text: String) = Badge(text, Tones.neutralFg, Tones.neutralBg)
 
+// ---------------- 卡片外壳 ----------------
+
+@Composable
+fun CardSurface(
+    modifier: Modifier = Modifier,
+    radius: androidx.compose.ui.unit.Dp = Radius.md,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(radius))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(radius)),
+        content = content
+    )
+}
+
 // ---------------- 代码块 ----------------
 
 @Composable
@@ -108,9 +130,9 @@ fun CodeBlock(
     Box(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .background(background ?: Tones.codeBg)
-            .padding(horizontal = 9.dp, vertical = 7.dp)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Text(
             text,
@@ -137,59 +159,61 @@ fun EntryRow(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(11.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(11.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
             .clickable { onClick() }
-            .padding(10.dp)
+            .padding(Space.md)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TypeBadge(entry.type)
-            Spacer(Modifier.width(7.dp))
+            Spacer(Modifier.width(Space.sm))
             Text(
                 entry.title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = TypeScale.body,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
             Box(
                 Modifier
-                    .size(26.dp)
-                    .clip(RoundedCornerShape(13.dp))
+                    .size(Dimen.iconButton)
+                    .clip(RoundedCornerShape(Radius.sm))
                     .clickable { onToggleFav() },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     if (fav) "★" else "☆",
-                    fontSize = 14.sp,
+                    fontSize = 15.sp,
                     color = if (fav) Color(0xFFF2A93B) else MaterialTheme.colorScheme.outline
                 )
             }
         }
+
         val preview = when {
             entry.body.isNotBlank() -> entry.body.replace("\n", " ⏎ ")
-            !entry.adb.isNullOrBlank() -> entry.adb
+            entry.adb.isNotBlank() -> entry.adb
             entry.intent?.action?.isNotBlank() == true -> entry.intent!!.action
             entry.intent?.component?.isNotBlank() == true -> entry.intent!!.component
             else -> ""
         }
         if (preview.isNotBlank()) {
-            Spacer(Modifier.height(7.dp))
-            CodeBlock(preview, maxLines = 1, fontSize = 11)
+            Spacer(Modifier.height(Space.sm))
+            CodeBlock(preview, maxLines = 1, fontSize = 12)
         }
-        Spacer(Modifier.height(7.dp))
+
+        Spacer(Modifier.height(Space.sm))
         Row(verticalAlignment = Alignment.CenterVertically) {
             MutedBadge(typeLabel(entry.type))
-            Spacer(Modifier.width(5.dp))
+            Spacer(Modifier.width(Space.xs))
             RiskBadge(entry.risk)
             if (entry.need != Need.NONE) {
-                Spacer(Modifier.width(5.dp))
+                Spacer(Modifier.width(Space.xs))
                 MutedBadge(entry.need.label)
             }
             if (showCategory && entry.categoryId.isNotBlank()) {
-                Spacer(Modifier.width(5.dp))
+                Spacer(Modifier.width(Space.xs))
                 MutedBadge(entry.categoryId)
             }
         }
@@ -207,20 +231,23 @@ fun TopBar(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .padding(horizontal = 12.dp),
+            .height(Dimen.topBar)
+            .padding(start = if (onBack != null) Space.sm else Space.md, end = Space.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (onBack != null) {
             Box(
-                Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).clickable { onBack() },
+                Modifier
+                    .size(Dimen.iconButton)
+                    .clip(RoundedCornerShape(Radius.sm))
+                    .clickable { onBack() },
                 contentAlignment = Alignment.Center
             ) { Text("‹", fontSize = 24.sp, color = MaterialTheme.colorScheme.onBackground) }
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(Space.xs))
         }
         Text(
             title,
-            fontSize = 18.sp,
+            fontSize = TypeScale.headline,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -233,7 +260,10 @@ fun TopBar(
 @Composable
 fun IconBtn(glyph: String, onClick: () -> Unit) {
     Box(
-        Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).clickable { onClick() },
+        Modifier
+            .size(Dimen.iconButton)
+            .clip(RoundedCornerShape(Radius.sm))
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) { Text(glyph, fontSize = 17.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .7f)) }
 }
@@ -256,31 +286,33 @@ fun SearchField(
         Row(
             Modifier
                 .weight(1f)
-                .height(38.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .height(40.dp)
+                .clip(RoundedCornerShape(Radius.md))
                 .background(MaterialTheme.colorScheme.surface)
                 .border(
                     1.dp,
-                    if (autoFocus) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .5f),
-                    RoundedCornerShape(10.dp)
+                    if (autoFocus) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outline.copy(alpha = .9f),
+                    RoundedCornerShape(Radius.md)
                 )
-                .padding(horizontal = 10.dp),
+                .padding(horizontal = Space.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("⌕", fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(Space.sm))
             Box(Modifier.weight(1f)) {
                 if (query.isEmpty()) {
-                    Text(placeholder, fontSize = 12.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .7f))
+                    Text(
+                        placeholder,
+                        fontSize = TypeScale.small,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .75f)
+                    )
                 }
                 BasicTextField(
                     value = query,
                     onValueChange = onQueryChange,
                     singleLine = true,
-                    textStyle = TextStyle(
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    ),
+                    textStyle = TextStyle(fontSize = TypeScale.body, color = MaterialTheme.colorScheme.onSurface),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(),
                     modifier = Modifier.fillMaxWidth().focusRequester(fr)
@@ -291,16 +323,18 @@ fun SearchField(
                     "✕",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.clickable { onQueryChange("") }.padding(4.dp)
+                    modifier = Modifier.clickable { onQueryChange("") }.padding(Space.xs)
                 )
             }
         }
         if (onCancel != null) {
             Text(
                 "取消",
-                fontSize = 13.sp,
+                fontSize = TypeScale.body,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 10.dp).clickable { onCancel() }
+                modifier = Modifier
+                    .padding(start = Space.md)
+                    .clickable { onCancel() }
             )
         }
     }
@@ -312,19 +346,20 @@ fun SearchField(
 fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
             .border(
                 1.dp,
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .5f),
-                RoundedCornerShape(7.dp)
+                if (selected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outline.copy(alpha = .9f),
+                RoundedCornerShape(Radius.sm)
             )
             .clickable { onClick() }
-            .padding(horizontal = 9.dp, vertical = 4.dp)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
     ) {
         Text(
             label,
-            fontSize = 11.5.sp,
+            fontSize = TypeScale.small,
             color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal
         )
@@ -339,10 +374,10 @@ fun EmptyState(title: String, hint: String = "") {
         Modifier.fillMaxWidth().padding(vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(title, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title, fontSize = TypeScale.body, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (hint.isNotBlank()) {
-            Spacer(Modifier.height(6.dp))
-            Text(hint, fontSize = 11.5.sp, color = MaterialTheme.colorScheme.outline)
+            Spacer(Modifier.height(Space.sm))
+            Text(hint, fontSize = TypeScale.small, color = MaterialTheme.colorScheme.outline)
         }
     }
 }
@@ -363,7 +398,7 @@ fun SettingRow(
         Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(enabled) { onClick() } else Modifier)
-            .padding(horizontal = 13.dp, vertical = 12.dp),
+            .padding(horizontal = Space.md, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -373,16 +408,16 @@ fun SettingRow(
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) { Text(glyph, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary) }
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(Space.md))
         Text(
             title,
-            fontSize = 13.sp,
+            fontSize = TypeScale.body,
             color = if (danger) Tones.danger else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
         if (subtitle.isNotBlank()) {
-            Text(subtitle, fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(4.dp))
+            Text(subtitle, fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(Space.xs))
         }
         if (trailing != null) trailing()
         else if (onClick != null) Text("›", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
@@ -394,9 +429,9 @@ fun GroupCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
     Column(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
     ) { content() }
 }
 
@@ -404,10 +439,10 @@ fun GroupCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
 fun GroupTitle(text: String) {
     Text(
         text,
-        fontSize = 10.5.sp,
+        fontSize = TypeScale.caption,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 3.dp, top = 14.dp, bottom = 6.dp)
+        modifier = Modifier.padding(start = Space.xs, top = Space.lg, bottom = Space.sm)
     )
 }
 
@@ -417,7 +452,7 @@ fun Divider() {
         Modifier
             .fillMaxWidth()
             .height(1.dp)
-            .padding(horizontal = 13.dp)
-            .background(MaterialTheme.colorScheme.outline.copy(alpha = .22f))
+            .padding(start = Space.md)
+            .background(MaterialTheme.colorScheme.outlineVariant)
     )
 }

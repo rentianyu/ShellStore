@@ -31,7 +31,10 @@ import com.xbta.shellstore.data.FontChoice
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.data.Updater
+import com.xbta.shellstore.ui.theme.Radius
+import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
+import com.xbta.shellstore.ui.theme.TypeScale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -65,7 +68,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(12.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(12.dp))
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -82,7 +85,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE}) · 1 个源 · ${entries.size} 条",
-                        fontSize = 11.sp,
+                        fontSize = TypeScale.small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -94,7 +97,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(12.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(12.dp))
                     .padding(vertical = 13.dp)
             ) {
                 StatCell("${favs.items.size}", "已收藏", Modifier.weight(1f))
@@ -150,7 +153,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
             Spacer(Modifier.height(14.dp))
             Text(
                 "首版仅支持复制到剪贴板，不申请任何执行权限。\nShizuku / Termux 执行通道在后续版本提供。",
-                fontSize = 10.5.sp,
+                fontSize = TypeScale.caption,
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -181,7 +184,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                             Spacer(Modifier.height(6.dp))
                             Text(
                                 "下载后交由系统安装器处理，需允许「安装未知应用」。",
-                                fontSize = 11.sp,
+                                fontSize = TypeScale.small,
                                 lineHeight = 17.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -190,7 +193,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     }
                     if (progress >= 0) {
                         Spacer(Modifier.height(10.dp))
-                        Text("下载中 $progress%", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("下载中 $progress%", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             },
@@ -241,7 +244,7 @@ private fun StatCell(value: String, label: String, modifier: Modifier = Modifier
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(3.dp))
-        Text(label, fontSize = 9.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -343,7 +346,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "贴到电脑终端时选 adb shell；手机上用 Shizuku / Termux 保持「无」",
-                        fontSize = 10.sp,
+                        fontSize = TypeScale.caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(9.dp))
@@ -430,7 +433,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             )
                             if (fc == FontChoice.CUSTOM && settings.customFontPath.isBlank()) {
                                 Spacer(Modifier.width(8.dp))
-                                Text("未导入", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                                Text("未导入", fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.outline)
                             }
                             Spacer(Modifier.weight(1f))
                             if (cur == fc) Text("✓", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
@@ -440,7 +443,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Text(
                         if (isUi) "「系统默认」用手机自带字体，中文显示最稳；导入的字体对中英文同时生效。"
                         else "代码块使用等宽字体。「系统等宽」跟随系统，字形各家差异较大。",
-                        fontSize = 10.sp,
+                        fontSize = TypeScale.caption,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -456,7 +459,7 @@ private fun Toggle(on: Boolean, onChange: (Boolean) -> Unit) {
     Box(
         Modifier
             .size(width = 38.dp, height = 21.dp)
-            .clip(RoundedCornerShape(11.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .5f))
             .clickable { onChange(!on) }
     ) {
@@ -465,7 +468,7 @@ private fun Toggle(on: Boolean, onChange: (Boolean) -> Unit) {
                 .padding(2.dp)
                 .size(17.dp)
                 .align(if (on) Alignment.CenterEnd else Alignment.CenterStart)
-                .clip(RoundedCornerShape(9.dp))
+                .clip(RoundedCornerShape(Radius.sm))
                 .background(androidx.compose.ui.graphics.Color.White)
         )
     }
@@ -528,12 +531,12 @@ fun SourcesScreen(onBack: () -> Unit) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(9.dp))
+                        .clip(RoundedCornerShape(Radius.sm))
                         .background(MaterialTheme.colorScheme.primaryContainer)
                         .padding(horizontal = 12.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("${busy}中…", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text("${busy}中…", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
                 Spacer(Modifier.height(10.dp))
             }
@@ -542,9 +545,9 @@ fun SourcesScreen(onBack: () -> Unit) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(11.dp))
+                        .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(11.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -561,7 +564,7 @@ fun SourcesScreen(onBack: () -> Unit) {
                                 s.error.isNotBlank() -> s.error
                                 else -> "${s.count} 条" + (if (s.url.isNotBlank()) " · ${s.url.take(48)}" else "")
                             },
-                            fontSize = 10.5.sp,
+                            fontSize = TypeScale.caption,
                             color = if (s.error.isNotBlank()) Tones.danger else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2
                         )
@@ -608,7 +611,7 @@ fun SourcesScreen(onBack: () -> Unit) {
                 "SMD 格式：## 分类 / ### 条目 / @risk safe / 代码块装命令。\n" +
                     "也支持 ● 开头的清单直接粘贴成文件导入。\n" +
                     "在线源支持 ETag 增量更新，内容未变时不重复下载。",
-                fontSize = 10.5.sp,
+                fontSize = TypeScale.caption,
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -629,7 +632,7 @@ fun SourcesScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "例如 https://f.xbta.cc/shellstore/01-system.md",
-                        fontSize = 9.5.sp,
+                        fontSize = TypeScale.caption,
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
@@ -667,7 +670,7 @@ fun SourcesScreen(onBack: () -> Unit) {
 @Composable
 private fun Field(label: String, value: String, onChange: (String) -> Unit) {
     Column {
-        Text(label, fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(4.dp))
         Row(
             Modifier
@@ -719,7 +722,7 @@ fun BackupScreen(onBack: () -> Unit) {
                 "当前备份包含：收藏（含快照）、文件夹、标签、设置。\n" +
                     "内置源由 App 自带，不进入备份；在线源的地址与本地导入源的原文会一并保存。\n" +
                     "导入支持「合并」（按 id 去重）与「覆盖」两种模式。",
-                fontSize = 10.5.sp,
+                fontSize = TypeScale.caption,
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -756,7 +759,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE})",
-                        fontSize = 11.sp,
+                        fontSize = TypeScale.small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -775,7 +778,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Text(
                 "命令与脚本均来自数据源，App 自身不做任何联网上传。\n" +
                     "标注为「危险」的条目在执行前请自行确认内容，误操作造成的后果由使用者承担。",
-                fontSize = 10.5.sp,
+                fontSize = TypeScale.caption,
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.outline
             )
