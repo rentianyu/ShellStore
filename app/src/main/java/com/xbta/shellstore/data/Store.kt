@@ -604,6 +604,37 @@ object Store {
         Repo.saveFavs(c, _favs.value)
     }
 
+    /** 批量追加标签：保留每个条目原有的标签，只往里加 */
+    fun addTagsTo(ids: Collection<String>, tags: List<String>) {
+        val c = ctx ?: return
+        if (ids.isEmpty() || tags.isEmpty()) return
+        _favs.value = _favs.value.copy(
+            items = _favs.value.items.map {
+                if (it.entryId in ids) it.copy(tags = (it.tags + tags).distinct()) else it
+            }
+        )
+        Repo.saveFavs(c, _favs.value)
+    }
+
+    /** 把收藏导出成一份 SMD 源文本，按收藏夹分组 */
+    fun exportFavsSmd(): String {
+        val d = _favs.value
+        if (d.items.isEmpty()) return ""
+        val tagName = d.tags.associate { it.id to it.name }
+        val groups = LinkedHashMap<String, MutableList<String>>()
+        d.items.forEach { fi ->
+            val cat = d.folders.firstOrNull { it.id == fi.folderId }?.name ?: "未分类"
+            val names = fi.tags.mapNotNull { tagName[it] }
+            groups.getOrPut(cat) { mutableListOf() }
+                .add(SmdWriter.entry(fi.entry, note = fi.note, tagNames = names))
+        }
+        return SmdWriter.source(
+            name = "我的收藏",
+            desc = "由 Shell 商店导出的收藏（${d.items.size} 条）",
+            groups = groups.map { it.key to it.value }
+        )
+    }
+
     /** 给收藏条目设置标签集合 */
     fun setFavTags(entryId: String, tags: List<String>) {
         val c = ctx ?: return

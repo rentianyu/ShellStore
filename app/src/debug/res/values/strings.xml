@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 开发版单独的应用名，和正式版并排装在桌面上时一眼能区分 -->
+    <string name="app_name">Shell 商店 DEBUG</string>
+</resources>

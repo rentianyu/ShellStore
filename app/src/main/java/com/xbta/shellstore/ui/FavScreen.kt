@@ -7,7 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +50,7 @@ private sealed interface FavDialog {
     data class EditNote(val item: FavItem) : FavDialog
     data class EditTags(val item: FavItem) : FavDialog
     data class BatchMove(val ids: Set<String>) : FavDialog
+    data class BatchTag(val ids: Set<String>) : FavDialog
     data class TagActions(val id: String) : FavDialog
     data class RenameTag(val id: String) : FavDialog
 }
@@ -276,6 +279,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(Space.sm)
             ) {
+                BatchBtn("打标签", selected.isNotEmpty()) { dialog = FavDialog.BatchTag(selected) }
                 BatchBtn("移动到", selected.isNotEmpty()) { dialog = FavDialog.BatchMove(selected) }
                 BatchBtn("取消收藏", selected.isNotEmpty(), danger = true) {
                     Store.removeFavs(selected)
@@ -411,6 +415,21 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     onDismiss = { dialog = null }
                 )
             }
+
+            is FavDialog.BatchTag -> BatchTagDialog(
+                count = d.ids.size,
+                allTags = favs.tags,
+                onSave = { names ->
+                    val ids = names.map { name ->
+                        favs.tags.firstOrNull { it.name == name }?.id ?: Store.createTag(name)
+                    }
+                    Store.addTagsTo(d.ids, ids)
+                    dialog = null
+                    selected = emptySet()
+                    multiMode = false
+                },
+                onDismiss = { dialog = null }
+            )
 
             is FavDialog.BatchMove -> {
                 AlertDialog(
@@ -651,12 +670,71 @@ fun FavFolderScreen(folderId: String?, onBack: () -> Unit, onOpen: (Page) -> Uni
 @Composable
 fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val favs by Store.favs.collectAsState()
-    Column(Modifier.fillMaxSize()) {
-        TopBar("标签", onBack = onBack)
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(14.dp)) {
-            items(favs.tags, key = { it.id }) { t ->
-                val n = favs.items.count { t.id in it.tags }
-                Text("${t.name}  ·  $n 条", fontSize = 13.sp, modifier = Modifier.padding(vertical = 10.dp))
+    var chosen by remember { mutableStateOf<String?>(null) }
+
+    // 进入某个标签后，返回键先退回标签列表，而不是直接退出这一页
+    BackHandler(enabled = chosen != null) { chosen = null }
+
+    val tag = favs.tags.firstOrNull { it.id == chosen }
+    if (tag == null) {
+        Column(Modifier.fillMaxSize()) {
+            TopBar("标签", onBack = onBack, actions = {
+                Text("${favs.tags.size} 个", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            })
+            if (favs.tags.isEmpty()) {
+                EmptyState("还没有标签", "在收藏里选几条，点「打标签」就能创建")
+            } else {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    items(favs.tags, key = { it.id }) { t ->
+                        val n = favs.items.count { t.id in it.tags }
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(Radius.md))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
+                                .clickable { chosen = t.id }
+                                .padding(horizontal = Space.md, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(10.dp)
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(TAG_COLORS[t.colorIdx % TAG_COLORS.size])
+                            )
+                            Spacer(Modifier.width(Space.md))
+                            Text(t.name, fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                            Text("$n 条", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(Space.xs))
+                            Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        val list = favs.items.filter { tag.id in it.tags }
+        Column(Modifier.fillMaxSize()) {
+            TopBar("#${tag.name}", onBack = { chosen = null }, actions = {
+                Text("${list.size} 条", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            })
+            if (list.isEmpty()) {
+                EmptyState("这个标签下没有条目", "给收藏打上「${tag.name}」后就会出现在这里")
+            } else {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    items(list, key = { it.entryId }) { fi ->
+                        FavRow(fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = {})
+                    }
+                }
             }
         }
     }
@@ -677,6 +755,104 @@ fun AllFavScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
             }
         }
     }
+}
+
+/** 批量打标签：勾选已有标签、可顺手新建。语义是「追加」，不覆盖原有标签 */
+@Composable
+private fun BatchTagDialog(
+    count: Int,
+    allTags: List<com.xbta.shellstore.data.Tag>,
+    onSave: (List<String>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var checked by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var newName by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("给 $count 条打标签", fontSize = TypeScale.title) },
+        text = {
+            Column(
+                Modifier
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                if (allTags.isEmpty()) {
+                    Text(
+                        "还没有标签，在下面输入名称新建。",
+                        fontSize = TypeScale.small,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                allTags.forEach { t ->
+                    val on = t.id in checked
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radius.sm))
+                            .clickable {
+                                checked = if (on) checked - t.id else checked + t.id
+                            }
+                            .padding(vertical = 8.dp, horizontal = Space.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            Modifier
+                                .size(20.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(
+                                    if (on) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surface
+                                )
+                                .border(
+                                    1.5.dp,
+                                    if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                    RoundedCornerShape(5.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (on) Text("✓", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                        }
+                        Spacer(Modifier.width(Space.sm))
+                        Text(t.name, fontSize = TypeScale.body, modifier = Modifier.weight(1f))
+                    }
+                }
+
+                Spacer(Modifier.height(Space.sm))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 10.dp, vertical = 9.dp)
+                ) {
+                    BasicTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        singleLine = true,
+                        textStyle = TextStyle(fontSize = TypeScale.body, color = MaterialTheme.colorScheme.onSurface),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "输入名称可新建标签，与勾选的标签一起加到这 $count 条上（不覆盖原有）。",
+                    fontSize = TypeScale.caption,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val names = checked.mapNotNull { id -> allTags.firstOrNull { it.id == id }?.name }.toMutableList()
+                val extra = newName.trim()
+                if (extra.isNotEmpty() && extra !in names) names.add(extra)
+                if (names.isNotEmpty()) onSave(names) else onDismiss()
+            }) { Text("保存") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
 }
 
 @Composable

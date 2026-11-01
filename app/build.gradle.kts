@@ -44,8 +44,11 @@ android {
 
     buildTypes {
         debug {
-            // 迭代期也出签名包：与 release 同签名才能互相覆盖安装，
-            // 否则每换一次构建类型都要先卸载（用户侧表现为「应用未安装」）。
+            // 开发版独立包名：可以和正式版同时装在手机上，互不覆盖。
+            // 应用名在 app/src/debug/res/values/strings.xml 里覆盖成「Shell 商店 DEBUG」。
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            // 与 release 同签名，迭代时 debug 覆盖 debug 不用卸载
             if (keystorePropsFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }

@@ -98,7 +98,8 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     Text("Shell 商店", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        "v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE}) · ${srcList.count { it.enabled }} 个源 · ${entries.size} 条",
+                        (if (BuildConfig.DEBUG) "DEBUG · " else "") +
+                            "v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE}) · ${srcList.count { it.enabled }} 个源 · ${entries.size} 条",
                         fontSize = TypeScale.small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -132,7 +133,11 @@ fun MeScreen(onOpen: (Page) -> Unit) {
 
             GroupTitle("应用")
             GroupCard {
-                SettingRow("↻", "检查更新", updateSub, onClick = {
+                SettingRow("↻", "检查更新", if (BuildConfig.DEBUG) "DEBUG 版不检查" else updateSub, onClick = {
+                    if (BuildConfig.DEBUG) {
+                        Toast.makeText(ctx, "DEBUG 版不检查自身更新，请直接装正式 Release", Toast.LENGTH_SHORT).show()
+                        return@SettingRow
+                    }
                     showUpdate = true
                     if (!checking) {
                         checking = true
@@ -746,6 +751,27 @@ fun BackupScreen(onBack: () -> Unit) {
         }
     }
 
+    val mdSaver = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/markdown")
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val text = Store.exportFavsSmd()
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        ctx.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) }
+                        true
+                    }.getOrDefault(false)
+                }
+                Toast.makeText(
+                    ctx,
+                    if (ok) "已导出 ${text.length} 字符" else "写入文件失败",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
     fun doImport(json: String, overwrite: Boolean) {
         scope.launch {
             val err = withContext(Dispatchers.IO) { Store.importBackup(json, overwrite) }
@@ -764,7 +790,26 @@ fun BackupScreen(onBack: () -> Unit) {
         ) {
             GroupTitle("导出")
             GroupCard {
-                SettingRow("⇧", "复制到剪贴板", "${favs.items.size} 条收藏 · JSON", onClick = {
+                SettingRow("⇧", "导出为订阅源", "${favs.items.size} 条收藏 · Markdown（SMD）", onClick = {
+                    if (favs.items.isEmpty()) {
+                        Toast.makeText(ctx, "还没有收藏可导出", Toast.LENGTH_SHORT).show()
+                    } else {
+                        mdSaver.launch("shellstore-favs.md")
+                    }
+                })
+                Divider()
+                SettingRow("⧉", "复制订阅源文本", "可直接粘贴成新的订阅源", onClick = {
+                    val smd = Store.exportFavsSmd()
+                    if (smd.isBlank()) {
+                        Toast.makeText(ctx, "还没有收藏可导出", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("shellstore-favs", smd))
+                        Toast.makeText(ctx, "已复制 ${smd.length} 字符", Toast.LENGTH_SHORT).show()
+                    }
+                })
+                Divider()
+                SettingRow("⇧", "复制备份到剪贴板", "${favs.items.size} 条收藏 · JSON", onClick = {
                     val json = Store.exportBackupJson()
                     val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     cm.setPrimaryClip(ClipData.newPlainText("shellstore-backup", json))
