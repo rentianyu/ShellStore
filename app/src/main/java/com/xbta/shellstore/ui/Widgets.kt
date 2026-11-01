@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -23,8 +24,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.xbta.shellstore.core.*
 import com.xbta.shellstore.ui.theme.LocalCodeFont
+import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Radius
 import com.xbta.shellstore.ui.theme.Dimen
 import com.xbta.shellstore.ui.theme.Space
@@ -54,7 +58,7 @@ fun typeLabel(t: EntryType): String = when (t) {
 }
 
 @Composable
-fun TypeBadge(t: EntryType, size: Int = 20) {
+fun TypeBadge(t: EntryType, size: Int = 24) {
     Box(
         Modifier
             .size(size.dp)
@@ -64,7 +68,7 @@ fun TypeBadge(t: EntryType, size: Int = 20) {
     ) {
         Text(
             typeGlyph(t),
-            fontSize = (size / 2.1f).sp,
+            fontSize = (size / 2.05f).sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
             fontFamily = FontFamily.Monospace
@@ -155,8 +159,7 @@ fun EntryRow(
     onClick: () -> Unit,
     onToggleFav: () -> Unit,
     showCategory: Boolean = true,
-    collapsed: Boolean = false,
-    onToggleCollapse: (() -> Unit)? = null
+    folded: Boolean = false
 ) {
     Column(
         Modifier
@@ -178,24 +181,9 @@ fun EntryRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            if (collapsed) {
+            if (folded) {
                 RiskBadge(entry.risk)
                 Spacer(Modifier.width(Space.xs))
-            }
-            if (onToggleCollapse != null) {
-                Box(
-                    Modifier
-                        .size(Dimen.iconButton)
-                        .clip(RoundedCornerShape(Radius.sm))
-                        .clickable { onToggleCollapse() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        if (collapsed) "▸" else "▾",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
             }
             Box(
                 Modifier
@@ -206,7 +194,7 @@ fun EntryRow(
             ) {
                 Text(
                     if (fav) "★" else "☆",
-                    fontSize = 15.sp,
+                    fontSize = IconSize.action,
                     color = if (fav) Color(0xFFF2A93B) else MaterialTheme.colorScheme.outline
                 )
             }
@@ -219,7 +207,7 @@ fun EntryRow(
             entry.intent?.component?.isNotBlank() == true -> entry.intent!!.component
             else -> ""
         }
-        if (collapsed) return@Column
+        if (folded) return@Column
 
         if (preview.isNotBlank()) {
             Spacer(Modifier.height(Space.sm))
@@ -265,7 +253,7 @@ fun TopBar(
                     .clip(RoundedCornerShape(Radius.sm))
                     .clickable { onBack() },
                 contentAlignment = Alignment.Center
-            ) { Text("‹", fontSize = 24.sp, color = MaterialTheme.colorScheme.onBackground) }
+            ) { Text("‹", fontSize = IconSize.nav, color = MaterialTheme.colorScheme.onBackground) }
             Spacer(Modifier.width(Space.xs))
         }
         Text(
@@ -288,7 +276,7 @@ fun IconBtn(glyph: String, onClick: () -> Unit) {
             .clip(RoundedCornerShape(Radius.sm))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
-    ) { Text(glyph, fontSize = 17.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .7f)) }
+    ) { Text(glyph, fontSize = IconSize.top, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .7f)) }
 }
 
 // ---------------- 搜索框 ----------------
@@ -321,7 +309,7 @@ fun SearchField(
                 .padding(horizontal = Space.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("⌕", fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
+            Text("⌕", fontSize = IconSize.inline, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(Space.sm))
             Box(Modifier.weight(1f)) {
                 if (query.isEmpty()) {
@@ -344,7 +332,7 @@ fun SearchField(
             if (query.isNotEmpty()) {
                 Text(
                     "✕",
-                    fontSize = 13.sp,
+                    fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.clickable { onQueryChange("") }.padding(Space.xs)
                 )
@@ -430,7 +418,7 @@ fun SettingRow(
                 .clip(RoundedCornerShape(7.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
-        ) { Text(glyph, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary) }
+        ) { Text(glyph, fontSize = IconSize.card, color = MaterialTheme.colorScheme.primary) }
         Spacer(Modifier.width(Space.md))
         Text(
             title,
@@ -444,7 +432,7 @@ fun SettingRow(
             Spacer(Modifier.width(Space.xs))
         }
         if (trailing != null) trailing()
-        else if (onClick != null) Text("›", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
+        else if (onClick != null) Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
     }
 }
 
@@ -479,4 +467,99 @@ fun Divider() {
             .padding(start = Space.md)
             .background(MaterialTheme.colorScheme.outlineVariant)
     )
+}
+
+// ---------------- 开关 ----------------
+
+@Composable
+fun Toggle(on: Boolean, onChange: (Boolean) -> Unit) {
+    Box(
+        Modifier
+            .size(width = 42.dp, height = 24.dp)
+            .clip(RoundedCornerShape(Radius.md))
+            .background(if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .5f))
+            .clickable { onChange(!on) }
+    ) {
+        Box(
+            Modifier
+                .padding(2.dp)
+                .size(20.dp)
+                .align(if (on) Alignment.CenterEnd else Alignment.CenterStart)
+                .clip(RoundedCornerShape(Radius.sm))
+                .background(Color.White)
+        )
+    }
+}
+
+// ---------------- 多选勾选框 ----------------
+
+@Composable
+fun CheckCircle(checked: Boolean) {
+    Box(
+        Modifier
+            .size(Dimen.checkbox)
+            .clip(CircleShape)
+            .background(if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+            .border(1.5.dp, if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        if (checked) {
+            Text(
+                "✓",
+                fontSize = IconSize.check,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+    }
+}
+
+// ---------------- 视图设置弹层 ----------------
+
+/**
+ * 列表显示设置。入口是顶栏右上角的视图图标，点开后是一个开关面板，
+ * 而不是每张卡片各挂一个折叠按钮。
+ */
+@Composable
+fun ViewOptionsDialog(
+    foldPreview: Boolean,
+    onFoldChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp)
+                .clip(RoundedCornerShape(Radius.lg))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.lg))
+                .padding(Space.lg)
+        ) {
+            Text("列表显示", fontSize = TypeScale.title, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(Space.lg))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("折叠命令预览", fontSize = TypeScale.body, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "只显示标题，一屏最多看 3 倍条目",
+                        fontSize = TypeScale.small,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.width(Space.md))
+                Toggle(foldPreview, onFoldChange)
+            }
+
+            Spacer(Modifier.height(Space.lg))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("完成", fontSize = TypeScale.body) }
+            }
+        }
+    }
 }

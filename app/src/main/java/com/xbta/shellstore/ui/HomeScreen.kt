@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Dimen
+import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Radius
 import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.TypeScale
@@ -34,9 +35,10 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
     val cats by Store.categories.collectAsState()
     val favs by Store.favs.collectAsState()
-    val collapsedIds by Store.collapsed.collectAsState()
+    val settings by Store.settings.collectAsState()
 
     var searchMode by remember { mutableStateOf(false) }
+    var viewOptions by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var typeSel by remember { mutableStateOf<Set<String>>(emptySet()) }
 
@@ -65,6 +67,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
             }
         } else {
             TopBar("Shell 商店", actions = {
+                IconBtn("☰") { viewOptions = true }
                 IconBtn("⌕") { searchMode = true }
             })
         }
@@ -107,8 +110,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                         fav = favs.isFav(e.id),
                         onClick = { onOpen(Page.Detail(e.id)) },
                         onToggleFav = { Store.toggleFav(e) },
-                        collapsed = e.id in collapsedIds,
-                        onToggleCollapse = { Store.toggleCollapse(e.id) }
+                        folded = settings.foldPreview
                     )
                 }
             } else {
@@ -127,7 +129,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                         Text("全部分类", fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         Text("共 ${cats.size} 个分类", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(Space.xs))
-                        Text("›", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
+                        Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
                     }
                 }
                 item {
@@ -138,23 +140,6 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                         Text("全部命令", fontSize = TypeScale.title, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.weight(1f))
                         Text("${entries.size} 条", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(Space.xs))
-                        val allCollapsed = entries.isNotEmpty() && entries.all { it.id in collapsedIds }
-                        Box(
-                            Modifier
-                                .size(Dimen.iconButton)
-                                .clip(RoundedCornerShape(Radius.sm))
-                                .clickable {
-                                    Store.setCollapseAll(entries.map { it.id }, !allCollapsed)
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                if (allCollapsed) "▸" else "▾",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                 }
                 items(entries, key = { it.id }) { e ->
@@ -163,12 +148,19 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                         fav = favs.isFav(e.id),
                         onClick = { onOpen(Page.Detail(e.id)) },
                         onToggleFav = { Store.toggleFav(e) },
-                        collapsed = e.id in collapsedIds,
-                        onToggleCollapse = { Store.toggleCollapse(e.id) }
+                        folded = settings.foldPreview
                     )
                 }
             }
         }
+    }
+
+    if (viewOptions) {
+        ViewOptionsDialog(
+            foldPreview = settings.foldPreview,
+            onFoldChange = { Store.updateSettings(settings.copy(foldPreview = it)) },
+            onDismiss = { viewOptions = false }
+        )
     }
 }
 
@@ -261,7 +253,7 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
                     ) {
                         Text(
                             catGlyph(idx),
-                            fontSize = 12.sp,
+                            fontSize = IconSize.card,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.primary
@@ -275,7 +267,7 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.width(Space.xs))
-                    Text("›", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
+                    Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
                 }
             }
         }
@@ -286,7 +278,8 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
 fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
     val favs by Store.favs.collectAsState()
-    val collapsedIds by Store.collapsed.collectAsState()
+    val settings by Store.settings.collectAsState()
+    var viewOptions by remember { mutableStateOf(false) }
     val list = remember(cat, entries) { entries.filter { it.categoryId == cat } }
     var query by remember { mutableStateOf("") }
 
@@ -298,7 +291,7 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar(cat, onBack = onBack)
+        TopBar(cat, onBack = onBack, actions = { IconBtn("☰") { viewOptions = true } })
         Box(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
             SearchField(query = query, onQueryChange = { query = it }, placeholder = "在「$cat」内搜索")
         }
@@ -317,10 +310,17 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
                     onClick = { onOpen(Page.Detail(e.id)) },
                     onToggleFav = { Store.toggleFav(e) },
                     showCategory = false,
-                    collapsed = e.id in collapsedIds,
-                    onToggleCollapse = { Store.toggleCollapse(e.id) }
+                    folded = settings.foldPreview
                 )
             }
         }
+    }
+
+    if (viewOptions) {
+        ViewOptionsDialog(
+            foldPreview = settings.foldPreview,
+            onFoldChange = { Store.updateSettings(settings.copy(foldPreview = it)) },
+            onDismiss = { viewOptions = false }
+        )
     }
 }

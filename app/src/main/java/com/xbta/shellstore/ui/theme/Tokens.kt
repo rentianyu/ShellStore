@@ -46,12 +46,49 @@ object TypeScale {
     val codeLarge = 14.sp
 }
 
+/**
+ * 图标字号档位。UI 上的字形图标（非图片）统一从这里取字号，
+ * 调整图标大小只改这一处，避免各处散落字面量。
+ */
+object IconSize {
+    /** 底部 tab 图标 */
+    val tab = 26.sp
+
+    /** 顶栏操作按钮（搜索、视图、加号） */
+    val top = 21.sp
+
+    /** 顶栏返回箭头 */
+    val nav = 30.sp
+
+    /** 列表卡片右侧操作（⋯） */
+    val action = 19.sp
+
+    /** 分类卡片 / 卡片内装饰图标 */
+    val card = 18.sp
+
+    /** 搜索框内图标 */
+    val inline = 17.sp
+
+    /** 行尾「›」箭头 */
+    val chevron = 18.sp
+
+    /** 勾选框内的对勾 */
+    val check = 13.sp
+}
+
 object Dimen {
     val topBar = 54.dp
     val tabBar = 58.dp
     val button = 42.dp
     val buttonSmall = 36.dp
-    val iconButton = 34.dp
-    val badgeIcon = 20.dp
-    val listIcon = 26.dp
+
+    /** 顶栏图标按钮的点击热区，同时决定图表视觉留白 */
+    val iconButton = 40.dp
+
+    /** 类型徽章方块边长 */
+    val badgeIcon = 24.dp
+    val listIcon = 30.dp
+
+    /** 多选勾选框边长 */
+    val checkbox = 22.dp
 }

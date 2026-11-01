@@ -27,6 +27,7 @@ import com.xbta.shellstore.core.*
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Radius
+import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
 import com.xbta.shellstore.ui.theme.TypeScale
@@ -332,7 +333,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
             ) {
                 Text(
                     if (fav) "★" else "☆",
-                    fontSize = 16.sp,
+                    fontSize = IconSize.action,
                     color = if (fav) androidx.compose.ui.graphics.Color(0xFFF2A93B) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

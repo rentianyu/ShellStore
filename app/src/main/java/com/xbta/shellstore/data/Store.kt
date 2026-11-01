@@ -29,18 +29,6 @@ object Store {
     private val _sourceVersion = MutableStateFlow("")
     val sourceVersion: StateFlow<String> = _sourceVersion.asStateFlow()
 
-    /** 折叠中的条目 id 集合（不持久化，重启后全部展开） */
-    private val _collapsed = MutableStateFlow<Set<String>>(emptySet())
-    val collapsed: StateFlow<Set<String>> = _collapsed.asStateFlow()
-
-    fun toggleCollapse(id: String) {
-        _collapsed.value = if (id in _collapsed.value) _collapsed.value - id else _collapsed.value + id
-    }
-
-    fun setCollapseAll(ids: Collection<String>, collapse: Boolean) {
-        _collapsed.value = if (collapse) ids.toSet() else emptySet()
-    }
-
     private val _loaded = MutableStateFlow(false)
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 

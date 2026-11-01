@@ -26,6 +26,8 @@ import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.data.FavItem
 import com.xbta.shellstore.data.Folder
 import com.xbta.shellstore.data.Store
+import com.xbta.shellstore.ui.theme.Dimen
+import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Radius
 import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
@@ -68,6 +70,13 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             fi.note.contains(q, true) || e.tags.any { it.contains(q, true) }
     }
 
+    // 「全选」只作用于当前视图看得见的条目，不跨文件夹
+    val visibleIds: List<String> = when (view) {
+        0 -> favs.itemsIn(currentFolder).filter { hit(it) }.map { it.entryId }
+        2 -> favs.items.filter { hit(it) }.map { it.entryId }
+        else -> emptyList()
+    }
+
     Column(Modifier.fillMaxSize()) {
         if (searchMode) {
             Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
@@ -84,17 +93,20 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 title = "已选 ${selected.size}",
                 onBack = { multiMode = false; selected = emptySet() },
                 actions = {
-                    Text(
-                        "全选",
-                        fontSize = TypeScale.body,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clickable {
-                                selected = if (selected.size == favs.items.size) emptySet()
-                                else favs.items.map { it.entryId }.toSet()
-                            }
-                            .padding(horizontal = Space.sm, vertical = Space.xs)
-                    )
+                    if (view != 1) {
+                        val allSel = visibleIds.isNotEmpty() && selected.containsAll(visibleIds)
+                        Text(
+                            if (allSel) "取消全选" else "全选",
+                            fontSize = TypeScale.body,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable {
+                                    selected = if (allSel) selected - visibleIds.toSet()
+                                    else selected + visibleIds
+                                }
+                                .padding(horizontal = Space.sm, vertical = Space.xs)
+                        )
+                    }
                 }
             )
         } else {
@@ -445,7 +457,7 @@ private fun FolderRow(folder: Folder, count: Int, onClick: () -> Unit, onMenu: (
             Modifier.size(26.dp).clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
-        ) { Text("▣", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary) }
+        ) { Text("▣", fontSize = IconSize.card, color = MaterialTheme.colorScheme.primary) }
         Spacer(Modifier.width(10.dp))
         Text(
             folder.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
@@ -454,7 +466,7 @@ private fun FolderRow(folder: Folder, count: Int, onClick: () -> Unit, onMenu: (
         Text("$count", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).clickable { onMenu() }, contentAlignment = Alignment.Center) {
-            Text("⋯", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
+            Text("⋯", fontSize = IconSize.action, color = MaterialTheme.colorScheme.outline)
         }
     }
 }
@@ -472,39 +484,59 @@ fun FavRow(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.md))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
+            .background(
+                if (checked) MaterialTheme.colorScheme.primary.copy(alpha = .07f)
+                else MaterialTheme.colorScheme.surface
+            )
+            .border(
+                if (checked) 1.5.dp else 1.dp,
+                if (checked) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outline.copy(alpha = .7f),
+                RoundedCornerShape(Radius.md)
+            )
             .clickable { onOpen() }
-            .padding(10.dp)
+            .padding(Space.md)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (multiMode) {
+                CheckCircle(checked)
+                Spacer(Modifier.width(Space.sm))
+            }
             TypeBadge(e.type)
-            Spacer(Modifier.width(7.dp))
+            Spacer(Modifier.width(Space.sm))
             Text(
-                e.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                e.title, fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
             )
-            Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).clickable { onMenu() }, contentAlignment = Alignment.Center) {
-                Text("⋯", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
+            if (!multiMode) {
+                Box(
+                    Modifier
+                        .size(Dimen.iconButton)
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .clickable { onMenu() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("⋯", fontSize = IconSize.action, color = MaterialTheme.colorScheme.outline)
+                }
             }
         }
         val preview = if (e.body.isNotBlank()) e.body.replace("\n", " ⏎ ")
         else if (e.adb.isNotBlank()) e.adb else e.intent?.action ?: ""
         if (preview.isNotBlank()) {
-            Spacer(Modifier.height(7.dp))
-            CodeBlock(preview, maxLines = 1, fontSize = 11)
+            Spacer(Modifier.height(Space.sm))
+            CodeBlock(preview, maxLines = 1, fontSize = 12)
         }
-        Spacer(Modifier.height(7.dp))
+        Spacer(Modifier.height(Space.sm))
         Row(verticalAlignment = Alignment.CenterVertically) {
             MutedBadge(typeLabel(e.type))
-            Spacer(Modifier.width(5.dp))
+            Spacer(Modifier.width(Space.xs))
             RiskBadge(e.risk)
             if (!item.alive && !Store.isAlive(item.entryId)) {
-                Spacer(Modifier.width(5.dp))
+                Spacer(Modifier.width(Space.xs))
                 Badge("源已失效", Tones.danger, Tones.dangerBg)
             }
             if (item.note.isNotBlank()) {
-                Spacer(Modifier.width(5.dp))
+                Spacer(Modifier.width(Space.xs))
                 Text(
                     "备注：${item.note}", fontSize = TypeScale.caption,
                     color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis

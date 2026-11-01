@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.ui.theme.AppTheme
+import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.LocalCodeFont
 import com.xbta.shellstore.ui.theme.resolveCodeFont
 import com.xbta.shellstore.ui.theme.resolveUiFont
@@ -127,7 +128,7 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(pair.first, fontSize = 22.sp, color = color)
+                Text(pair.first, fontSize = IconSize.tab, color = color)
                 Spacer(Modifier.height(1.dp))
                 Text(
                     pair.second,

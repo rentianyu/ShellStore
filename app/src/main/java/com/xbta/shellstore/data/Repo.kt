@@ -30,7 +30,9 @@ data class AppSettings(
     val copyPrefix: CopyPrefix = CopyPrefix.NONE,
     val confirmDanger: Boolean = true,
     val checkUpdateOnStart: Boolean = true,
-    val copyAndReturn: Boolean = false
+    val copyAndReturn: Boolean = false,
+    /** 列表只显示标题、收起命令预览 */
+    val foldPreview: Boolean = false
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("theme", theme.name)
@@ -42,6 +44,7 @@ data class AppSettings(
         put("confirmDanger", confirmDanger)
         put("checkUpdateOnStart", checkUpdateOnStart)
         put("copyAndReturn", copyAndReturn)
+        put("foldPreview", foldPreview)
     }
 
     companion object {
@@ -58,7 +61,8 @@ data class AppSettings(
                 copyPrefix = e(o.optString("copyPrefix"), CopyPrefix.NONE, CopyPrefix.entries.toTypedArray()),
                 confirmDanger = o.optBoolean("confirmDanger", true),
                 checkUpdateOnStart = o.optBoolean("checkUpdateOnStart", true),
-                copyAndReturn = o.optBoolean("copyAndReturn", false)
+                copyAndReturn = o.optBoolean("copyAndReturn", false),
+                foldPreview = o.optBoolean("foldPreview", false)
             )
         }
     }

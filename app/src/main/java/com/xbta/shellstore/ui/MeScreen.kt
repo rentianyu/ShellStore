@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,12 +20,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.BuildConfig
+import com.xbta.shellstore.R
 import com.xbta.shellstore.data.AppSettings
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.FontChoice
@@ -32,6 +37,7 @@ import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.data.Updater
 import com.xbta.shellstore.ui.theme.Radius
+import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
 import com.xbta.shellstore.ui.theme.TypeScale
@@ -72,12 +78,19 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    Modifier.size(46.dp).clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(">_", color = MaterialTheme.colorScheme.onPrimary, fontFamily = FontFamily.Monospace, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                // 与桌面图标同一套图形：深色渐变底 + 青绿提示符
+                Box(Modifier.size(48.dp).clip(RoundedCornerShape(13.dp))) {
+                    Image(
+                        painterResource(R.drawable.ic_launcher_background),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Image(
+                        painterResource(R.drawable.ic_launcher_foreground),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().scale(1.55f)
+                    )
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
@@ -455,24 +468,6 @@ fun SettingsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun Toggle(on: Boolean, onChange: (Boolean) -> Unit) {
-    Box(
-        Modifier
-            .size(width = 38.dp, height = 21.dp)
-            .clip(RoundedCornerShape(Radius.md))
-            .background(if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = .5f))
-            .clickable { onChange(!on) }
-    ) {
-        Box(
-            Modifier
-                .padding(2.dp)
-                .size(17.dp)
-                .align(if (on) Alignment.CenterEnd else Alignment.CenterStart)
-                .clip(RoundedCornerShape(Radius.sm))
-                .background(androidx.compose.ui.graphics.Color.White)
-        )
-    }
-}
 
 // ---------------- 数据源 ----------------
 
