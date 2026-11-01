@@ -341,7 +341,7 @@ fun FavRow(item: FavItem, onOpen: () -> Unit, onMenu: () -> Unit) {
             MutedBadge(typeLabel(e.type))
             Spacer(Modifier.width(5.dp))
             RiskBadge(e.risk)
-            if (!item.alive) {
+            if (!item.alive && !Store.isAlive(item.entryId)) {
                 Spacer(Modifier.width(5.dp))
                 Badge("源已失效", Tones.danger, Tones.dangerBg)
             }

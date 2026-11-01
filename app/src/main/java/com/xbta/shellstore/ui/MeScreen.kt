@@ -30,7 +30,11 @@ import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.FontChoice
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
+import com.xbta.shellstore.data.Updater
 import com.xbta.shellstore.ui.theme.Tones
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun MeScreen(onOpen: (Page) -> Unit) {
@@ -38,7 +42,14 @@ fun MeScreen(onOpen: (Page) -> Unit) {
     val favs by Store.favs.collectAsState()
     val cats by Store.categories.collectAsState()
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     var showUpdate by remember { mutableStateOf(false) }
+    var checking by remember { mutableStateOf(false) }
+    var latest by remember { mutableStateOf<Updater.Info?>(null) }
+    var updateMsg by remember { mutableStateOf("") }
+    var progress by remember { mutableIntStateOf(-1) }
+    var downloaded by remember { mutableStateOf(false) }
+    var updateSub by remember { mutableStateOf("v${BuildConfig.APP_VERSION}") }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("我的")
@@ -100,7 +111,31 @@ fun MeScreen(onOpen: (Page) -> Unit) {
 
             GroupTitle("应用")
             GroupCard {
-                SettingRow("↻", "检查更新", "v${BuildConfig.APP_VERSION}", onClick = { showUpdate = true })
+                SettingRow("↻", "检查更新", updateSub, onClick = {
+                    showUpdate = true
+                    if (!checking) {
+                        checking = true
+                        updateMsg = "正在检查…"
+                        latest = null
+                        downloaded = false
+                        scope.launch {
+                            val r = withContext(Dispatchers.IO) { Updater.checkLatest() }
+                            checking = false
+                            val info = r.info
+                            if (info == null) {
+                                updateMsg = r.error ?: "检查失败"
+                                updateSub = "检查失败"
+                            } else if (Updater.isNewer(info.tag, BuildConfig.APP_VERSION)) {
+                                latest = info
+                                updateMsg = ""
+                                updateSub = "发现 ${info.tag}"
+                            } else {
+                                updateMsg = "已是最新版本（${info.tag}）"
+                                updateSub = "已是最新"
+                            }
+                        }
+                    }
+                })
                 Divider()
                 SettingRow("⚙", "设置", "主题 · 字号 · 复制前缀", onClick = { onOpen(Page.Settings) })
                 Divider()
@@ -124,15 +159,79 @@ fun MeScreen(onOpen: (Page) -> Unit) {
 
     if (showUpdate) {
         AlertDialog(
-            onDismissRequest = { showUpdate = false },
+            onDismissRequest = { if (progress < 0) showUpdate = false },
             title = { Text("检查更新", fontSize = 15.sp) },
             text = {
-                Text(
-                    "当前版本 v${BuildConfig.APP_VERSION}。\n自动检查更新在网络模块接入后启用，届时会从发布页读取最新版本号。",
-                    fontSize = 12.sp, lineHeight = 19.sp
-                )
+                Column {
+                    Text(
+                        "当前版本 v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE})",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    when {
+                        updateMsg.isNotBlank() -> Text(updateMsg, fontSize = 12.sp, lineHeight = 19.sp)
+                        latest != null && !downloaded -> {
+                            Text(
+                                "发现新版本 ${latest!!.tag}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "下载后交由系统安装器处理，需允许「安装未知应用」。",
+                                fontSize = 11.sp,
+                                lineHeight = 17.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        downloaded -> Text("安装包已就绪", fontSize = 12.sp)
+                    }
+                    if (progress >= 0) {
+                        Spacer(Modifier.height(10.dp))
+                        Text("下载中 $progress%", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             },
-            confirmButton = { TextButton(onClick = { showUpdate = false }) { Text("知道了") } }
+            confirmButton = {
+                val l = latest
+                if (l != null) {
+                    TextButton(
+                        enabled = progress < 0 && !checking,
+                        onClick = {
+                            if (downloaded) {
+                                val err = Updater.install(ctx, l)
+                                if (err != null) Toast.makeText(ctx, err, Toast.LENGTH_SHORT).show()
+                                showUpdate = false
+                            } else {
+                                progress = 0
+                                scope.launch {
+                                    val err = withContext(Dispatchers.IO) {
+                                        Updater.download(ctx, l) { p -> progress = p }
+                                    }
+                                    progress = -1
+                                    if (err == null) {
+                                        downloaded = true
+                                        updateSub = "待安装 ${l.tag}"
+                                    } else {
+                                        updateMsg = err
+                                    }
+                                }
+                            }
+                        }
+                    ) {
+                        Text(if (downloaded) "立即安装" else "下载（${latest!!.tag}）")
+                    }
+                } else {
+                    TextButton(onClick = { showUpdate = false }) { Text("关闭") }
+                }
+            },
+            dismissButton = {
+                if (latest != null) {
+                    TextButton(onClick = { showUpdate = false }, enabled = progress < 0) { Text("稍后") }
+                }
+            }
         )
     }
 }
@@ -376,61 +475,216 @@ private fun Toggle(on: Boolean, onChange: (Boolean) -> Unit) {
 
 @Composable
 fun SourcesScreen(onBack: () -> Unit) {
-    val entries by Store.entries.collectAsState()
-    val name by Store.sourceName.collectAsState()
-    val ver by Store.sourceVersion.collectAsState()
+    val sources by Store.sources.collectAsState()
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf("") }
+    var showAdd by remember { mutableStateOf(false) }
+    var addName by remember { mutableStateOf("") }
+    var addUrl by remember { mutableStateOf("") }
+    var pendingDelete by remember { mutableStateOf<String?>(null) }
+
+    fun runAsync(tag: String, block: suspend () -> String?) {
+        scope.launch {
+            busy = tag
+            val msg = withContext(Dispatchers.IO) { block() }
+            busy = ""
+            Toast.makeText(ctx, msg ?: "$tag 完成", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val importer = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runAsync("导入") {
+                val text = runCatching {
+                    ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                }.getOrNull()
+                if (text.isNullOrBlank()) return@runAsync "读取文件失败"
+                var fname = "本地源"
+                runCatching {
+                    ctx.contentResolver.query(uri, null, null, null, null)?.use { cur ->
+                        val idx = cur.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (idx >= 0 && cur.moveToFirst()) fname = cur.getString(idx)
+                    }
+                }
+                val display = fname.substringBeforeLast('.')
+                Store.importLocal(display, text, fname)
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("数据源", onBack = onBack)
-        Column(Modifier.padding(horizontal = 14.dp).verticalScroll(rememberScrollState())) {
-            Spacer(Modifier.height(4.dp))
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(11.dp))
-                    .padding(13.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    Modifier.size(30.dp).clip(RoundedCornerShape(9.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) { Text("▤", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary) }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        "内置 · ${entries.size} 条" + (if (ver.isNotBlank()) " · v$ver" else ""),
-                        fontSize = 10.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp)
+                .padding(bottom = 20.dp)
+        ) {
+            if (busy.isNotEmpty()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("$busy中…", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
-                Badge("已启用", Tones.safe, Tones.safeBg)
+                Spacer(Modifier.height(10.dp))
             }
 
-            Spacer(Modifier.height(12.dp))
+            sources.forEach { s ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .45f), RoundedCornerShape(11.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(s.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.width(6.dp))
+                            MutedBadge(s.typeLabel)
+                        }
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            when {
+                                !s.enabled -> "已停用"
+                                s.error.isNotBlank() -> s.error
+                                else -> "${s.count} 条" + (if (s.url.isNotBlank()) " · ${s.url.take(48)}" else "")
+                            },
+                            fontSize = 10.5.sp,
+                            color = if (s.error.isNotBlank()) Tones.danger else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2
+                        )
+                    }
+                    if (s.id != Store.BUILTIN_ID) {
+                        Box(
+                            Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).clickable {
+                                if (s.type == com.xbta.shellstore.core.SourceType.REMOTE) {
+                                    runAsync("刷新") { Store.refresh(s.id)?.let { "刷新失败：$it" } ?: "刷新完成" }
+                                } else {
+                                    Toast.makeText(ctx, "本地源无需刷新", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            contentAlignment = Alignment.Center
+                        ) { Text("⟳", fontSize = 15.sp, color = MaterialTheme.colorScheme.primary) }
+                        Box(
+                            Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).clickable {
+                                pendingDelete = s.id
+                            },
+                            contentAlignment = Alignment.Center
+                        ) { Text("✕", fontSize = 13.sp, color = MaterialTheme.colorScheme.outline) }
+                    } else {
+                        Toggle(s.enabled) { Store.toggleSource(s.id, it) }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            GroupTitle("添加")
             GroupCard {
-                SettingRow("↗", "添加在线源", "填 URL 拉取 SMD", onClick = {
-                    Toast.makeText(ctx, "在线源在下一版接入", Toast.LENGTH_SHORT).show()
+                SettingRow("↗", "添加在线源", "从 URL 拉取 SMD", onClick = {
+                    addName = ""
+                    addUrl = ""
+                    showAdd = true
                 })
                 Divider()
-                SettingRow("▣", "导入本地文件", "选择 .md / .json", onClick = {
-                    Toast.makeText(ctx, "本地导入在下一版接入", Toast.LENGTH_SHORT).show()
+                SettingRow("▣", "导入本地文件", "选择 .md / .txt / .json", onClick = {
+                    importer.launch(arrayOf("*/*"))
                 })
             }
 
             Spacer(Modifier.height(14.dp))
             Text(
-                "数据源格式为 SMD（Markdown 超集）：\n" +
-                    "## 分类名　### 条目名　@risk safe　代码块装命令。\n" +
-                    "也支持 ● 开头的清单直接粘贴导入。",
+                "SMD 格式：## 分类 / ### 条目 / @risk safe / 代码块装命令。\n" +
+                    "也支持 ● 开头的清单直接粘贴成文件导入。\n" +
+                    "在线源支持 ETag 增量更新，内容未变时不重复下载。",
                 fontSize = 10.5.sp,
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+
+    if (showAdd) {
+        var name by remember { mutableStateOf("") }
+        var url by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showAdd = false },
+            title = { Text("添加在线源", fontSize = 15.sp) },
+            text = {
+                Column {
+                    Field("名称（可留空）", name) { name = it }
+                    Spacer(Modifier.height(8.dp))
+                    Field("SMD 文件地址", url) { url = it }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "例如 https://f.xbta.cc/shellstore/01-system.md",
+                        fontSize = 9.5.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (url.isBlank()) {
+                        Toast.makeText(ctx, "请填写地址", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showAdd = false
+                        runAsync("拉取") { Store.addRemote(name, url.trim()) ?: "已添加" }
+                    }
+                }) { Text("添加") }
+            },
+            dismissButton = { TextButton(onClick = { showAdd = false }) { Text("取消") } }
+        )
+    }
+
+    pendingDelete?.let { id ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("删除数据源", fontSize = 15.sp) },
+            text = { Text("将移除该源及其缓存，收藏里的快照不受影响。", fontSize = 12.sp, lineHeight = 19.sp) },
+            confirmButton = {
+                TextButton(onClick = {
+                    Store.removeSource(id)
+                    pendingDelete = null
+                }) { Text("删除", color = Tones.danger) }
+            },
+            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("取消") } }
+        )
+    }
+}
+
+@Composable
+private fun Field(label: String, value: String, onChange: (String) -> Unit) {
+    Column {
+        Text(label, fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 10.dp, vertical = 9.dp)
+        ) {
+            androidx.compose.foundation.text.BasicTextField(
+                value = value,
+                onValueChange = onChange,
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

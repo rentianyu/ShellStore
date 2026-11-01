@@ -118,7 +118,9 @@ data class Entry(
     val verifiedAt: String = "",
     val pinned: Boolean = false,
     /** 导入时的原始写法（含 adb shell 前缀），仅供详情页折叠展示 */
-    val origin: String = ""
+    val origin: String = "",
+    /** 来自哪个源，多源聚合时用于回溯 */
+    val sourceId: String = ""
 ) {
     /** 详情页主按钮文案 */
     val primaryActionLabel: String

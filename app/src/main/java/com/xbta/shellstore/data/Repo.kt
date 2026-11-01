@@ -185,6 +185,18 @@ object Repo {
         runCatching { file(ctx, "settings.json").writeText(s.toJson().toString()) }
     }
 
+    // -- 数据源配置 --
+    fun loadSourceConfigs(ctx: Context): List<SourceConfig> = try {
+        val f = file(ctx, "sources.json")
+        if (!f.exists()) emptyList() else SourceConfig.listFromJson(f.readText())
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    fun saveSourceConfigs(ctx: Context, list: List<SourceConfig>) {
+        runCatching { file(ctx, "sources.json").writeText(SourceConfig.listToJson(list)) }
+    }
+
     // -- 收藏 --
     fun loadFavs(ctx: Context): FavData = try {
         val f = file(ctx, "favorites.json")
@@ -305,6 +317,7 @@ object Repo {
         })
         put("example", e.example); put("doc", e.doc); put("adb", e.adb)
         put("verifiedAt", e.verifiedAt); put("pinned", e.pinned); put("origin", e.origin)
+        put("sourceId", e.sourceId)
         put("extra", JSONObject(e.extra as Map<*, *>))
         e.intent?.let { s ->
             put("intent", JSONObject().apply {
@@ -378,7 +391,8 @@ object Repo {
             } ?: emptyMap(),
             verifiedAt = o.optString("verifiedAt"),
             pinned = o.optBoolean("pinned"),
-            origin = o.optString("origin")
+            origin = o.optString("origin"),
+            sourceId = o.optString("sourceId")
         )
     }
 }

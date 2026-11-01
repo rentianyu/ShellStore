@@ -241,10 +241,11 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
 
             item { SectionLabel("来源") }
             item {
-                val meta = Store.sourceName.collectAsState().value
+                val src = Store.sourceOf(entry.sourceId)
+                val meta = src?.name ?: "内置命令集"
                 val ver = Store.sourceVersion.collectAsState().value
                 Text(
-                    "来源　$meta" + (if (ver.isNotBlank()) " · v$ver" else "") + "\n" +
+                    "来源　$meta" + (if (ver.isNotBlank() && src?.type == com.xbta.shellstore.core.SourceType.BUILTIN) " · v$ver" else "") + "\n" +
                         "条目　${entry.id}" +
                         (if (entry.verifiedAt.isNotBlank()) "\n验证　${entry.verifiedAt}" else ""),
                     fontSize = 10.5.sp,
