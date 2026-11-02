@@ -482,7 +482,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 // ---------------- 订阅源 ----------------
 
 @Composable
-fun SourcesScreen(onBack: () -> Unit) {
+fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val sources by Store.sources.collectAsState()
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -571,6 +571,40 @@ fun SourcesScreen(onBack: () -> Unit) {
                     Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.primary)
                 }
             }
+
+            // 订阅源的介绍与格式说明就放在这里，不另找地方
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radius.md))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .clickable { onOpen(Page.SourceHelp) }
+                    .padding(horizontal = 12.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("?", fontSize = TypeScale.body, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary)
+                }
+                Spacer(Modifier.width(Space.sm))
+                Column(Modifier.weight(1f)) {
+                    Text("怎么写自己的源", fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "格式说明 · 最小模板 · 一键复制给 AI",
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
+            }
+            Spacer(Modifier.height(10.dp))
 
             sources.forEach { s ->
                 Row(

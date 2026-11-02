@@ -10,8 +10,8 @@ object Tones {
     val cautionBg = Color(0xFFFDF3E3)
     val danger = Color(0xFFC3271F)
     val dangerBg = Color(0xFFFDECEC)
-    val neutralBg = Color(0xFFEEF1F6)
-    val neutralFg = Color(0xFF66708A)
-    val codeBg = Color(0xFFF6F8FA)
-    val codeFg = Color(0xFF24292F)
+    val neutralBg = Color(0xFFE9E6EA)
+    val neutralFg = Color(0xFF5E5C60)
+    val codeBg = Color(0xFFE9E6EA)
+    val codeFg = Color(0xFF1B1B1E)
 }

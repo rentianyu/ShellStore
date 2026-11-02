@@ -51,6 +51,7 @@ sealed interface Page {
     data object Backup : Page
     data object About : Page
     data object Help : Page
+    data object SourceHelp : Page
 }
 
 @Composable
@@ -151,10 +152,11 @@ private fun Root() {
                     is Page.AllFav -> AllFavScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Recent -> RecentScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Settings -> SettingsScreen(onBack = ::pop)
-                    is Page.Sources -> SourcesScreen(onBack = ::pop)
+                    is Page.Sources -> SourcesScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Backup -> BackupScreen(onBack = ::pop)
                     is Page.About -> AboutScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Help -> HelpScreen(onBack = ::pop)
+                    is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)
                 }
             }
             }
