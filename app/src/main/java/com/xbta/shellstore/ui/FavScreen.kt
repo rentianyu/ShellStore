@@ -143,7 +143,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 }
             )
         }
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(Modifier.padding(horizontal = Space.page, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             FilterChip("文件夹", view == 0) { view = 0; currentFolder = null }
             FilterChip("标签", view == 1) { view = 1 }
             FilterChip("全部", view == 2) { view = 2; currentFolder = null }
@@ -151,7 +151,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
 
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             if (view == 0) {
@@ -243,7 +243,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                                     .background(TAG_COLORS[t.colorIdx % TAG_COLORS.size])
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text(t.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                            Text(t.name, fontSize = TypeScale.small, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                             Text("$n", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -282,7 +282,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = Space.page, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(Space.sm)
             ) {
                 BatchBtn("打标签", selected.isNotEmpty()) { dialog = FavDialog.BatchTag(selected) }
@@ -335,7 +335,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 val f = favs.folders.firstOrNull { it.id == d.id }
                 AlertDialog(
                     onDismissRequest = { dialog = null },
-                    title = { Text(f?.name ?: "文件夹", fontSize = 15.sp) },
+                    title = { Text(f?.name ?: "文件夹", fontSize = TypeScale.body) },
                     text = {
                         Column {
                             MenuItem("新建子文件夹") { dialog = FavDialog.NewFolder(d.id) }
@@ -355,7 +355,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             is FavDialog.FavActions -> {
                 AlertDialog(
                     onDismissRequest = { dialog = null },
-                    title = { Text(d.item.entry.title, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                    title = { Text(d.item.entry.title, fontSize = TypeScale.body, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     text = {
                         Column {
                             MenuItem("移动到…") { dialog = FavDialog.MoveTo(d.item) }
@@ -373,7 +373,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             is FavDialog.MoveTo -> {
                 AlertDialog(
                     onDismissRequest = { dialog = null },
-                    title = { Text("移动到", fontSize = 15.sp) },
+                    title = { Text("移动到", fontSize = TypeScale.body) },
                     text = {
                         LazyColumn(Modifier.heightIn(max = 320.dp)) {
                             item {
@@ -510,7 +510,7 @@ private fun FolderRow(folder: Folder, count: Int, onClick: () -> Unit, onMenu: (
         ) { Text("▣", fontSize = IconSize.card, color = MaterialTheme.colorScheme.primary) }
         Spacer(Modifier.width(10.dp))
         Text(
-            folder.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            folder.name, fontSize = TypeScale.small, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis
         )
         Text("$count", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -606,7 +606,7 @@ fun FavRow(
 private fun MenuItem(text: String, danger: Boolean = false, onClick: () -> Unit) {
     Text(
         text,
-        fontSize = 13.sp,
+        fontSize = TypeScale.small,
         color = if (danger) Tones.danger else MaterialTheme.colorScheme.onSurface,
         modifier = Modifier
             .fillMaxWidth()
@@ -627,7 +627,7 @@ private fun InputDialog(
     var v by remember { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, fontSize = 15.sp) },
+        title = { Text(title, fontSize = TypeScale.body) },
         text = {
             Column {
                 Text(label, fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -643,7 +643,7 @@ private fun InputDialog(
                         value = v,
                         onValueChange = { v = it },
                         singleLine = true,
-                        textStyle = TextStyle(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface),
+                        textStyle = TextStyle(fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurface),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -695,7 +695,7 @@ fun FavFolderScreen(folderId: String?, onBack: () -> Unit, onOpen: (Page) -> Uni
         LazyColumn(
             state = state,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(14.dp),
+            contentPadding = PaddingValues(Space.page),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             itemsIndexed(items, key = { _, fi -> fi.entryId }) { _, fi ->
@@ -781,7 +781,7 @@ fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
             } else {
                 LazyColumn(
                     Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 6.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     items(favs.tags, key = { it.id }) { t ->
@@ -823,7 +823,7 @@ fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
             } else {
                 LazyColumn(
                     Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 6.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     items(list, key = { it.entryId }) { fi ->
@@ -842,7 +842,7 @@ fun AllFavScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
         TopBar("全部收藏", onBack = onBack)
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(14.dp),
+            contentPadding = PaddingValues(Space.page),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             items(favs.items, key = { it.entryId }) { fi ->

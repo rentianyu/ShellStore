@@ -77,7 +77,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
 
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (searchMode && query.isBlank() && history.isNotEmpty()) {
@@ -229,7 +229,7 @@ private fun CategoryGrid(
                     ) {
                         Text(
                             catGlyph(idx),
-                            fontSize = 15.sp,
+                            fontSize = TypeScale.body,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.primary
@@ -260,7 +260,7 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
         TopBar("全部分类", onBack = onBack)
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             item {
@@ -331,12 +331,12 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         TopBar(cat, onBack = onBack, actions = { IconBtn("☰") { viewOptions = true } })
-        Box(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
+        Box(Modifier.padding(horizontal = Space.page, vertical = 4.dp)) {
             SearchField(query = query, onQueryChange = { query = it }, placeholder = "在「$cat」内搜索")
         }
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {

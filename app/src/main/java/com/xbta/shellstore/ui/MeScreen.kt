@@ -68,7 +68,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp)
+                .padding(horizontal = Space.page)
                 .padding(bottom = 20.dp)
         ) {
             Row(
@@ -77,11 +77,11 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(12.dp))
-                    .padding(14.dp),
+                    .padding(Space.page),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 与桌面图标同一套图形：深色渐变底 + 青绿提示符
-                Box(Modifier.size(48.dp).clip(RoundedCornerShape(13.dp))) {
+                Box(Modifier.size(48.dp).clip(RoundedCornerShape(Radius.md))) {
                     Image(
                         painterResource(R.drawable.ic_launcher_background),
                         contentDescription = null,
@@ -96,7 +96,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("Shell 商店", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("Shell 商店", fontSize = TypeScale.body, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(3.dp))
                     Text(
                         (if (BuildConfig.DEBUG) "DEBUG · " else "") +
@@ -114,7 +114,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(12.dp))
-                    .padding(vertical = 13.dp)
+                    .padding(vertical = Space.md)
             ) {
                 StatCell("${favs.items.size}", "已收藏", Modifier.weight(1f))
                 StatCell("${favs.folders.size}", "收藏夹", Modifier.weight(1f))
@@ -169,6 +169,8 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                 Divider()
                 SettingRow("⚙", "设置", "主题 · 字号 · 复制前缀", onClick = { onOpen(Page.Settings) })
                 Divider()
+                SettingRow("？", "使用帮助", "上手 · 类型 · 订阅源 · 常见问题", onClick = { onOpen(Page.Help) })
+                Divider()
                 SettingRow("ⓘ", "关于", "开源地址 · 许可", onClick = { onOpen(Page.About) })
             }
 
@@ -177,7 +179,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                 SettingRow("▶", "执行通道", "Shizuku / Termux", enabled = false)
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(Space.md))
             Text(
                 "首版仅支持复制到剪贴板，不申请任何执行权限。\nShizuku / Termux 执行通道在后续版本提供。",
                 fontSize = TypeScale.caption,
@@ -190,7 +192,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
     if (showUpdate) {
         AlertDialog(
             onDismissRequest = { if (progress < 0) showUpdate = false },
-            title = { Text("检查更新", fontSize = 15.sp) },
+            title = { Text("检查更新", fontSize = TypeScale.body) },
             text = {
                 Column {
                     Text(
@@ -204,7 +206,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                         latest != null && !downloaded -> {
                             Text(
                                 "发现新版本 v${latest!!.version}",
-                                fontSize = 13.sp,
+                                fontSize = TypeScale.small,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -269,7 +271,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
 @Composable
 private fun StatCell(value: String, label: String, modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(value, fontSize = TypeScale.title, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(3.dp))
         Text(label, fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -312,13 +314,13 @@ fun SettingsScreen(onBack: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp)
+                .padding(horizontal = Space.page)
                 .padding(bottom = 20.dp)
         ) {
             GroupTitle("外观")
             GroupCard {
-                Column(Modifier.padding(13.dp)) {
-                    Text("主题", fontSize = 13.sp)
+                Column(Modifier.padding(Space.md)) {
+                    Text("主题", fontSize = TypeScale.small)
                     Spacer(Modifier.height(9.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         ThemeMode.entries.forEach { m ->
@@ -327,8 +329,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 Divider()
-                Column(Modifier.padding(13.dp)) {
-                    Text("字号", fontSize = 13.sp)
+                Column(Modifier.padding(Space.md)) {
+                    Text("字号", fontSize = TypeScale.small)
                     Spacer(Modifier.height(9.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         listOf(0.9f to "小", 1.0f to "标准", 1.15f to "大").forEach { (f, l) ->
@@ -368,8 +370,8 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             GroupTitle("复制")
             GroupCard {
-                Column(Modifier.padding(13.dp)) {
-                    Text("复制前缀", fontSize = 13.sp)
+                Column(Modifier.padding(Space.md)) {
+                    Text("复制前缀", fontSize = TypeScale.small)
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "贴到电脑终端时选 adb shell；手机上用 Shizuku / Termux 保持「无」",
@@ -412,7 +414,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("清除收藏数据", fontSize = 15.sp) },
+            title = { Text("清除收藏数据", fontSize = TypeScale.body) },
             text = {
                 Text(
                     "将删除全部收藏、文件夹与标签，此操作不可恢复。\n订阅源与设置不受影响。",
@@ -434,7 +436,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         val isUi = fontDialog == 1
         AlertDialog(
             onDismissRequest = { fontDialog = 0 },
-            title = { Text(if (isUi) "界面字体" else "代码字体", fontSize = 15.sp) },
+            title = { Text(if (isUi) "界面字体" else "代码字体", fontSize = TypeScale.body) },
             text = {
                 Column {
                     FontChoice.entries.forEach { fc ->
@@ -454,7 +456,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         ) {
                             Text(
                                 fc.label,
-                                fontSize = 13.sp,
+                                fontSize = TypeScale.small,
                                 color = if (usable) MaterialTheme.colorScheme.onSurface
                                 else MaterialTheme.colorScheme.outline
                             )
@@ -531,7 +533,7 @@ fun SourcesScreen(onBack: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp)
+                .padding(horizontal = Space.page)
                 .padding(bottom = 20.dp)
         ) {
             if (busy.isNotEmpty()) {
@@ -586,7 +588,7 @@ fun SourcesScreen(onBack: () -> Unit) {
                 ) {
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(s.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(s.name, fontSize = TypeScale.small, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.width(6.dp))
                             MutedBadge(s.typeLabel)
                         }
@@ -638,7 +640,7 @@ fun SourcesScreen(onBack: () -> Unit) {
                 })
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(Space.md))
             Text(
                 "SMD 格式：## 分类 / ### 条目 / @risk safe / 代码块装命令。\n" +
                     "也支持 ● 开头的清单直接粘贴成文件导入。\n" +
@@ -655,7 +657,7 @@ fun SourcesScreen(onBack: () -> Unit) {
         var url by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showAdd = false },
-            title = { Text("添加在线源", fontSize = 15.sp) },
+            title = { Text("添加在线源", fontSize = TypeScale.body) },
             text = {
                 Column {
                     Field("名称（可留空）", name) { name = it }
@@ -686,7 +688,7 @@ fun SourcesScreen(onBack: () -> Unit) {
     pendingDelete?.let { id ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除订阅源", fontSize = 15.sp) },
+            title = { Text("删除订阅源", fontSize = TypeScale.body) },
             text = { Text("将移除该源及其缓存，收藏里的快照不受影响。", fontSize = 12.sp, lineHeight = 19.sp) },
             confirmButton = {
                 TextButton(onClick = {
@@ -789,7 +791,7 @@ fun BackupScreen(onBack: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp)
+                .padding(horizontal = Space.page)
                 .padding(bottom = 20.dp)
         ) {
             GroupTitle("导出")
@@ -881,7 +883,7 @@ fun BackupScreen(onBack: () -> Unit) {
 // ---------------- 关于 ----------------
 
 @Composable
-fun AboutScreen(onBack: () -> Unit) {
+fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
     val cats by Store.categories.collectAsState()
 
@@ -889,13 +891,13 @@ fun AboutScreen(onBack: () -> Unit) {
         TopBar("关于", onBack = onBack)
         Column(
             Modifier
-                .padding(horizontal = 14.dp)
+                .padding(horizontal = Space.page)
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    Modifier.size(54.dp).clip(RoundedCornerShape(14.dp))
+                    Modifier.size(54.dp).clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
@@ -903,7 +905,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("Shell 商店", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Shell 商店", fontSize = TypeScale.title, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(3.dp))
                     Text(
                         "v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE})",
@@ -915,6 +917,8 @@ fun AboutScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(16.dp))
             GroupCard {
+                SettingRow("？", "使用帮助", "离线可用，不联网也能查", onClick = { onOpen(Page.Help) })
+                Divider()
                 SettingRow("▤", "当前内容", "${cats.size} 个分类 · ${entries.size} 条")
                 Divider()
                 SettingRow("⌘", "数据格式", "SMD v1")
@@ -922,7 +926,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 SettingRow("⚖", "开源协议", "MIT")
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(Space.md))
             Text(
                 "命令与脚本均来自订阅源，App 自身不做任何联网上传。\n" +
                     "标注为「危险」的条目在执行前请自行确认内容，误操作造成的后果由使用者承担。",

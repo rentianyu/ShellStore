@@ -23,6 +23,7 @@ import com.xbta.shellstore.data.UpdateCenter
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.ui.theme.AppTheme
 import com.xbta.shellstore.ui.theme.IconSize
+import com.xbta.shellstore.ui.theme.TypeScale
 import com.xbta.shellstore.ui.theme.LocalCodeFont
 import com.xbta.shellstore.ui.theme.resolveCodeFont
 import com.xbta.shellstore.ui.theme.resolveUiFont
@@ -43,6 +44,7 @@ sealed interface Page {
     data object Sources : Page
     data object Backup : Page
     data object About : Page
+    data object Help : Page
 }
 
 @Composable
@@ -146,7 +148,8 @@ private fun Root() {
                     is Page.Settings -> SettingsScreen(onBack = ::pop)
                     is Page.Sources -> SourcesScreen(onBack = ::pop)
                     is Page.Backup -> BackupScreen(onBack = ::pop)
-                    is Page.About -> AboutScreen(onBack = ::pop)
+                    is Page.About -> AboutScreen(onBack = ::pop, onOpen = ::push)
+                    is Page.Help -> HelpScreen(onBack = ::pop)
                 }
             }
             }
@@ -203,7 +206,7 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
                 Spacer(Modifier.height(1.dp))
                 Text(
                     pair.second,
-                    fontSize = 13.sp,
+                    fontSize = TypeScale.small,
                     fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
                     color = color
                 )

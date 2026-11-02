@@ -114,7 +114,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
 
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
@@ -310,7 +310,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 14.dp, vertical = 9.dp),
+                .padding(horizontal = Space.page, vertical = 9.dp),
             horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             if (runnable) {
@@ -344,7 +344,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                         .clip(RoundedCornerShape(Radius.md))
                         .background(variant)
                         .clickable { copy() }
-                        .padding(horizontal = 14.dp),
+                        .padding(horizontal = Space.page),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
@@ -379,7 +379,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                         .clip(RoundedCornerShape(Radius.md))
                         .background(variant)
                         .clickable { copy() }
-                        .padding(horizontal = 14.dp),
+                        .padding(horizontal = Space.page),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)

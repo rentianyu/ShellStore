@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Radius
+import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.TypeScale
 
 /**
@@ -64,7 +65,7 @@ fun RecentScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
 
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             if (gone > 0) {

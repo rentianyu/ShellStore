@@ -369,12 +369,20 @@ fun SearchField(
                 )
             }
             if (query.isNotEmpty()) {
-                Text(
-                    "✕",
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.clickable { onQueryChange("") }.padding(Space.xs)
-                )
+                // 热区给到 32dp：文字本身只有十几 dp，点起来容易落空
+                Box(
+                    Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .clickable { onQueryChange("") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "✕",
+                        fontSize = TypeScale.title,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
             }
         }
         if (onCancel != null) {
@@ -448,7 +456,7 @@ fun SettingRow(
         Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(enabled) { onClick() } else Modifier)
-            .padding(horizontal = Space.md, vertical = 13.dp),
+            .padding(horizontal = Space.md, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(

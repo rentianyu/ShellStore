@@ -215,7 +215,7 @@ fun DownloadBar(pct: Int) {
             )
         }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 3.dp),
+            Modifier.fillMaxWidth().padding(horizontal = Space.page, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("新版本下载中 $pct%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -14,6 +14,12 @@ object Space {
     val md = 12.dp
     val lg = 16.dp
     val xl = 20.dp
+
+    /**
+     * 页面左右留白。14dp 是 4 栅格的例外：正文 15sp + 14dp 两侧留白才有合适的行长，
+     * 改成 16 会让内容区明显变窄。单独定义成一档，避免 14.dp 散落在几十个地方。
+     */
+    val page = 14.dp
 }
 
 object Radius {
@@ -82,8 +88,8 @@ object Dimen {
     val button = 42.dp
     val buttonSmall = 36.dp
 
-    /** 顶栏图标按钮的点击热区，同时决定图表视觉留白 */
-    val iconButton = 40.dp
+    /** 图标按钮的点击热区。按无障碍建议取 48dp（顶栏 54dp 高，上下各余 3dp） */
+    val iconButton = 48.dp
 
     /** 类型徽章方块边长 */
     val badgeIcon = 24.dp
