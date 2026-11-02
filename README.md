@@ -10,10 +10,9 @@ App 本身不含命令，首次启动会引导你启用官方源（129 条 / 10 
 
 ## 安装
 
-| 版本 | 下载 | 说明 |
-|---|---|---|
-| **正式版** | [app-release.apk](https://p.xbta.cc/https://github.com/rentianyu/ShellStore/releases/latest/download/app-release.apk) | 稳定，从正式 Release 更新 |
-| 开发版 | [app-debug.apk](https://p.xbta.cc/https://github.com/rentianyu/ShellStore/releases/download/dev-latest/app-debug.apk) | 新功能先在开发版，包名独立，可与正式版同时安装 |
+| 下载 | 说明 |
+|---|---|
+| [app-release.apk](https://p.xbta.cc/https://github.com/rentianyu/ShellStore/releases/latest/download/app-release.apk) | 永远指向最新正式版，App 内也会自动检查更新 |
 
 要求 Android 8.0（API 26）以上。首次安装需允许「安装未知应用」。
 
@@ -121,9 +120,6 @@ A：解析时会自动剥掉，你原样贴进来也不会出错。
 A：收藏存在 App 私有目录，随 App 卸载一起删除。建议「我的 › 备份与恢复」定期导出一份 JSON
 （含收藏、标签、设置），换机时导入即可，支持合并或覆盖。
 
-**Q：正式版和开发版能同时装吗？**
-A：可以。开发版包名是 `com.xbta.shellstore.debug`，应用名带 DEBUG 后缀，两套数据独立。
-
 **Q：为什么应用内更新下载完要我手动点安装？**
 A：Android 的安全限制，App 不能静默安装，只能把安装包交给系统安装器。
 
@@ -143,8 +139,8 @@ A：只有三个：联网、读取网络状态（判断在线源能否更新）�
 
 CI 由 GitHub Actions 负责：
 
-- 推 `main` → 构建 debug → 覆盖上传到预发布 `dev-latest`
-- 推 `v*` tag → 构建 release → 生成正式 Release
+- 推 `main` → 只做编译验证（aapt2 体检 + 30 天 artifact），不出 Release
+- 推 `v*` tag → 构建 release → 生成正式 Release，这是唯一的分发出口
 
 技术栈：Kotlin 2.4 · Jetpack Compose · AGP 8.13 / Gradle 8.14 · JDK 17 · minSdk 26 / targetSdk 36。
 无数据库、无序列化框架、无图片库——SMD 解析器和 UI 都是手写的。

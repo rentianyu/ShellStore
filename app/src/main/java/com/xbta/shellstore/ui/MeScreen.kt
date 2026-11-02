@@ -99,8 +99,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     Text("Shell 商店", fontSize = TypeScale.body, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        (if (BuildConfig.DEBUG) "DEBUG · " else "") +
-                            "v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE}) · ${srcList.count { it.enabled }} 个源 · ${entries.size} 条",
+                        "v${BuildConfig.VERSION_NAME} (${BuildConfig.APP_VERSION_CODE}) · ${srcList.count { it.enabled }} 个源 · ${entries.size} 条",
                         fontSize = TypeScale.small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -148,8 +147,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                         latest = null
                         downloaded = false
                         scope.launch {
-                            // DEBUG 包查 dev-latest 的开发包，正式版查正式 Release
-                            val r = withContext(Dispatchers.IO) { Updater.checkLatest(BuildConfig.DEBUG) }
+                            val r = withContext(Dispatchers.IO) { Updater.checkLatest() }
                             checking = false
                             val info = r.info
                             if (info == null) {

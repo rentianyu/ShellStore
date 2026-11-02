@@ -2,8 +2,8 @@ name: build-apk
 
 # 沙箱无本地 Android SDK，出包完全依赖这条流水线。
 # 交付方式：产物直接挂 GitHub Release，下载链接 = 代理前缀 + release asset（不传 R2）。
-#   分支构建 -> 更新固定 tag 的 dev-latest（预发布，asset 覆盖）
-#   tag v*   -> 正式 Release
+#   分支构建 -> 只编译验证（aapt2/apksigner 体检 + 30 天 artifact），不出 Release
+#   tag v*   -> 正式 Release（唯一的分发出口）
 # 前提：仓库必须 public，否则匿名下载拿不到（返回 9 字节错误体），代理也救不了。
 
 on:
@@ -91,15 +91,6 @@ jobs:
         run: |
           mkdir -p out
           find app/build/outputs/apk -name '*.apk' -exec cp -v {} out/ \;
-          # 分支构建额外产出一个带版本号的 debug 包：debug 版自更新靠文件名判断版本
-          # （dev-latest 的 tag 固定不变，只能从 ShellStore-<版本>-debug.apk 里读）。
-          # 固定名 app-debug.apk 继续保留，作为人工下载的最新包入口。
-          if [ "${GITHUB_REF}" = "${GITHUB_REF#refs/tags/}" ]; then
-            V=$(grep -E '^VERSION_NAME=' gradle.properties | head -1 | cut -d= -f2 | tr -d ' \r')
-            if [ -f out/app-debug.apk ] && [ -n "$V" ]; then
-              cp -v out/app-debug.apk "out/ShellStore-$V-debug.apk"
-            fi
-          fi
           ls -l out
           [ -n "$(ls out/*.apk 2>/dev/null)" ] || { echo "没有产物"; exit 1; }
 
@@ -126,34 +117,3 @@ jobs:
         with:
           files: out/*.apk
           generate_release_notes: true
-
-      # 分支构建：更新固定 tag 的预发布 release，asset 名固定 -> --clobber 覆盖
-      - name: Publish dev-latest
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: |
-          TAG=dev-latest
-          gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1 || \
-            gh release create "$TAG" --repo "$REPO" --prerelease \
-              --title "最新开发构建" --notes "CI 自动更新，文件名固定、内容覆盖"
-          # --clobber 只覆盖同名文件，而带版本号的名字每次都不同 -> 不清理会一直累积，
-          # App 端页面解析可能先拿到旧版本。这里只保留本次版本的带版本号 asset。
-          V=$(grep -E '^VERSION_NAME=' gradle.properties | head -1 | cut -d= -f2 | tr -d ' \r')
-          gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[].name' 2>/dev/null | \
-          while read -r n; do
-            case "$n" in
-              ShellStore-*-debug.apk)
-                if [ "$n" != "ShellStore-$V-debug.apk" ]; then
-                  echo "remove old asset: $n"
-                  gh release delete-asset "$TAG" "$n" --repo "$REPO" --yes || true
-                fi
-                ;;
-            esac
-          done
-          gh release upload "$TAG" out/*.apk --repo "$REPO" --clobber
-          echo "下载直链（代理前缀 + 下列地址）："
-          for f in out/*.apk; do
-            echo "  https://github.com/$REPO/releases/download/$TAG/$(basename "$f")"
-          done

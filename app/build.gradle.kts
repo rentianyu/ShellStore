@@ -44,11 +44,7 @@ android {
 
     buildTypes {
         debug {
-            // 开发版独立包名：可以和正式版同时装在手机上，互不覆盖。
-            // 应用名在 app/src/debug/res/values/strings.xml 里覆盖成「Shell 商店 DEBUG」。
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
-            // 与 release 同签名，迭代时 debug 覆盖 debug 不用卸载
+            // 与 release 同签名：本地 debug 包也能覆盖安装到已装的正式版上（包名一致）
             if (keystorePropsFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
