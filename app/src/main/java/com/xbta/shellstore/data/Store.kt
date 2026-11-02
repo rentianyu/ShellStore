@@ -492,6 +492,43 @@ object Store {
         Repo.saveFavs(c, _favs.value)
     }
 
+    /**
+     * 批量加收藏（粘贴导入用）。返回 (新增, 跳过)。
+     * 已收藏过的 entryId 直接跳过，不覆盖原有的备注与标签。
+     */
+    fun addFavs(entries: List<Entry>, folderId: String? = null): Pair<Int, Int> {
+        val c = ctx ?: return 0 to 0
+        if (entries.isEmpty()) return 0 to 0
+        val list = _favs.value.items.toMutableList()
+        var top = list.filter { it.folderId == folderId }.maxOfOrNull { it.order } ?: 0
+        var added = 0
+        var skipped = 0
+        entries.forEach { e ->
+            if (list.any { it.entryId == e.id }) {
+                skipped++
+                return@forEach
+            }
+            top++
+            list.add(
+                FavItem(
+                    entryId = e.id,
+                    folderId = folderId,
+                    savedAt = System.currentTimeMillis(),
+                    entry = e,
+                    sourceId = e.sourceId,
+                    sourceName = "导入",
+                    order = top
+                )
+            )
+            added++
+        }
+        if (added > 0) {
+            _favs.value = _favs.value.copy(items = list)
+            Repo.saveFavs(c, _favs.value)
+        }
+        return added to skipped
+    }
+
     /** 本地新建一条命令，直接进收藏。返回新条目 id */
     fun addLocalEntry(entry: Entry, folderId: String? = null): String {
         val c = ctx ?: return ""

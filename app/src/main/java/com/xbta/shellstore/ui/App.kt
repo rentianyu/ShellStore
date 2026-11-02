@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.BuildConfig
+import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.UpdateCenter
 import com.xbta.shellstore.data.ThemeMode
@@ -52,8 +53,12 @@ sealed interface Page {
     data object About : Page
     data object Help : Page
     data object SourceHelp : Page
-    /** entryId 为空 = 新建；folderId 决定新条目落在哪个收藏夹 */
-    data class Editor(val entryId: String?, val folderId: String? = null) : Page
+    /** entryId 为空 = 新建；folderId 决定新条目落在哪个收藏夹；draft 用于粘贴导入时预填 */
+    data class Editor(
+        val entryId: String? = null,
+        val folderId: String? = null,
+        val draft: Entry? = null
+    ) : Page
 }
 
 @Composable
@@ -159,7 +164,7 @@ private fun Root() {
                     is Page.About -> AboutScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Help -> HelpScreen(onBack = ::pop)
                     is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)
-                    is Page.Editor -> EntryEditorScreen(p.entryId, p.folderId, onBack = ::pop)
+                    is Page.Editor -> EntryEditorScreen(p.entryId, p.folderId, p.draft, onBack = ::pop)
                 }
             }
             }

@@ -43,20 +43,23 @@ import com.xbta.shellstore.ui.theme.TypeScale
 fun EntryEditorScreen(
     entryId: String? = null,
     folderId: String? = null,
+    draft: Entry? = null,
     onBack: () -> Unit
 ) {
     val existing = remember(entryId) { entryId?.let { Store.entryById(it) } }
+    // draft 只用于预填（粘贴导入），不改变"这是新建"的语义
+    val seed = existing ?: draft
     val isEditing = existing != null
 
-    var type by remember { mutableStateOf(existing?.type ?: EntryType.SHELL) }
-    var title by remember { mutableStateOf(existing?.title ?: "") }
-    var desc by remember { mutableStateOf(existing?.desc ?: "") }
-    var body by remember { mutableStateOf(existing?.body ?: "") }
-    var risk by remember { mutableStateOf(existing?.risk ?: Risk.SAFE) }
-    var need by remember { mutableStateOf(existing?.need ?: Need.NONE) }
-    var tagText by remember { mutableStateOf(existing?.tags?.joinToString(" ") ?: "") }
+    var type by remember { mutableStateOf(seed?.type ?: EntryType.SHELL) }
+    var title by remember { mutableStateOf(seed?.title ?: "") }
+    var desc by remember { mutableStateOf(seed?.desc ?: "") }
+    var body by remember { mutableStateOf(seed?.body ?: "") }
+    var risk by remember { mutableStateOf(seed?.risk ?: Risk.SAFE) }
+    var need by remember { mutableStateOf(seed?.need ?: Need.NONE) }
+    var tagText by remember { mutableStateOf(seed?.tags?.joinToString(" ") ?: "") }
 
-    val it0 = existing?.intent
+    val it0 = seed?.intent
     var action by remember { mutableStateOf(it0?.action ?: "") }
     var component by remember { mutableStateOf(it0?.component ?: "") }
     var pkg by remember { mutableStateOf(it0?.packageName ?: "") }
@@ -64,13 +67,13 @@ fun EntryEditorScreen(
     var mime by remember { mutableStateOf(it0?.mime ?: "") }
     var cats by remember { mutableStateOf(it0?.categories?.joinToString(" ") ?: "") }
 
-    val params = remember { mutableStateListOf<Param>().apply { existing?.params?.let { addAll(it) } } }
+    val params = remember { mutableStateListOf<Param>().apply { seed?.params?.let { addAll(it) } } }
     val extras = remember { mutableStateListOf<Extra>().apply { it0?.extras?.let { addAll(it) } } }
 
     var tip by remember { mutableStateOf<String?>(null) }
 
     fun build(): Entry {
-        val base = existing ?: Entry(id = "", type = type, title = "")
+        val base = seed ?: Entry(id = "", type = type, title = "")
         val intentSpec = if (type.hasBody) null else IntentSpec(
             action = action.trim(),
             data = data.trim(),

@@ -1,5 +1,7 @@
 package com.xbta.shellstore.ui
 
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
@@ -22,8 +25,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -48,7 +53,8 @@ private val TAG_COLORS = listOf(
 )
 
 private sealed interface FavDialog {
-    data object NewEntry : FavDialog
+    data object QuickAdd : FavDialog
+    data class PasteImport(val raw: String) : FavDialog
     data class NewFolder(val parentId: String?) : FavDialog
     data class RenameFolder(val id: String) : FavDialog
     data class FolderActions(val id: String) : FavDialog
@@ -78,6 +84,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
     var viewOptions by remember { mutableStateOf(false) }
     val settings by Store.settings.collectAsState()
     val exporter = rememberSmdExporter()
+    val ctx = LocalContext.current
 
     // 返回键优先退选择模式 / 关弹窗 / 退搜索，最后才交给系统
     BackHandler(enabled = multiMode) {
@@ -104,6 +111,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
         else -> emptyList()
     }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         if (searchMode) {
             Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
@@ -143,7 +151,6 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     IconBtn("☰") { viewOptions = true }
                     IconBtn("⌕") { searchMode = true }
                     IconBtn("☑") { multiMode = true; selected = emptySet() }
-                    IconBtn("+") { dialog = FavDialog.NewEntry }
                 }
             )
         }
@@ -155,7 +162,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
 
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 8.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 8.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             if (view == 0) {
@@ -303,6 +310,24 @@ fun FavScreen(onOpen: (Page) -> Unit) {
         }
     }
 
+        // 右下角浮动新建：不遮挡列表，搜索/多选时自动隐藏
+        if (!multiMode && !searchMode) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 18.dp, bottom = 18.dp)
+                    .size(52.dp)
+                    .shadow(10.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable { dialog = FavDialog.QuickAdd },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("+", fontSize = 28.sp, color = MaterialTheme.colorScheme.onPrimary)
+            }
+        }
+    }
+
     if (viewOptions) {
         ViewOptionsDialog(
             foldPreview = settings.foldPreview,
@@ -371,7 +396,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 )
             }
 
-            is FavDialog.NewEntry -> {
+            is FavDialog.QuickAdd -> {
                 AlertDialog(
                     onDismissRequest = { dialog = null },
                     title = { Text("新建", fontSize = TypeScale.body) },
@@ -385,9 +410,36 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                                 input = ""
                                 dialog = FavDialog.NewFolder(currentFolder)
                             }
+                            MenuItem("添加订阅源") {
+                                dialog = null
+                                onOpen(Page.Sources)
+                            }
+                            MenuItem("粘贴导入 SMD / JSON / 命令") {
+                                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val text = cm.primaryClip
+                                    ?.takeIf { it.itemCount > 0 }
+                                    ?.getItemAt(0)?.text?.toString().orEmpty()
+                                dialog = FavDialog.PasteImport(text)
+                            }
                         }
                     },
                     confirmButton = { TextButton(onClick = { dialog = null }) { Text("关闭") } }
+                )
+            }
+
+            is FavDialog.PasteImport -> {
+                PasteImportDialog(
+                    raw = d.raw,
+                    folderId = currentFolder,
+                    onDismiss = { dialog = null },
+                    onOpenEditor = { draft ->
+                        dialog = null
+                        onOpen(Page.Editor(folderId = currentFolder, draft = draft))
+                    },
+                    onOpenSources = {
+                        dialog = null
+                        onOpen(Page.Sources)
+                    }
                 )
             }
 
