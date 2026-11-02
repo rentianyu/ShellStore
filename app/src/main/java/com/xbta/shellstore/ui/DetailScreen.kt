@@ -128,6 +128,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     MutedBadge(typeLabel(entry.type))
                     Spacer(Modifier.width(5.dp))
+                    if (Store.isLocal(entry.id)) {
+                        MutedBadge("本地")
+                        Spacer(Modifier.width(5.dp))
+                    }
                     RiskBadge(entry.risk)
                     if (entry.need != Need.NONE) {
                         Spacer(Modifier.width(5.dp))

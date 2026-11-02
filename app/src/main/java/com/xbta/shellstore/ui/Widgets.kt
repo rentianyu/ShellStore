@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.xbta.shellstore.core.*
+import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.LocalCodeFont
 import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Radius
@@ -218,6 +219,10 @@ fun EntryRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+            if (Store.isLocal(entry.id)) {
+                Spacer(Modifier.width(Space.xs))
+                Badge("本地", Tones.neutralFg, Tones.neutralBg)
+            }
             if (folded) {
                 RiskBadge(entry.risk)
                 Spacer(Modifier.width(Space.xs))

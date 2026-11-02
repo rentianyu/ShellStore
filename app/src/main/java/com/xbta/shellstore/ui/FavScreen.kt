@@ -656,6 +656,10 @@ fun FavRow(
                 e.title, fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
             )
+            if (Store.isLocal(item.entryId)) {
+                Spacer(Modifier.width(Space.xs))
+                Badge("本地", Tones.neutralFg, Tones.neutralBg)
+            }
             if (folded && !multiMode) {
                 RiskBadge(e.risk)
                 Spacer(Modifier.width(Space.xs))
