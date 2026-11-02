@@ -57,7 +57,9 @@ fun detectPaste(raw: String): PasteKind {
 
     val hasCat = Regex("(?m)^##\\s+\\S").containsMatchIn(t)
     val hasEntry = Regex("(?m)^###\\s+\\S").containsMatchIn(t)
-    if (hasCat && hasEntry) {
+    // 有分类标题的整套源，或带 @type 的单条片段（SMD 片段没有 ## 分类行）
+    val looksSmd = hasEntry && (hasCat || t.contains("@type", ignoreCase = true))
+    if (looksSmd) {
         val parsed = SmdParser.parse(t, "_paste", "粘贴导入")
         val n = parsed.source.entries.size
         if (n > 0) return PasteKind.Smd(t, n, parsed.source.name.ifBlank { "粘贴的源" })
