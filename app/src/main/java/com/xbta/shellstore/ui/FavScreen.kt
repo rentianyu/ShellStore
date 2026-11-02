@@ -48,6 +48,7 @@ private val TAG_COLORS = listOf(
 )
 
 private sealed interface FavDialog {
+    data object NewEntry : FavDialog
     data class NewFolder(val parentId: String?) : FavDialog
     data class RenameFolder(val id: String) : FavDialog
     data class FolderActions(val id: String) : FavDialog
@@ -139,7 +140,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     IconBtn("☰") { viewOptions = true }
                     IconBtn("⌕") { searchMode = true }
                     IconBtn("☑") { multiMode = true; selected = emptySet() }
-                    IconBtn("+") { input = ""; dialog = FavDialog.NewFolder(currentFolder) }
+                    IconBtn("+") { dialog = FavDialog.NewEntry }
                 }
             )
         }
@@ -351,12 +352,36 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 )
             }
 
+            is FavDialog.NewEntry -> {
+                AlertDialog(
+                    onDismissRequest = { dialog = null },
+                    title = { Text("新建", fontSize = TypeScale.body) },
+                    text = {
+                        Column {
+                            MenuItem("命令 / 脚本 / Scheme / Intent") {
+                                dialog = null
+                                onOpen(Page.Editor(null, currentFolder))
+                            }
+                            MenuItem("收藏夹") {
+                                input = ""
+                                dialog = FavDialog.NewFolder(currentFolder)
+                            }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { dialog = null }) { Text("关闭") } }
+                )
+            }
+
             is FavDialog.FavActions -> {
                 AlertDialog(
                     onDismissRequest = { dialog = null },
                     title = { Text(d.item.entry.title, fontSize = TypeScale.body, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     text = {
                         Column {
+                            MenuItem("编辑内容") {
+                                dialog = null
+                                onOpen(Page.Editor(d.item.entryId, null))
+                            }
                             MenuItem("移动到…") { dialog = FavDialog.MoveTo(d.item) }
                             MenuItem("打标签") { dialog = FavDialog.EditTags(d.item) }
                             MenuItem("写备注") { dialog = FavDialog.EditNote(d.item) }
@@ -585,7 +610,7 @@ fun FavRow(
             MutedBadge(typeLabel(e.type))
             Spacer(Modifier.width(Space.xs))
             RiskBadge(e.risk)
-            if (!item.alive && !Store.isAlive(item.entryId)) {
+            if (!item.alive && !Store.isAlive(item.entryId) && !Store.isLocal(item.entryId)) {
                 Spacer(Modifier.width(Space.xs))
                 Badge("源已失效", Tones.danger, Tones.dangerBg)
             }
@@ -752,7 +777,7 @@ fun FavFolderScreen(folderId: String?, onBack: () -> Unit, onOpen: (Page) -> Uni
                                 onOpen(Page.Detail(fi.entryId))
                             }
                         },
-                        onMenu = {}
+                        onMenu = { onOpen(Page.Editor(fi.entryId, null)) }
                     )
                 }
             }
@@ -824,7 +849,7 @@ fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     items(list, key = { it.entryId }) { fi ->
-                        FavRow(fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = {})
+                        FavRow(fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = { onOpen(Page.Editor(fi.entryId, null)) })
                     }
                 }
             }
@@ -843,7 +868,7 @@ fun AllFavScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             items(favs.items, key = { it.entryId }) { fi ->
-                FavRow(fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = {})
+                FavRow(fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = { onOpen(Page.Editor(fi.entryId, null)) })
             }
         }
     }

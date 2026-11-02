@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun DetailScreen(entryId: String, onBack: () -> Unit) {
+fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
     val entry = Store.entryById(entryId)
     val favs by Store.favs.collectAsState()
     val settings by Store.settings.collectAsState()
@@ -104,6 +104,13 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 cm.setPrimaryClip(ClipData.newPlainText("标题", entry.title))
                                 Toast.makeText(ctx, "已复制标题", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("编辑内容", fontSize = TypeScale.body) },
+                            onClick = {
+                                menuOpen = false
+                                onOpen(Page.Editor(entry.id, null))
                             }
                         )
                     }

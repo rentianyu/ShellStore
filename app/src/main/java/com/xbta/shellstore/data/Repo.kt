@@ -98,7 +98,12 @@ data class FavItem(
     val sourceId: String = "",
     val sourceName: String = "",
     /** 手动排序位次，越大越靠前；0 表示未手动排过（此时按 savedAt 排） */
-    val order: Int = 0
+    val order: Int = 0,
+    /**
+     * 用户手动改过内容。为 true 时详情页用快照而不是源里的原始条目，
+     * 且刷新订阅源不会覆盖用户改动。本地新建的条目恒为 true。
+     */
+    val edited: Boolean = false
 ) {
     /** 当前源里还能不能找到（由 Store 在加载后回填） */
     var alive: Boolean = true
@@ -310,6 +315,7 @@ object Repo {
                     put("sourceId", it.sourceId)
                     put("sourceName", it.sourceName)
                     put("order", it.order)
+                    put("edited", it.edited)
                     put("entry", entryToJson(it.entry))
                 })
             }
@@ -355,7 +361,8 @@ object Repo {
                             ?: Entry(id = it2.optString("entryId"), type = EntryType.SHELL, title = it2.optString("entryId")),
                         sourceId = it2.optString("sourceId"),
                         sourceName = it2.optString("sourceName"),
-                        order = it2.optInt("order")
+                        order = it2.optInt("order"),
+                        edited = it2.optBoolean("edited", false)
                     )
                 )
             }

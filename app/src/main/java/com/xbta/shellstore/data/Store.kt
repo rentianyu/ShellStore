@@ -28,6 +28,8 @@ object Store {
 
     const val OFFICIAL_ID = "official"
 
+    /** 本地自建条目的 id 前缀，带此前缀的条目只存在于收藏里，不属于任何源 */
+    const val LOCAL_PREFIX = "local-"
     /** 官方命令库。直连不通时自动走 p.xbta.cc 反代，国内也能拉。 */
     const val OFFICIAL_URL = "https://raw.githubusercontent.com/rentianyu/ShellStore/main/sources/official.md"
 
@@ -402,9 +404,17 @@ object Store {
 
     // ---------------- 查询 ----------------
 
-    fun entryById(id: String): Entry? =
-        _entries.value.firstOrNull { it.id == id }
-            ?: _favs.value.items.firstOrNull { it.entryId == id }?.entry
+    fun entryById(id: String): Entry? {
+        val fav = _favs.value.items.firstOrNull { it.entryId == id }
+        // 用户改过的（含本地新建）以快照为准，不跟随源
+        if (fav != null && fav.edited) return fav.entry
+        return _entries.value.firstOrNull { it.id == id } ?: fav?.entry
+    }
+
+    /** 本地自建条目（id 前缀 local-），不存在于任何源里 */
+    fun isLocal(entryId: String): Boolean = entryId.startsWith(LOCAL_PREFIX)
+
+    private fun newLocalId(): String = LOCAL_PREFIX + UUID.randomUUID().toString().take(8)
 
     fun entriesInCategory(cat: String): List<Entry> =
         _entries.value.filter { it.categoryId == cat }
@@ -468,6 +478,55 @@ object Store {
         val list = _favs.value.items.map { fi ->
             val p = pos[fi.entryId]
             if (p != null && fi.folderId == folderId) fi.copy(order = p) else fi
+        }
+        _favs.value = _favs.value.copy(items = list)
+        Repo.saveFavs(c, _favs.value)
+    }
+
+    /** 本地新建一条命令，直接进收藏。返回新条目 id */
+    fun addLocalEntry(entry: Entry, folderId: String? = null): String {
+        val c = ctx ?: return ""
+        val id = if (entry.id.startsWith(LOCAL_PREFIX)) entry.id else newLocalId()
+        val item = entry.copy(id = id)
+        val list = _favs.value.items.filterNot { it.entryId == id }.toMutableList()
+        val top = list.filter { it.folderId == folderId }.maxOfOrNull { it.order } ?: 0
+        list.add(
+            FavItem(
+                entryId = id,
+                folderId = folderId,
+                savedAt = System.currentTimeMillis(),
+                entry = item,
+                sourceId = "",
+                sourceName = "本地",
+                order = top + 1,
+                edited = true
+            )
+        )
+        _favs.value = _favs.value.copy(items = list)
+        Repo.saveFavs(c, _favs.value)
+        return id
+    }
+
+    /**
+     * 改收藏条目的内容（只改本地快照，不动源）。
+     * 保留原条目的文件夹 / 标签 / 备注 / 排序位次。
+     */
+    fun updateFavEntry(entryId: String, entry: Entry) {
+        val c = ctx ?: return
+        val list = _favs.value.items.map { fi ->
+            if (fi.entryId == entryId) fi.copy(entry = entry.copy(id = entryId), edited = true) else fi
+        }
+        _favs.value = _favs.value.copy(items = list)
+        Repo.saveFavs(c, _favs.value)
+    }
+
+    /** 放弃手动改动，回到源的原始内容（本地条目无源，调用会被忽略） */
+    fun revertFavEntry(entryId: String) {
+        if (isLocal(entryId)) return
+        val c = ctx ?: return
+        val src = _entries.value.firstOrNull { it.id == entryId } ?: return
+        val list = _favs.value.items.map { fi ->
+            if (fi.entryId == entryId) fi.copy(entry = src, edited = false) else fi
         }
         _favs.value = _favs.value.copy(items = list)
         Repo.saveFavs(c, _favs.value)

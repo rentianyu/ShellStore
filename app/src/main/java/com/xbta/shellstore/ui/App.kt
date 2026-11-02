@@ -52,6 +52,8 @@ sealed interface Page {
     data object About : Page
     data object Help : Page
     data object SourceHelp : Page
+    /** entryId 为空 = 新建；folderId 决定新条目落在哪个收藏夹 */
+    data class Editor(val entryId: String?, val folderId: String? = null) : Page
 }
 
 @Composable
@@ -146,7 +148,7 @@ private fun Root() {
                 when (val p = current) {
                     is Page.AllCats -> AllCatsScreen(onBack = ::pop, onOpenCat = { push(Page.CatList(it)) })
                     is Page.CatList -> CatListScreen(p.cat, onBack = ::pop, onOpen = ::push)
-                    is Page.Detail -> DetailScreen(p.entryId, onBack = ::pop)
+                    is Page.Detail -> DetailScreen(p.entryId, onBack = ::pop, onOpen = ::push)
                     is Page.FavFolder -> FavFolderScreen(p.folderId, onBack = ::pop, onOpen = ::push)
                     is Page.TagView -> TagScreen(onBack = ::pop, onOpen = ::push)
                     is Page.AllFav -> AllFavScreen(onBack = ::pop, onOpen = ::push)
@@ -157,6 +159,7 @@ private fun Root() {
                     is Page.About -> AboutScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Help -> HelpScreen(onBack = ::pop)
                     is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)
+                    is Page.Editor -> EntryEditorScreen(p.entryId, p.folderId, onBack = ::pop)
                 }
             }
             }
