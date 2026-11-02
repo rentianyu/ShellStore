@@ -234,7 +234,6 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(Radius.md))
                                 .background(MaterialTheme.colorScheme.surface)
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                                 .padding(horizontal = 12.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -498,7 +497,6 @@ private fun FolderRow(folder: Folder, count: Int, onClick: () -> Unit, onMenu: (
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -791,7 +789,6 @@ fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(Radius.md))
                                 .background(MaterialTheme.colorScheme.surface)
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                                 .clickable { chosen = t.id }
                                 .padding(horizontal = Space.md, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically

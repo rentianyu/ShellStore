@@ -3,6 +3,7 @@ package com.xbta.shellstore.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
@@ -11,6 +12,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -22,7 +26,9 @@ import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.UpdateCenter
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.ui.theme.AppTheme
+import com.xbta.shellstore.ui.theme.Dimen
 import com.xbta.shellstore.ui.theme.IconSize
+import com.xbta.shellstore.ui.theme.Radius
 import com.xbta.shellstore.ui.theme.TypeScale
 import com.xbta.shellstore.ui.theme.LocalCodeFont
 import com.xbta.shellstore.ui.theme.resolveCodeFont
@@ -45,6 +51,7 @@ sealed interface Page {
     data object Backup : Page
     data object About : Page
     data object Help : Page
+    data object SourceHelp : Page
 }
 
 @Composable
@@ -145,10 +152,11 @@ private fun Root() {
                     is Page.AllFav -> AllFavScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Recent -> RecentScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Settings -> SettingsScreen(onBack = ::pop)
-                    is Page.Sources -> SourcesScreen(onBack = ::pop)
+                    is Page.Sources -> SourcesScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Backup -> BackupScreen(onBack = ::pop)
                     is Page.About -> AboutScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Help -> HelpScreen(onBack = ::pop)
+                    is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)
                 }
             }
             }
@@ -183,32 +191,55 @@ private fun Root() {
 
 @Composable
 private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
-    Row(
+    // 浮动胶囊 dock：不贴边、带阴影，落到页面底色上，才有「浮起来」的层次。
+    // 选中指示器用中性色托盘（比 dock 亮一档）而不是主色药丸，色只留给图标和文字。
+    Box(
         Modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 18.dp, vertical = 8.dp)
     ) {
-        listOf("▦" to "商店", "☆" to "收藏", "◍" to "我的").forEachIndexed { i, pair ->
-            val on = i == current && !hasOverlay
-            val color = if (on) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .6f)
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clickable { onSelect(i) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(pair.first, fontSize = IconSize.tab, color = color)
-                Spacer(Modifier.height(1.dp))
-                Text(
-                    pair.second,
-                    fontSize = TypeScale.small,
-                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                    color = color
-                )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(Dimen.tabBar)
+                .shadow(10.dp, RoundedCornerShape(Radius.lg), clip = false)
+                .clip(RoundedCornerShape(Radius.lg))
+                .background(MaterialTheme.colorScheme.surface),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf("▦" to "商店", "☆" to "收藏", "◍" to "我的").forEachIndexed { i, pair ->
+                val on = i == current && !hasOverlay
+                val fg = if (on) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .75f)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable { onSelect(i) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        Modifier
+                            .width(58.dp)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (on) MaterialTheme.colorScheme.surfaceContainerHighest
+                                else Color.Transparent
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(pair.first, fontSize = IconSize.tab, color = fg)
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        pair.second,
+                        fontSize = TypeScale.small,
+                        fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                        color = fg
+                    )
+                }
             }
         }
     }

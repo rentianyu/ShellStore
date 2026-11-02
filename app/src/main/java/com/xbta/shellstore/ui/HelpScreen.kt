@@ -155,11 +155,6 @@ private fun HelpQ(q: String, a: String) {
             .padding(bottom = Space.md)
             .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(
-                1.dp,
-                MaterialTheme.colorScheme.outline.copy(alpha = .7f),
-                RoundedCornerShape(Radius.md)
-            )
             .padding(Space.md)
     ) {
         Text(q, fontSize = TypeScale.small, fontWeight = FontWeight.SemiBold)
