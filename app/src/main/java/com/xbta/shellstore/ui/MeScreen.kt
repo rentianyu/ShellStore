@@ -786,26 +786,8 @@ fun BackupScreen(onBack: () -> Unit) {
         }
     }
 
-    val mdSaver = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/markdown")
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val text = Store.exportFavsSmd()
-                val ok = withContext(Dispatchers.IO) {
-                    runCatching {
-                        ctx.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) }
-                        true
-                    }.getOrDefault(false)
-                }
-                Toast.makeText(
-                    ctx,
-                    if (ok) "已导出 ${text.length} 字符" else "写入文件失败",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
+    val exporter = rememberSmdExporter()
+    var pickingExport by remember { mutableStateOf(false) }
 
     fun doImport(json: String, overwrite: Boolean) {
         scope.launch {
@@ -825,11 +807,11 @@ fun BackupScreen(onBack: () -> Unit) {
         ) {
             GroupTitle("导出")
             GroupCard {
-                SettingRow("⇧", "导出为订阅源", "${favs.items.size} 条收藏 · Markdown（SMD）", onClick = {
+                SettingRow("⇧", "导出为订阅源", "${favs.items.size} 条收藏 · 可选文件夹 · Markdown（SMD）", onClick = {
                     if (favs.items.isEmpty()) {
                         Toast.makeText(ctx, "还没有收藏可导出", Toast.LENGTH_SHORT).show()
                     } else {
-                        mdSaver.launch("shellstore-favs.md")
+                        pickingExport = true
                     }
                 })
                 Divider()
@@ -904,6 +886,17 @@ fun BackupScreen(onBack: () -> Unit) {
                 TextButton(onClick = { val j = json; pending = null; doImport(j, overwrite = true) }) {
                     Text("覆盖", color = Tones.danger)
                 }
+            }
+        )
+    }
+
+    if (pickingExport) {
+        ExportFolderDialog(
+            favs = favs,
+            onDismiss = { pickingExport = false },
+            onConfirm = { pick ->
+                pickingExport = false
+                exporter(pick)
             }
         )
     }

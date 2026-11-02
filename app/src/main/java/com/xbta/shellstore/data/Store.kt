@@ -424,7 +424,8 @@ object Store {
     fun search(query: String, types: Set<EntryType>, risks: Set<Risk>): List<Entry> {
         val kw = query.trim().lowercase()
         if (kw.isEmpty() && types.isEmpty() && risks.isEmpty()) return _entries.value
-        return _entries.value.filter { e ->
+
+        fun match(e: Entry): Boolean =
             (types.isEmpty() || e.type in types) &&
                 (risks.isEmpty() || e.risk in risks) &&
                 (kw.isEmpty() ||
@@ -433,7 +434,15 @@ object Store {
                     e.desc.lowercase().contains(kw) ||
                     e.tags.any { it.lowercase().contains(kw) } ||
                     e.categoryId.lowercase().contains(kw))
-        }
+
+        val fromSources = _entries.value.filter(::match)
+        // 本地自建条目不属于任何源，只在搜索里并入，免得混进分类浏览
+        val local = _favs.value.items.asSequence()
+            .filter { isLocal(it.entryId) }
+            .map { it.entry }
+            .filter(::match)
+            .toList()
+        return fromSources + local
     }
 
     // ---------------- 收藏 ----------------
@@ -749,21 +758,25 @@ object Store {
         Repo.saveFavs(c, _favs.value)
     }
 
-    /** 把收藏导出成一份 SMD 源文本，按收藏夹分组 */
-    fun exportFavsSmd(): String {
+    /**
+     * 把收藏导出成一份 SMD 源文本，按收藏夹分组。
+     * filter 为 null 导出全部；给定谓词时只导出命中的条目（用于指定文件夹）。
+     */
+    fun exportFavsSmd(title: String = "我的收藏", filter: ((FavItem) -> Boolean)? = null): String {
         val d = _favs.value
-        if (d.items.isEmpty()) return ""
+        val picked = if (filter == null) d.items else d.items.filter(filter)
+        if (picked.isEmpty()) return ""
         val tagName = d.tags.associate { it.id to it.name }
         val groups = LinkedHashMap<String, MutableList<String>>()
-        d.items.forEach { fi ->
+        picked.forEach { fi ->
             val cat = d.folders.firstOrNull { it.id == fi.folderId }?.name ?: "未分类"
             val names = fi.tags.mapNotNull { tagName[it] }
             groups.getOrPut(cat) { mutableListOf() }
                 .add(SmdWriter.entry(fi.entry, note = fi.note, tagNames = names))
         }
         return SmdWriter.source(
-            name = "我的收藏",
-            desc = "由 Shell 商店导出的收藏（${d.items.size} 条）",
+            name = title,
+            desc = "由 Shell 商店导出的收藏（${picked.size} 条）",
             groups = groups.map { it.key to it.value }
         )
     }

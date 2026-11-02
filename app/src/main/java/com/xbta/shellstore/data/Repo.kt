@@ -166,6 +166,17 @@ data class FavData(
         return items.count { it.folderId != null && it.folderId in ids }
     }
 
+    /** 该文件夹及其所有子孙文件夹的 id；不存在时返回空集合 */
+    fun subtreeIds(folderId: String): Set<String> {
+        val out = mutableSetOf<String>()
+        fun walk(id: String) {
+            if (!out.add(id)) return
+            childrenOf(id).forEach { walk(it.id) }
+        }
+        walk(folderId)
+        return out
+    }
+
     fun itemsIn(folderId: String?): List<FavItem> =
         items.filter { it.folderId == folderId }
             .sortedWith(

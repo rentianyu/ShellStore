@@ -77,6 +77,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var viewOptions by remember { mutableStateOf(false) }
     val settings by Store.settings.collectAsState()
+    val exporter = rememberSmdExporter()
 
     // 返回键优先退选择模式 / 关弹窗 / 退搜索，最后才交给系统
     BackHandler(enabled = multiMode) {
@@ -344,6 +345,18 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     title = { Text(f?.name ?: "文件夹", fontSize = TypeScale.body) },
                     text = {
                         Column {
+                            MenuItem("导出此文件夹") {
+                                dialog = null
+                                favs.folders.firstOrNull { it.id == d.id }?.let { f ->
+                                    exporter(
+                                        ExportPick.Folders(
+                                            ids = favs.subtreeIds(f.id),
+                                            includeRoot = false,
+                                            label = f.name
+                                        )
+                                    )
+                                }
+                            }
                             MenuItem("新建子文件夹") { dialog = FavDialog.NewFolder(d.id) }
                             MenuItem("重命名") { dialog = FavDialog.RenameFolder(d.id) }
                             MenuItem("删除（子内容上移）", danger = true) {
