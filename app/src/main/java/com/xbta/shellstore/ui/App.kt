@@ -22,6 +22,7 @@ import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.UpdateCenter
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.ui.theme.AppTheme
+import com.xbta.shellstore.ui.theme.Dimen
 import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.TypeScale
 import com.xbta.shellstore.ui.theme.LocalCodeFont
@@ -186,7 +187,7 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(Dimen.tabBar)
             .background(MaterialTheme.colorScheme.surface)
     ) {
         listOf("▦" to "商店", "☆" to "收藏", "◍" to "我的").forEachIndexed { i, pair ->
@@ -205,7 +206,7 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
                 Spacer(Modifier.height(1.dp))
                 Text(
                     pair.second,
-                    fontSize = TypeScale.small,
+                    fontSize = TypeScale.body,
                     fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
                     color = color
                 )

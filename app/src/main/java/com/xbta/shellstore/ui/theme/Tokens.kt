@@ -19,7 +19,7 @@ object Space {
      * 页面左右留白。14dp 是 4 栅格的例外：正文 15sp + 14dp 两侧留白才有合适的行长，
      * 改成 16 会让内容区明显变窄。单独定义成一档，避免 14.dp 散落在几十个地方。
      */
-    val page = 16.dp
+    val page = 20.dp
 }
 
 /**
@@ -62,13 +62,13 @@ object TypeScale {
  */
 object IconSize {
     /** 底部 tab 图标 */
-    val tab = 26.sp
+    val tab = 30.sp
 
     /** 顶栏操作按钮（搜索、视图、加号） */
-    val top = 21.sp
+    val top = 24.sp
 
     /** 顶栏返回箭头 */
-    val nav = 30.sp
+    val nav = 32.sp
 
     /** 列表卡片右侧操作（⋯） */
     val action = 19.sp
@@ -87,8 +87,8 @@ object IconSize {
 }
 
 object Dimen {
-    val topBar = 54.dp
-    val tabBar = 58.dp
+    val topBar = 56.dp
+    val tabBar = 64.dp
     val button = 42.dp
     val buttonSmall = 36.dp
 
