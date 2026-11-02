@@ -160,7 +160,6 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(Radius.md))
                             .background(MaterialTheme.colorScheme.surface)
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                             .clickable { onOpen(Page.AllCats) }
                             .padding(horizontal = Space.md, vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -223,7 +222,6 @@ private fun CategoryGrid(
                             .weight(1f)
                             .clip(RoundedCornerShape(Radius.md))
                             .background(MaterialTheme.colorScheme.surface)
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                             .clickable { onOpen(Page.CatList(c.name)) }
                             .padding(horizontal = Space.md, vertical = Space.md)
                     ) {
@@ -278,7 +276,6 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                         .clickable { onOpenCat(c.name) }
                         .padding(horizontal = Space.md, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically

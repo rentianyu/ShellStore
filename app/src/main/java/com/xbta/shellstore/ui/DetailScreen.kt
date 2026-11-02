@@ -178,7 +178,6 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                         .clickable { copy() }
                         .padding(12.dp)
                 ) {
@@ -220,7 +219,6 @@ fun DetailScreen(entryId: String, onBack: () -> Unit) {
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(Radius.sm))
                                     .background(MaterialTheme.colorScheme.surface)
-                                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.sm))
                                     .padding(horizontal = 11.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -571,7 +569,6 @@ private fun IntentFieldTable(spec: IntentSpec) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
     ) {
         rows.forEachIndexed { i, pair ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 8.dp)) {

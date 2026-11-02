@@ -97,7 +97,6 @@ fun WelcomeScreen(onDone: () -> Unit) {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.lg))
                 .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.lg))
                 .padding(Space.lg)
         ) {
             Row(verticalAlignment = Alignment.Top) {

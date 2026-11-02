@@ -119,8 +119,7 @@ fun CardSurface(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(radius))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(radius)),
+            .background(MaterialTheme.colorScheme.surface),
         content = content
     )
 }
@@ -205,7 +204,6 @@ fun EntryRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
             .clickable { onClick() }
             .padding(Space.md)
     ) {
@@ -490,7 +488,6 @@ fun GroupCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
     ) { content() }
 }
 

@@ -19,13 +19,17 @@ object Space {
      * 页面左右留白。14dp 是 4 栅格的例外：正文 15sp + 14dp 两侧留白才有合适的行长，
      * 改成 16 会让内容区明显变窄。单独定义成一档，避免 14.dp 散落在几十个地方。
      */
-    val page = 14.dp
+    val page = 16.dp
 }
 
+/**
+ * 圆角档位对齐 FlClash（AppCorner: 4/8/16/20/24/28）。
+ * 这里保留三档：小控件 8、卡片 16、容器与弹层 24。
+ */
 object Radius {
     val sm = 8.dp
-    val md = 12.dp
-    val lg = 16.dp
+    val md = 16.dp
+    val lg = 24.dp
 }
 
 /** 字号六档：统一用系统字体，字号偏大以保证可读性 */
@@ -39,11 +43,11 @@ object TypeScale {
     /** 正文、卡片标题、列表项 */
     val body = 15.sp
 
-    /** 区块标题 */
-    val title = 16.sp
+    /** 区块标题（对齐 FlClash 的 headline 17） */
+    val title = 17.sp
 
-    /** 顶栏标题 */
-    val headline = 19.sp
+    /** 顶栏标题（对齐 FlClash 的 title3 20） */
+    val headline = 20.sp
 
     /** 卡片内命令预览 */
     val code = 13.sp

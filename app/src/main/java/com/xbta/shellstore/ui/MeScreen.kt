@@ -76,7 +76,6 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(12.dp))
                     .padding(Space.page),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -112,7 +111,6 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(12.dp))
                     .padding(vertical = Space.md)
             ) {
                 StatCell("${favs.items.size}", "已收藏", Modifier.weight(1f))
@@ -580,7 +578,6 @@ fun SourcesScreen(onBack: () -> Unit) {
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = .7f), RoundedCornerShape(Radius.md))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
