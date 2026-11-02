@@ -53,6 +53,8 @@ private sealed interface FavDialog {
     data class RenameFolder(val id: String) : FavDialog
     data class FolderActions(val id: String) : FavDialog
     data class FavActions(val item: FavItem) : FavDialog
+    data class ConfirmDelete(val item: FavItem) : FavDialog
+    data class ConfirmDeleteMany(val ids: Set<String>) : FavDialog
     data class MoveTo(val item: FavItem) : FavDialog
     data class EditNote(val item: FavItem) : FavDialog
     data class EditTags(val item: FavItem) : FavDialog
@@ -288,9 +290,13 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 BatchBtn("打标签", selected.isNotEmpty()) { dialog = FavDialog.BatchTag(selected) }
                 BatchBtn("移动到", selected.isNotEmpty()) { dialog = FavDialog.BatchMove(selected) }
                 BatchBtn("取消收藏", selected.isNotEmpty(), danger = true) {
-                    Store.removeFavs(selected)
-                    selected = emptySet()
-                    multiMode = false
+                    if (selected.any { Store.isLocal(it) }) {
+                        dialog = FavDialog.ConfirmDeleteMany(selected)
+                    } else {
+                        Store.removeFavs(selected)
+                        selected = emptySet()
+                        multiMode = false
+                    }
                 }
             }
         }
@@ -372,6 +378,54 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 )
             }
 
+            is FavDialog.ConfirmDelete -> {
+                AlertDialog(
+                    onDismissRequest = { dialog = null },
+                    title = { Text("删除本地条目", fontSize = TypeScale.body) },
+                    text = {
+                        Text(
+                            "「${d.item.entry.title}」是你自己新建的，不属于任何订阅源，" +
+                                "删掉就再也找不回来了。",
+                            fontSize = TypeScale.small
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            Store.removeFav(d.item.entryId)
+                            dialog = null
+                        }) { Text("仍然删除", color = Tones.danger) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { dialog = null }) { Text("取消") }
+                    }
+                )
+            }
+
+            is FavDialog.ConfirmDeleteMany -> {
+                AlertDialog(
+                    onDismissRequest = { dialog = null },
+                    title = { Text("删除本地条目", fontSize = TypeScale.body) },
+                    text = {
+                        Text(
+                            "所选的 ${d.ids.count { Store.isLocal(it) }} 条是你自己新建的，" +
+                                "不属于任何订阅源，删掉就找不回来了。",
+                            fontSize = TypeScale.small
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            Store.removeFavs(d.ids)
+                            selected = emptySet()
+                            multiMode = false
+                            dialog = null
+                        }) { Text("仍然删除", color = Tones.danger) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { dialog = null }) { Text("取消") }
+                    }
+                )
+            }
+
             is FavDialog.FavActions -> {
                 AlertDialog(
                     onDismissRequest = { dialog = null },
@@ -385,8 +439,15 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                             MenuItem("移动到…") { dialog = FavDialog.MoveTo(d.item) }
                             MenuItem("打标签") { dialog = FavDialog.EditTags(d.item) }
                             MenuItem("写备注") { dialog = FavDialog.EditNote(d.item) }
-                            MenuItem("取消收藏", danger = true) {
-                                Store.removeFav(d.item.entryId); dialog = null
+                            MenuItem(
+                                if (Store.isLocal(d.item.entryId)) "删除（本地条目）" else "取消收藏",
+                                danger = true
+                            ) {
+                                if (Store.isLocal(d.item.entryId)) {
+                                    dialog = FavDialog.ConfirmDelete(d.item)
+                                } else {
+                                    Store.removeFav(d.item.entryId); dialog = null
+                                }
                             }
                         }
                     },
