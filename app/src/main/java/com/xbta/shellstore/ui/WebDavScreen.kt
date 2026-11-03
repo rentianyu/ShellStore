@@ -152,7 +152,7 @@ fun WebDavScreen(onBack: () -> Unit) {
                 })
                 Divider()
                 SettingRow(
-                    "⇄", "测试连接",
+                    "▶", "测试连接",
                     if (busy) "正在连接…" else "会建目录并上传一个探针文件",
                     enabled = !busy,
                     onClick = {
@@ -212,7 +212,7 @@ fun WebDavScreen(onBack: () -> Unit) {
             GroupTitle("状态")
             GroupCard {
                 SettingRow(
-                    if (state.lastOk) "✓" else "!",
+                    if (state.lastOk) "✓" else "⚠",
                     "上次备份",
                     when {
                         state.running -> "进行中…"

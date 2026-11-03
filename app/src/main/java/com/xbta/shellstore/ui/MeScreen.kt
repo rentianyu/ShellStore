@@ -946,7 +946,7 @@ fun BackupScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
             GroupTitle("云备份")
             GroupCard {
                 SettingRow(
-                    "☁", "WebDAV 云备份",
+                    "⇅", "WebDAV 云备份",
                     "自动备份到自己的 WebDAV，换机可恢复",
                     onClick = { onOpen(Page.WebDav) }
                 )
