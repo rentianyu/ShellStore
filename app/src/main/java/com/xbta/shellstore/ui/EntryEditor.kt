@@ -146,6 +146,16 @@ fun EntryEditorScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Space.page)
         ) {
+            // 编辑源里尚未收藏的条目时，说明保存会落到收藏
+            if (isEditing && entryId != null && favs.items.none { it.entryId == entryId }) {
+                Text(
+                    "这条还没收藏，保存后会加入收藏（改动只影响你的副本，不改源）",
+                    fontSize = TypeScale.caption,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = Space.sm)
+                )
+            }
+
             // ---------- 类型 ----------
             GroupTitle("类型")
             Row(

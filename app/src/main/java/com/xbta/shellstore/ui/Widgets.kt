@@ -196,6 +196,7 @@ fun EntryRow(
     fav: Boolean,
     onClick: () -> Unit,
     onToggleFav: () -> Unit,
+    onEdit: (() -> Unit)? = null,
     showCategory: Boolean = true,
     folded: Boolean = false,
     highlight: String = ""
@@ -239,6 +240,17 @@ fun EntryRow(
                     fontSize = IconSize.action,
                     color = if (fav) Color(0xFFF2A93B) else MaterialTheme.colorScheme.outline
                 )
+            }
+            if (onEdit != null) {
+                Box(
+                    Modifier
+                        .size(Dimen.iconButton)
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .clickable { onEdit() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("⋯", fontSize = IconSize.action, color = MaterialTheme.colorScheme.outline)
+                }
             }
         }
 
