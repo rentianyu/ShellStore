@@ -189,7 +189,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(Radius.md))
                         .background(MaterialTheme.colorScheme.surface)
-                        .clickable { copy() }
+                        .clickable { onOpen(Page.Editor(entry.id)) }
                         .padding(12.dp)
                 ) {
                     Column {
@@ -203,7 +203,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                         Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "点击复制",
+                                "点击编辑",
                                 fontSize = TypeScale.caption,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
@@ -349,11 +349,11 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 }
                 Box(
                     Modifier
+                        .weight(1f)
                         .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
                         .background(variant)
-                        .clickable { copy() }
-                        .padding(horizontal = Space.page),
+                        .clickable { copy() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
@@ -384,11 +384,11 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 }
                 Box(
                     Modifier
+                        .weight(1f)
                         .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
                         .background(variant)
-                        .clickable { copy() }
-                        .padding(horizontal = Space.page),
+                        .clickable { copy() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
@@ -412,11 +412,11 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 }
                 Box(
                     Modifier
+                        .weight(1f)
                         .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
                         .background(variant)
-                        .clickable { copy() }
-                        .padding(horizontal = Space.page),
+                        .clickable { copy() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
