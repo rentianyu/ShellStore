@@ -33,6 +33,7 @@ import com.xbta.shellstore.R
 import com.xbta.shellstore.data.AppSettings
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.FontChoice
+import com.xbta.shellstore.data.SeriesSources
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.data.Updater
@@ -666,22 +667,36 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 Spacer(Modifier.height(8.dp))
             }
 
-            GroupTitle("小贝塔系列")
+            GroupTitle("订阅源")
             GroupCard {
                 SettingRow(
-                    "✦", "启用小贝塔系列订阅源",
-                    when {
-                        !settings.xbtaSeries -> "关闭时系列源保留配置但不生效"
-                        seriesItems.isEmpty() -> "正在获取清单…"
-                        seriesError.isNotBlank() -> "清单未更新：$seriesError"
-                        else -> "${seriesItems.size} 个可选，按需单独开启"
-                    },
+                    "✦", SeriesSources.LABEL, "",
                     trailing = {
-                        Toggle(settings.xbtaSeries) { on ->
-                            Store.setXbtaSeries(on)
-                            if (on) runAsync("清单") { Store.loadSeriesCatalog() }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { runAsync("刷新") { Store.refreshSeries() } },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("↻", fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            Toggle(settings.xbtaSeries) { on ->
+                                Store.setXbtaSeries(on)
+                                if (on) runAsync("清单") { Store.loadSeriesCatalog() }
+                            }
                         }
                     }
+                )
+            }
+            if (settings.xbtaSeries && seriesError.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "清单未更新：$seriesError",
+                    fontSize = TypeScale.caption,
+                    color = Tones.danger
                 )
             }
             if (settings.xbtaSeries) {

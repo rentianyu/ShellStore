@@ -221,6 +221,27 @@ object Store {
         return err
     }
 
+    /**
+     * 刷新系列：重新拉清单，再逐个刷新系列下已启用的源。
+     * 界面上的条数、错误状态由 refresh() 内部更新。会联网，调用方切 IO 线程。
+     */
+    fun refreshSeries(): String? {
+        val err = loadSeriesCatalog()
+        var ok = 0
+        var fail = 0
+        _sources.value
+            .filter { it.series == SeriesSources.SERIES && it.enabled }
+            .forEach { cfg ->
+                if (refresh(cfg.id) == null) ok++ else fail++
+            }
+        return when {
+            err != null && ok == 0 && fail == 0 -> err
+            fail > 0 -> "清单已更新，$ok 个源刷新成功、$fail 个失败"
+            ok == 0 -> "清单已更新"
+            else -> "已刷新：清单 + $ok 个源"
+        }
+    }
+
     /** 总开关：关掉后系列源保留配置但不参与解析，重新打开立即恢复 */
     fun setXbtaSeries(on: Boolean) {
         if (_settings.value.xbtaSeries == on) return
