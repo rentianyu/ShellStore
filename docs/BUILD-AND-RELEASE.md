@@ -163,7 +163,7 @@ python3 apk_peek.py <apk-url> --expect-package com.xbta.shellstore --min-code <�
 https://p.xbta.cc/https://github.com/rentianyu/ShellStore/releases/latest/download/app-release.apk
 ```
 
-- `p.xbta.cc` 是自建反代（Cloudflare Worker），国内直连
+- `p.xbta.cc` 是自建反代（Cloudflare Worker），直连可用
 - 必须用 `releases/latest/download/` 这条固定路径，不要写死 tag（否则永远拿旧版）
 - 仓库必须 **public**：私有库的 release asset 匿名下载会返回 9 字节错误体，代理也救不了
 

@@ -16,7 +16,7 @@ App 本身不含命令，首次启动会引导你启用官方源（133 条 / 10 
 
 要求 Android 8.0（API 26）以上。首次安装需允许「安装未知应用」。
 
-国内直连 GitHub 慢时，上面的 `p.xbta.cc` 是自建反代，直接点就行。
+直连 GitHub 较慢时，上面的 `p.xbta.cc` 是自建反代，直接点就行。
 
 ## 首次使用
 
@@ -70,7 +70,7 @@ https://f.xbta.cc/ai/ShellStore/sources/official.md
 ```
 
 133 条命令 / 10 个分类，数据源在 [rentianyu/ai › ShellStore/sources](https://github.com/rentianyu/ai/tree/main/ShellStore/sources)，
-由 R2 分发（`f.xbta.cc`，国内可直连）。App 启动时会检查它有没有更新（比对条目数量），
+由 R2 分发（`f.xbta.cc`，可直连）。App 启动时会检查它有没有更新（比对条目数量），
 发现变化会先问你「新增几条、删除几条」，确认后才替换。
 
 ### 加自己的源

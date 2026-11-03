@@ -1064,8 +1064,7 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 SettingRow("§", "用户协议", "v${LegalText.LEGAL_VERSION}", onClick = { onOpen(Page.Legal("user")) })
                 Divider()
                 SettingRow("§", "隐私政策", "v${LegalText.LEGAL_VERSION}", onClick = { onOpen(Page.Legal("privacy")) })
-                Divider()
-                SettingRow("ⓘ", "备案号", LegalText.FILING_NO)
+
             }
 
             Spacer(Modifier.height(Space.md))
