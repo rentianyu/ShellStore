@@ -1060,6 +1060,10 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
     val cats by Store.categories.collectAsState()
     val ctx = LocalContext.current
+    // 崩溃日志：只在进入本页时读一次（很小，不联网）
+    var crashCount by remember { mutableIntStateOf(com.xbta.shellstore.data.CrashLog.all(ctx).size) }
+    var crashText by remember { mutableStateOf(com.xbta.shellstore.data.CrashLog.read(ctx)) }
+    var showCrash by remember { mutableStateOf(false) }
     // 更新日志来自 assets/changelog.md（构建时由仓库根 CHANGELOG.md 覆盖）
     val versions = remember {
         val md = runCatching {
@@ -1102,6 +1106,13 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 Divider()
                 SettingRow("▤", "当前内容", "${cats.size} 个分类 · ${entries.size} 条")
                 Divider()
+                SettingRow(
+                    "!",
+                    "崩溃日志",
+                    if (crashCount > 0) "$crashCount 条 · 点开可复制" else "无",
+                    onClick = if (crashCount > 0) ({ showCrash = true }) else null
+                )
+                Divider()
                 SettingRow("⌘", "数据格式", "SMD v1")
                 Divider()
                 SettingRow("⚖", "开源协议", "MIT")
@@ -1141,6 +1152,39 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
             }
             Spacer(Modifier.height(20.dp))
         }
+    }
+
+    if (showCrash) {
+        AlertDialog(
+            onDismissRequest = { showCrash = false },
+            title = { Text("崩溃日志", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    Text(
+                        crashText.ifBlank { "没有记录" },
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("crash", crashText))
+                    Toast.makeText(ctx, "已复制崩溃日志", Toast.LENGTH_SHORT).show()
+                }) { Text("复制") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    com.xbta.shellstore.data.CrashLog.clear(ctx)
+                    crashCount = 0
+                    crashText = ""
+                    showCrash = false
+                    Toast.makeText(ctx, "已清空", Toast.LENGTH_SHORT).show()
+                }) { Text("清空") }
+            }
+        )
     }
 }
 

@@ -155,6 +155,34 @@ object Store {
             }
         }
         _sources.value = loadedSources
+        // 清理历史遗留的重复源：同一个 URL 只保留一份（保留先出现的，启用状态取 OR）。
+        // 重复源会让它的每条命令在列表里出现两次、id 完全相同，LazyColumn 滚动时就会抛
+        // "Key was already used" 直接闪退——这是「搜索后往下滑就闪退」的根因之一。
+        run {
+            val seenUrl = HashMap<String, Int>()
+            val kept = mutableListOf<SourceConfig>()
+            var merged = false
+            loadedSources.forEach { s ->
+                val key = s.url.trim().trimEnd('/').lowercase()
+                if (key.isBlank()) {
+                    kept.add(s)
+                    return@forEach
+                }
+                val idx = seenUrl[key]
+                if (idx == null) {
+                    seenUrl[key] = kept.size
+                    kept.add(s)
+                } else {
+                    merged = true
+                    if (s.enabled && !kept[idx].enabled) kept[idx] = kept[idx].copy(enabled = true)
+                }
+            }
+            if (merged) {
+                loadedSources = kept
+                _sources.value = loadedSources
+                Repo.saveSourceConfigs(c, loadedSources)
+            }
+        }
 
         reloadAll()
 
@@ -211,6 +239,12 @@ object Store {
     fun reloadAll() {
         val c = ctx ?: return
         val allEntries = mutableListOf<Entry>()
+        // 条目 id 是「分类+标题」的短哈希，跨源必然可能撞：同一个源被添加两次、
+        // 或两个源里有同分类同标题，都会产出完全相同的 id。
+        // 重复 id 会让 LazyColumn 在两项同时进入可见区时抛 "Key was already used" 直接闪退，
+        // 所以合并时必须按 id 去重，保留先出现的那个源。
+        val seenIds = HashSet<String>()
+        var dupIds = 0
         val allCats = LinkedHashMap<String, Category>()
         val warns = mutableListOf<ParseWarning>()
         var mainName = "命令库"
@@ -228,7 +262,9 @@ object Store {
                 return@forEach
             }
             val r = SmdParser.parse(text, cfg.id, cfg.name)
-            allEntries.addAll(r.source.entries)
+            r.source.entries.forEach { e ->
+                if (seenIds.add(e.id)) allEntries.add(e) else dupIds++
+            }
             r.source.categories.forEach { cat ->
                 if (!allCats.containsKey(cat.name)) allCats[cat.name] = cat
             }
@@ -244,6 +280,14 @@ object Store {
         _categories.value = allCats.values.toList()
         _sourceName.value = mainName
         _sourceVersion.value = mainVer
+        if (dupIds > 0) {
+            warns.add(
+                ParseWarning(
+                    0,
+                    "已合并 $dupIds 条重复条目（同分类+同标题，或同一个源被添加了两次）"
+                )
+            )
+        }
         _warnings.value = warns
         _sources.value = updated
         Repo.saveSourceConfigs(c, updated)
@@ -324,6 +368,15 @@ object Store {
         val c = ctx ?: return "未初始化"
         if (!netAllowed) return "请先同意《用户协议》和《隐私政策》"
         if (!url.startsWith("http://") && !url.startsWith("https://")) return "地址必须以 http:// 或 https:// 开头"
+        // 同一地址只保留一份：重复添加会让该源的所有条目在列表里出现两次，
+        // 而条目 id 相同 → LazyColumn 滚动时直接抛异常闪退
+        val same = _sources.value.firstOrNull {
+            it.url.trim().trimEnd('/').equals(url.trim().trimEnd('/'), true)
+        }
+        if (same != null) {
+            if (!same.enabled) toggleSource(same.id, true)
+            return "这个地址已经加过（${same.name}），已直接启用，没有重复添加"
+        }
         val id = "r" + UUID.randomUUID().toString().replace("-", "").take(8)
         val r = if (Mirrors.isGitHub(url)) {
             Mirrors.fetch(url, prefer = _settings.value.sourceMirror, validate = { looksLikeSmd(it) })
@@ -573,7 +626,7 @@ object Store {
             .map { it.entry }
             .filter(::match)
             .toList()
-        return fromSources + local
+        return (fromSources + local).distinctBy { it.id }
     }
 
     // ---------------- 收藏 ----------------

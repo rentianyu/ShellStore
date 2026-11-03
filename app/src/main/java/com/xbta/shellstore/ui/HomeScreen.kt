@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +63,15 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
     val refreshScope = rememberCoroutineScope()
     val ctx = LocalContext.current
 
+    // 滑到底时手指常常还压在最后一张卡片上，会误触卡片里的「执行 / 打开」按钮，
+    // 进而唤起别的 App 或被系统回收。这里记住滚动结束时刻，EntryRow 内部据此忽略
+    // 滚动刚停下那一瞬间的点击（正常点击都在静止之后，不受影响）。
+    val listState = rememberLazyListState()
+    var scrollEndAt by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) scrollEndAt = System.currentTimeMillis()
+    }
+
     // 搜索态按返回键先退出搜索，而不是直接退出 App
     BackHandler(enabled = searchMode) {
         searchMode = false
@@ -112,6 +122,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
         ) {
         LazyColumn(
             Modifier.fillMaxSize(),
+            state = listState,
             contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -177,6 +188,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     EntryRow(
                         e,
                         fav = favs.isFav(e.id),
+                        scrollEndAt = scrollEndAt,
                         onClick = {
                             // 点开某条结果才算一次「有效搜索」，避免逐字输入污染历史
                             Store.addSearchHistory(query)
@@ -352,6 +364,11 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
     var viewOptions by remember { mutableStateOf(false) }
     val list = remember(cat, entries) { entries.filter { it.categoryId == cat } }
     var query by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    var scrollEndAt by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) scrollEndAt = System.currentTimeMillis()
+    }
 
     val shown = remember(query, list) {
         if (query.isBlank()) list
@@ -370,6 +387,7 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
         }
         LazyColumn(
             Modifier.fillMaxSize(),
+            state = listState,
             contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -380,6 +398,7 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 EntryRow(
                     e,
                     fav = favs.isFav(e.id),
+                    scrollEndAt = scrollEndAt,
                     onClick = { onOpen(Page.Detail(e.id)) },
                     onToggleFav = { Store.toggleFav(e) },
                     onEdit = { onOpen(Page.Editor(e.id)) },

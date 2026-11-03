@@ -202,8 +202,12 @@ fun EntryRow(
     onEdit: (() -> Unit)? = null,
     showCategory: Boolean = true,
     folded: Boolean = false,
-    highlight: String = ""
+    highlight: String = "",
+    /** 列表滚动结束时刻（毫秒）。刚停下 350ms 内的点击一律忽略，防滑动误触 */
+    scrollEndAt: Long = 0L
 ) {
+    // 滑到底时手指常压在最后一张卡片上，误触「执行 / 打开」会直接执行命令或唤起别的 App
+    fun tapAllowed(): Boolean = System.currentTimeMillis() - scrollEndAt >= 350L
     val ctx = LocalContext.current
     val canOpen = IntentLauncher.canTrigger(entry)
     val canRun = entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT
@@ -232,7 +236,7 @@ fun EntryRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surface)
-            .clickable { onClick() }
+            .clickable { if (tapAllowed()) onClick() }
             .padding(Space.md)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -258,7 +262,7 @@ fun EntryRow(
                 Modifier
                     .size(Dimen.iconButton)
                     .clip(RoundedCornerShape(Radius.sm))
-                    .clickable { onToggleFav() },
+                    .clickable { if (tapAllowed()) onToggleFav() },
                 contentAlignment = Alignment.Center
             ) {
                 AppIcon(
@@ -273,7 +277,7 @@ fun EntryRow(
                     Modifier
                         .size(Dimen.iconButton)
                         .clip(RoundedCornerShape(Radius.sm))
-                        .clickable { onEdit() },
+                        .clickable { if (tapAllowed()) onEdit() },
                     contentAlignment = Alignment.Center
                 ) {
                     AppIcon("✎", size = IconSize.action, color = MaterialTheme.colorScheme.outline, contentDescription = "编辑")
@@ -319,6 +323,7 @@ fun EntryRow(
                             MaterialTheme.colorScheme.primary.copy(alpha = if (dim) .06f else .10f)
                         )
                         .clickable(enabled = !dim) {
+                            if (!tapAllowed()) return@clickable
                             if (canRun) {
                                 if (entry.risk == Risk.DANGER && settings.confirmDanger) confirmExec = true
                                 else runNow()
