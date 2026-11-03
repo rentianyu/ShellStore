@@ -33,7 +33,6 @@ import com.xbta.shellstore.R
 import com.xbta.shellstore.data.AppSettings
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.FontChoice
-import com.xbta.shellstore.data.SeriesSources
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.data.Updater
@@ -697,9 +696,7 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                     GroupCard {
                         seriesItems.forEachIndexed { i, item ->
                             if (i > 0) Divider()
-                            val cfg = sources.firstOrNull {
-                                it.series == SeriesSources.SERIES && it.url == item.url
-                            }
+                            val cfg = sources.firstOrNull { it.url.trim() == item.url.trim() }
                             val on = cfg?.enabled == true
                             Row(
                                 Modifier

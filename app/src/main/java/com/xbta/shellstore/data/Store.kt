@@ -228,24 +228,35 @@ object Store {
         reloadAll()
     }
 
-    /** 系列清单里某一项的当前配置（没添加过就返回 null） */
-    fun seriesConfigOf(item: SeriesSources.Item): SourceConfig? =
-        _sources.value.firstOrNull { it.series == SeriesSources.SERIES && it.url == item.url }
+    /**
+     * 系列清单里某一项的当前配置（没添加过就返回 null）。
+     * 按 url 认源而不是按 series 标记——用户之前手动加过的同一个源也要能对上，
+     * 否则会重复添加出两条一样的源。
+     */
+    fun seriesConfigOf(item: SeriesSources.Item): SourceConfig? {
+        val u = item.url.trim()
+        return _sources.value.firstOrNull { it.url.trim() == u }
+    }
 
     /**
      * 打开/关闭系列里的某个源。还没添加过时，打开会先拉取内容再添加。
+     * 之前手动加过的同一个源会被就地归入系列，不会重复添加。
      * 会联网，调用方切 IO 线程。
      */
     fun toggleSeriesItem(item: SeriesSources.Item, on: Boolean): String? {
         val exist = seriesConfigOf(item)
-        return when {
-            exist == null && on -> addRemote(item.name, item.url, SeriesSources.SERIES)
-            exist == null -> null
-            else -> {
-                if (exist.enabled != on) toggleSource(exist.id, on)
-                null
-            }
+        if (exist == null) {
+            return if (on) addRemote(item.name, item.url, SeriesSources.SERIES) else null
         }
+        // 老的手动源：补上 series 标记，让它回到系列清单里统一管理
+        if (exist.series != SeriesSources.SERIES) {
+            _sources.value = _sources.value.map {
+                if (it.id == exist.id) it.copy(series = SeriesSources.SERIES) else it
+            }
+            ctx?.let { Repo.saveSourceConfigs(it, _sources.value) }
+        }
+        if (exist.enabled != on) toggleSource(exist.id, on)
+        return null
     }
 
     fun addRemote(name: String, url: String, series: String = ""): String? {
