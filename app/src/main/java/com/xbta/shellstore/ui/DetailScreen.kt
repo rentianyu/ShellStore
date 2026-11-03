@@ -457,7 +457,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
 
 /** 执行结果。输出可能很长，内部滚动，不撑破屏幕。 */
 @Composable
-private fun ExecResultDialog(
+internal fun ExecResultDialog(
     result: ShellExec.Result,
     command: String,
     onCopy: () -> Unit,

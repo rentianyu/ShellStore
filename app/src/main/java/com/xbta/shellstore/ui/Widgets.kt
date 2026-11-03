@@ -33,7 +33,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.xbta.shellstore.core.*
+import com.xbta.shellstore.data.ShellExec
 import com.xbta.shellstore.data.Store
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.xbta.shellstore.ui.theme.LocalCodeFont
 import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Radius
@@ -205,6 +209,27 @@ fun EntryRow(
 ) {
     val ctx = LocalContext.current
     val canOpen = IntentLauncher.canTrigger(entry)
+    val canRun = entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT
+    val settings by Store.settings.collectAsState()
+    val scope = rememberCoroutineScope()
+    var running by remember { mutableStateOf(false) }
+    var confirmExec by remember { mutableStateOf(false) }
+    var execResult by remember { mutableStateOf<ShellExec.Result?>(null) }
+
+    fun runNow() {
+        val cmd = CommandRenderer.primaryText(
+            entry,
+            entry.params.associate { it.key to it.default },
+            -1
+        )
+        scope.launch {
+            running = true
+            val r = withContext(Dispatchers.IO) { ShellExec.run(ctx, cmd) }
+            running = false
+            execResult = r
+            Store.recordRecent(entry.id)
+        }
+    }
     Column(
         Modifier
             .fillMaxWidth()
@@ -285,33 +310,91 @@ fun EntryRow(
                 Spacer(Modifier.width(Space.xs))
                 MutedBadge(entry.categoryId)
             }
-            if (canOpen) {
+            if (canRun || canOpen) {
                 Spacer(Modifier.weight(1f))
-                // 右下角快捷触发：不用进详情直接打开 / 发送 / 启动
+                // 右下角快捷操作：命令类直接执行，Intent 类直接唤起
+                val dim = canRun && running
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(Radius.sm))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = .10f))
-                        .clickable {
-                            val err = IntentLauncher.trigger(ctx, entry, emptyMap())
-                            if (err == null) Store.recordRecent(entry.id)
-                            Toast.makeText(
-                                ctx,
-                                err ?: "${IntentLauncher.actionLabel(entry)}成功",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = if (dim) .06f else .10f)
+                        )
+                        .clickable(enabled = !dim) {
+                            if (canRun) {
+                                if (entry.risk == Risk.DANGER && settings.confirmDanger) confirmExec = true
+                                else runNow()
+                            } else {
+                                val err = IntentLauncher.trigger(ctx, entry, emptyMap())
+                                if (err == null) Store.recordRecent(entry.id)
+                                Toast.makeText(
+                                    ctx,
+                                    err ?: "${IntentLauncher.actionLabel(entry)}成功",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        IntentLauncher.actionLabel(entry),
+                        when {
+                            canRun && running -> "执行中…"
+                            canRun -> "执行"
+                            else -> IntentLauncher.actionLabel(entry)
+                        },
                         fontSize = TypeScale.caption,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = if (dim) .5f else 1f)
                     )
                 }
             }
         }
+    }
+
+    // 危险命令二次确认
+    if (confirmExec) {
+        AlertDialog(
+            onDismissRequest = { confirmExec = false },
+            title = { Text("执行危险命令？", fontSize = TypeScale.body) },
+            text = {
+                Text(
+                    entry.title + "\n\n这条命令标记为「危险」，执行可能造成不可逆的改动。",
+                    fontSize = TypeScale.small
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { confirmExec = false; runNow() }) {
+                    Text("仍然执行", color = Tones.danger)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmExec = false }) { Text("取消") }
+            }
+        )
+    }
+
+    execResult?.let { r ->
+        ExecResultDialog(
+            result = r,
+            command = CommandRenderer.primaryText(
+                entry,
+                entry.params.associate { it.key to it.default },
+                -1
+            ),
+            onCopy = {
+                val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                    as android.content.ClipboardManager
+                cm.setPrimaryClip(
+                    android.content.ClipData.newPlainText(
+                        "输出",
+                        listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n")
+                    )
+                )
+                Toast.makeText(ctx, "输出已复制", Toast.LENGTH_SHORT).show()
+            },
+            onOpenTermux = { ShellExec.openTermux(ctx) },
+            onDismiss = { execResult = null }
+        )
     }
 }
 
