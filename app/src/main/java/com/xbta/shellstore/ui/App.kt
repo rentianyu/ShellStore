@@ -227,15 +227,9 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
+                    // 选中态只用颜色区分，不加托盘/胶囊底（避免看起来像一块椭圆阴影）
                     Box(
-                        Modifier
-                            .width(58.dp)
-                            .height(32.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                if (on) MaterialTheme.colorScheme.surfaceContainerHighest
-                                else Color.Transparent
-                            ),
+                        Modifier.width(58.dp).height(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(pair.first, fontSize = IconSize.tab, color = fg)

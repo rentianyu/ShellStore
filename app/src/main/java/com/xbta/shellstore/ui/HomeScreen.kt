@@ -1,5 +1,7 @@
 package com.xbta.shellstore.ui
 
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,19 +11,28 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.Entry
+import com.xbta.shellstore.core.EntryType
 import com.xbta.shellstore.data.Store
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.xbta.shellstore.ui.theme.Dimen
 import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Radius
@@ -32,6 +43,7 @@ private val CAT_GLYPHS = listOf(">_", "▤", "◍", "⚙", "▦", "▶", "⚡", 
 
 fun catGlyph(index: Int): String = CAT_GLYPHS.getOrElse(index) { "▪" }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
@@ -40,22 +52,29 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
     val settings by Store.settings.collectAsState()
     val history by Store.searchHistory.collectAsState()
 
-    var searchMode by remember { mutableStateOf(false) }
+    // 这几个要跨"进详情再返回"保留，所以用 rememberSaveable 而不是 remember
+    var searchMode by rememberSaveable { mutableStateOf(false) }
     var viewOptions by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
-    var typeSel by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var typeSel by rememberSaveable(
+        stateSaver = listSaver(save = { it.toList() }, restore = { it.toSet() })
+    ) { mutableStateOf<Set<String>>(emptySet()) }
+    var refreshing by remember { mutableStateOf(false) }
+    val refreshScope = rememberCoroutineScope()
+    val ctx = LocalContext.current
 
-    val results = remember(query, typeSel, entries) {
-        val kw = query.trim().lowercase()
-        entries.filter { e ->
-            (typeSel.isEmpty() || e.type.id in typeSel) &&
-                (kw.isEmpty() ||
-                    e.title.lowercase().contains(kw) ||
-                    e.body.lowercase().contains(kw) ||
-                    e.desc.lowercase().contains(kw) ||
-                    e.tags.any { it.lowercase().contains(kw) } ||
-                    e.categoryId.lowercase().contains(kw))
-        }
+    // 搜索态按返回键先退出搜索，而不是直接退出 App
+    BackHandler(enabled = searchMode) {
+        searchMode = false
+        query = ""
+    }
+
+    val results = remember(query, typeSel, entries, favs) {
+        Store.search(
+            query = query,
+            types = typeSel.mapNotNull { EntryType.of(it) }.toSet(),
+            risks = emptySet()
+        )
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -75,6 +94,23 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
             })
         }
 
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = {
+                refreshScope.launch {
+                    refreshing = true
+                    val r = withContext(Dispatchers.IO) { Store.refreshAllSources() }
+                    refreshing = false
+                    Toast.makeText(
+                        ctx,
+                        if (r.second == 0) "已刷新 ${r.first} 个源"
+                        else "已刷新 ${r.first} 个，${r.second} 个失败",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            modifier = Modifier.weight(1f).fillMaxWidth()
+        ) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = 16.dp),
@@ -192,6 +228,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     )
                 }
             }
+        }
         }
     }
 

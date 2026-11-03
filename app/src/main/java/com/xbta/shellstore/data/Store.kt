@@ -31,7 +31,12 @@ object Store {
     /** 本地自建条目的 id 前缀，带此前缀的条目只存在于收藏里，不属于任何源 */
     const val LOCAL_PREFIX = "local-"
     /** 官方命令库。直连不通时自动走 p.xbta.cc 反代，国内也能拉。 */
-    const val OFFICIAL_URL = "https://raw.githubusercontent.com/rentianyu/ShellStore/main/sources/official.md"
+    /** 官方源：托管在 ai 仓库的 ShellStore/sources/ 下，随 R2 同步到 f.xbta.cc */
+    const val OFFICIAL_URL = "https://f.xbta.cc/ai/ShellStore/sources/official.md"
+
+    /** 老地址，升级时用来识别需要迁移的已配置源 */
+    private const val OFFICIAL_URL_LEGACY =
+        "https://raw.githubusercontent.com/rentianyu/ShellStore/main/sources/official.md"
 
     /** 最近使用最多保留条数 */
     private const val RECENT_MAX = 60
@@ -89,7 +94,15 @@ object Store {
         _settings.value = Repo.loadSettings(c)
 
         // 不再有内置源：内容全部来自在线 / 本地源，首次启动由欢迎页引导启用官方源
-        _sources.value = Repo.loadSourceConfigs(c)
+        var loadedSources = Repo.loadSourceConfigs(c)
+        // 官方源地址迁移：老版本指向 GitHub raw，换到 f.xbta.cc
+        if (loadedSources.any { it.id == OFFICIAL_ID && it.url == OFFICIAL_URL_LEGACY }) {
+            loadedSources = loadedSources.map {
+                if (it.id == OFFICIAL_ID) it.copy(url = OFFICIAL_URL) else it
+            }
+            Repo.saveSourceConfigs(c, loadedSources)
+        }
+        _sources.value = loadedSources
 
         reloadAll()
 
@@ -258,6 +271,20 @@ object Store {
         Repo.saveSourceConfigs(c, _sources.value)
         reloadAll()
         return null
+    }
+
+    /**
+     * 刷新所有已启用的在线源（商店页下拉刷新用）。
+     * 返回 (成功数, 失败数)；单个源失败不影响其它源。
+     */
+    fun refreshAllSources(): Pair<Int, Int> {
+        var ok = 0
+        var bad = 0
+        _sources.value.filter { it.enabled && it.type == SourceType.REMOTE }.forEach { cfg ->
+            if (refresh(cfg.id) == null) ok++ else bad++
+        }
+        reloadAll()
+        return ok to bad
     }
 
     fun importLocal(name: String, text: String, fileName: String = ""): String? {
