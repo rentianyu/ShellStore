@@ -68,7 +68,7 @@ sealed interface Page {
     data object Settings : Page
     data object Sources : Page
     data object Backup : Page
-    data object WebDav : Page
+    data object Cloud : Page
     data object About : Page
     data object Help : Page
     data object SourceHelp : Page
@@ -270,7 +270,7 @@ private fun Root() {
                     is Page.Settings -> SettingsScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Sources -> SourcesScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Backup -> BackupScreen(onBack = ::pop, onOpen = ::push)
-                    is Page.WebDav -> WebDavScreen(onBack = ::pop)
+                    is Page.Cloud -> CloudBackupScreen(onBack = ::pop)
                     is Page.About -> AboutScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Help -> HelpScreen(onBack = ::pop)
                     is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)

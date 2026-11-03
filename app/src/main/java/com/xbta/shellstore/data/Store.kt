@@ -132,8 +132,9 @@ object Store {
         val c = ctx!!
 
         _settings.value = Repo.loadSettings(c)
-        // WebDAV 密码单独用 Keystore 加密存，不进 settings.json
-        webdavPass = SecretBox.load(c)
+        // 云备份的密码 / SecretKey 单独用 Keystore 加密存，不进 settings.json
+        webdavPass = SecretBox.load(c, "webdav")
+        s3Secret = SecretBox.load(c, "s3")
 
         var loadedSources = Repo.loadSourceConfigs(c)
         // 老配置迁移：官方源地址换成 f.xbta.cc，并归入「小贝塔订阅源」、改名为 AI 整理命令库。
@@ -827,30 +828,51 @@ object Store {
         Repo.saveSettings(c, s)
     }
 
-    // ---------------- 云备份（WebDAV） ----------------
+    // ---------------- 云备份（WebDAV / S3） ----------------
 
-    data class WebDavState(
+    data class CloudState(
         val running: Boolean = false,
         val lastAt: Long = 0L,
         val lastOk: Boolean = false,
         val lastMsg: String = ""
     )
 
-    private val _webdav = MutableStateFlow(WebDavState())
-    val webdav: StateFlow<WebDavState> = _webdav.asStateFlow()
+    /** 统一结果，UI 不必区分是哪种后端抛出来的 */
+    data class CloudResult(val ok: Boolean, val msg: String = "")
 
-    /** 密码不落 JSON，只在内存 + Keystore 加密文件里；导出备份也不含它 */
+    private val _webdav = MutableStateFlow(CloudState())
+    val webdav: StateFlow<CloudState> = _webdav.asStateFlow()
+
+    private val _s3 = MutableStateFlow(CloudState())
+    val s3: StateFlow<CloudState> = _s3.asStateFlow()
+
+    /** 密码 / SecretKey 不落 JSON，只在内存 + Keystore 加密文件里；导出备份也不含它们 */
     @Volatile
     private var webdavPass: String = ""
+
+    @Volatile
+    private var s3Secret: String = ""
 
     fun webdavPassOf(): String = webdavPass
 
     fun setWebdavPass(plain: String) {
         webdavPass = plain
-        ctx?.let { SecretBox.save(it, plain) }
+        ctx?.let { SecretBox.save(it, "webdav", plain) }
+    }
+
+    fun s3SecretOf(): String = s3Secret
+
+    fun setS3Secret(plain: String) {
+        s3Secret = plain
+        ctx?.let { SecretBox.save(it, "s3", plain) }
     }
 
     fun webdavReady(): Boolean = webdavConfig().ready
+
+    fun s3Ready(): Boolean = s3Config().ready
+
+    fun cloudReady(backend: CloudBackend): Boolean =
+        if (backend == CloudBackend.WEBDAV) webdavReady() else s3Ready()
 
     private fun webdavConfig() = WebDav.Config(
         baseUrl = _settings.value.webdavUrl,
@@ -859,35 +881,65 @@ object Store {
         path = _settings.value.webdavPath.ifBlank { "shellstore/shellstore-backup.json" }
     )
 
-    suspend fun pingWebdav(): WebDav.Result =
-        withContext(Dispatchers.IO) { WebDav.ping(webdavConfig()) }
+    private fun s3Config() = S3Backup.Config(
+        endpoint = _settings.value.s3Endpoint,
+        region = _settings.value.s3Region.ifBlank { "auto" },
+        bucket = _settings.value.s3Bucket,
+        accessKey = _settings.value.s3AccessKey,
+        secretKey = s3Secret,
+        key = _settings.value.s3Key.ifBlank { "shellstore/shellstore-backup.json" },
+        pathStyle = _settings.value.s3PathStyle
+    )
+
+    private fun stateOf(backend: CloudBackend): MutableStateFlow<CloudState> =
+        if (backend == CloudBackend.WEBDAV) _webdav else _s3
+
+    private fun unconfigured(backend: CloudBackend): String =
+        if (backend == CloudBackend.WEBDAV) "还没配置 WebDAV" else "还没配齐 S3（Endpoint / 桶 / 密钥）"
+
+    /** 测试连接：两种后端统一成 CloudResult */
+    suspend fun pingCloud(backend: CloudBackend = _settings.value.cloudBackend): CloudResult =
+        withContext(Dispatchers.IO) {
+            when (backend) {
+                CloudBackend.WEBDAV -> WebDav.ping(webdavConfig()).let { CloudResult(it.ok, it.msg) }
+                CloudBackend.S3 -> S3Backup.ping(s3Config()).let { CloudResult(it.ok, it.msg) }
+            }
+        }
 
     /** 上传整份备份，手动与自动共用同一条路径 */
-    suspend fun backupNow(): WebDav.Result = withContext(Dispatchers.IO) {
-        if (!webdavReady()) return@withContext WebDav.Result.fail(0, "还没配置 WebDAV")
-        if (_webdav.value.running) return@withContext WebDav.Result.fail(0, "备份正在进行")
-        _webdav.value = _webdav.value.copy(running = true)
-        val r = WebDav.upload(webdavConfig(), exportBackupJson())
-        _webdav.value = WebDavState(
-            running = false,
-            lastAt = System.currentTimeMillis(),
-            lastOk = r.ok,
-            lastMsg = r.msg
-        )
-        r
-    }
+    suspend fun backupNow(backend: CloudBackend = _settings.value.cloudBackend): CloudResult =
+        withContext(Dispatchers.IO) {
+            if (!cloudReady(backend)) return@withContext CloudResult(false, unconfigured(backend))
+            val st = stateOf(backend)
+            if (st.value.running) return@withContext CloudResult(false, "备份正在进行")
+            st.value = st.value.copy(running = true)
+            val json = exportBackupJson()
+            val r = when (backend) {
+                CloudBackend.WEBDAV -> WebDav.upload(webdavConfig(), json).let { CloudResult(it.ok, it.msg) }
+                CloudBackend.S3 -> S3Backup.upload(s3Config(), json).let { CloudResult(it.ok, it.msg) }
+            }
+            st.value = CloudState(
+                running = false,
+                lastAt = System.currentTimeMillis(),
+                lastOk = r.ok,
+                lastMsg = r.msg
+            )
+            r
+        }
 
     /**
-     * 变更触发的自动备份。
+     * 变更触发的自动备份，只走设置里选中的那一个后端。
      * 开关关着 / 没配置 / 处于离线基础模式时静默跳过，不打扰用户。
      */
     suspend fun autoBackup(force: Boolean = false) {
         val s = _settings.value
-        if (!force && (!s.webdavAuto || !webdavReady() || !netAllowed)) return
-        if (_webdav.value.running) return
-        val r = backupNow()
+        if (!force && (!s.webdavAuto || !netAllowed)) return
+        val backend = s.cloudBackend
+        if (!cloudReady(backend)) return
+        if (stateOf(backend).value.running) return
+        val r = backupNow(backend)
         if (!r.ok) {
-            _webdav.value = WebDavState(
+            stateOf(backend).value = CloudState(
                 lastAt = System.currentTimeMillis(),
                 lastOk = false,
                 lastMsg = r.msg
@@ -896,9 +948,15 @@ object Store {
     }
 
     /** 从云端拉回来覆盖/合并本地；返回 null 表示成功 */
-    suspend fun restoreFromCloud(overwrite: Boolean): String? = withContext(Dispatchers.IO) {
-        if (!webdavReady()) return@withContext "还没配置 WebDAV"
-        val (text, err) = WebDav.download(webdavConfig())
+    suspend fun restoreFromCloud(
+        overwrite: Boolean,
+        backend: CloudBackend = _settings.value.cloudBackend
+    ): String? = withContext(Dispatchers.IO) {
+        if (!cloudReady(backend)) return@withContext unconfigured(backend)
+        val (text, err) = when (backend) {
+            CloudBackend.WEBDAV -> WebDav.download(webdavConfig())
+            CloudBackend.S3 -> S3Backup.download(s3Config())
+        }
         if (err != null) return@withContext err
         if (text.isNullOrBlank()) return@withContext "云端还没有备份文件"
         importBackup(text, overwrite)

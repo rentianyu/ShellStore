@@ -4,6 +4,26 @@
 
 ---
 
+## [1.3.0] - 2026-11-03 【正式版】
+
+版本号 45。
+
+### 新增
+
+- **S3 对象存储备份**：云备份页新增 S3 通道，与 WebDAV 并列，顶部一键切换
+  - 兼容 Cloudflare R2（Region 填 `auto`）、AWS S3、MinIO、七牛 Kodo、阿里 OSS / 腾讯 COS 的 S3 端点
+  - 支持虚拟主机风格（`bucket.endpoint/key`）与路径风格（`endpoint/bucket/key`），后者对应「路径风格」开关
+  - 自实现 AWS Signature V4（只签 `host` / `x-amz-content-sha256` / `x-amz-date`），不引任何 SDK，
+    签名算法用 AWS 官方测试向量验证过（GET 与 PUT 两组完整签名一致）
+  - 测试连接用 HEAD 探测：200 表示已有备份可读写，404 表示认证通过、对象还没上传
+- **自动备份跟随当前通道**：WebDAV 或 S3 二选一，避免一次改动上传两份、流量翻倍
+- 备份内容不变：订阅源 + 收藏夹（含文件夹层级、标签、条目快照）+ 设置 + 最近使用
+
+### 说明
+
+- S3 的 Secret Access Key 与 WebDAV 密码一样用 KeyStore 加密只存本机，不进备份文件
+- 已有的 WebDAV 配置与自动备份开关不受影响，升级后照常工作
+
 ## [1.2.1] - 2026-11-03 【正式版】
 
 版本号 44。合并社区 PR #1（@A-LIGE-Z）。

@@ -158,24 +158,25 @@ object WebDav {
 }
 
 /**
- * WebDAV 密码的本机加密存储。
+ * 云备份密码的本机加密存储（WebDAV 密码、S3 SecretKey 各自一份）。
  *
- * 用 Android Keystore 的 AES/GCM 密钥加密，密钥不出 TEE，密码明文只在内存里；
- * 备份文件、导出 JSON 一律不含密码。
+ * 用 Android Keystore 的 AES/GCM 密钥加密，密钥不出 TEE，明文只在内存里；
+ * 备份文件、导出 JSON 一律不含密码。name 决定 Keystore 别名与文件名。
  * Keystore 不可用（个别魔改 ROM）时退回 base64 前缀标记，保证功能不残废。
  */
 object SecretBox {
 
-    private const val ALIAS = "shellstore-webdav"
-    private const val FILE = "webdav.secret"
     private const val PLAIN_FLAG = "plain:"
 
-    private fun key(): SecretKey {
+    private fun aliasOf(name: String) = "shellstore-$name"
+
+    private fun key(name: String): SecretKey {
+        val alias = aliasOf(name)
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (ks.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+        (ks.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
         val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
         gen.init(
-            KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
@@ -184,26 +185,26 @@ object SecretBox {
         return gen.generateKey()
     }
 
-    private fun file(ctx: android.content.Context) = File(ctx.filesDir, FILE)
+    private fun file(ctx: android.content.Context, name: String) = File(ctx.filesDir, "$name.secret")
 
-    fun save(ctx: android.content.Context, pass: String) {
+    fun save(ctx: android.content.Context, name: String, pass: String) {
         if (pass.isEmpty()) {
-            runCatching { file(ctx).delete() }
+            runCatching { file(ctx, name).delete() }
             return
         }
         val encoded = runCatching {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, key())
+            cipher.init(Cipher.ENCRYPT_MODE, key(name))
             val ct = cipher.doFinal(pass.toByteArray(Charsets.UTF_8))
             Base64.encodeToString(cipher.iv + ct, Base64.NO_WRAP)
         }.getOrElse {
             PLAIN_FLAG + Base64.encodeToString(pass.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
         }
-        runCatching { file(ctx).writeText(encoded) }
+        runCatching { file(ctx, name).writeText(encoded) }
     }
 
-    fun load(ctx: android.content.Context): String {
-        val raw = runCatching { if (file(ctx).exists()) file(ctx).readText() else "" }
+    fun load(ctx: android.content.Context, name: String): String {
+        val raw = runCatching { if (file(ctx, name).exists()) file(ctx, name).readText() else "" }
             .getOrDefault("")
         if (raw.isBlank()) return ""
         if (raw.startsWith(PLAIN_FLAG)) {
@@ -216,7 +217,7 @@ object SecretBox {
             val iv = all.copyOfRange(0, 12)
             val ct = all.copyOfRange(12, all.size)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv))
+            cipher.init(Cipher.DECRYPT_MODE, key(name), GCMParameterSpec(128, iv))
             String(cipher.doFinal(ct), Charsets.UTF_8)
         }.getOrDefault("")
     }

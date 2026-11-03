@@ -136,7 +136,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     onClick = { onOpen(Page.Recent) }
                 )
                 Divider()
-                SettingRow("⇅", "备份与恢复", "本地导出 · WebDAV 云备份", onClick = { onOpen(Page.Backup) })
+                SettingRow("⇅", "备份与恢复", "本地导出 · 云备份（WebDAV / S3）", onClick = { onOpen(Page.Backup) })
             }
 
             GroupTitle("应用")
@@ -946,9 +946,9 @@ fun BackupScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
             GroupTitle("云备份")
             GroupCard {
                 SettingRow(
-                    "⇅", "WebDAV 云备份",
-                    "自动备份到自己的 WebDAV，换机可恢复",
-                    onClick = { onOpen(Page.WebDav) }
+                    "⇅", "云备份",
+                    "WebDAV / S3 对象存储，可自动同步",
+                    onClick = { onOpen(Page.Cloud) }
                 )
             }
 

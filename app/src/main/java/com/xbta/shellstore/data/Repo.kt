@@ -37,19 +37,36 @@ const val UI_LEVEL_DEFAULT = 2
 fun nearestFontLevel(scale: Float): Int =
     FONT_SCALES.indices.minByOrNull { kotlin.math.abs(FONT_SCALES[it] - scale) } ?: FONT_LEVEL_DEFAULT
 
+/** 云备份走的通道。自动备份只走选中的这一个，避免双份流量与两份状态难以解释 */
+enum class CloudBackend(val label: String) {
+    WEBDAV("WebDAV"),
+    S3("S3")
+}
+
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.LIGHT,
     /** 字号档位 0..9，对应 FONT_SCALES */
     val fontLevel: Int = FONT_LEVEL_DEFAULT,
     /** 界面缩放档位 0..4，对应 UI_SCALES */
     val uiLevel: Int = UI_LEVEL_DEFAULT,
-    /** WebDAV 自动备份开关（变更后 30 秒防抖上传） */
+    /** 云备份后端；「变更后自动备份」只走这一个 */
+    val cloudBackend: CloudBackend = CloudBackend.WEBDAV,
+    /** 云备份自动开关（变更后 30 秒防抖上传，只走 cloudBackend 选中的后端）。字段名沿用旧名以兼容已有配置 */
     val webdavAuto: Boolean = false,
     /** WebDAV 服务地址，留空 = 未配置 */
     val webdavUrl: String = "",
     val webdavUser: String = "",
     /** 远端相对路径，默认 shellstore/shellstore-backup.json */
     val webdavPath: String = "shellstore/shellstore-backup.json",
+    /** S3 兼容对象存储：Endpoint 可带可不带协议 */
+    val s3Endpoint: String = "",
+    val s3Region: String = "auto",
+    val s3Bucket: String = "",
+    val s3AccessKey: String = "",
+    /** 对象键，默认 shellstore/shellstore-backup.json */
+    val s3Key: String = "shellstore/shellstore-backup.json",
+    /** 路径风格（endpoint/bucket/key）；MinIO、部分自建服务要开 */
+    val s3PathStyle: Boolean = false,
     val uiFont: FontChoice = FontChoice.SYSTEM,
     val codeFont: FontChoice = FontChoice.SYSTEM,
     val customFontPath: String = "",
@@ -77,10 +94,17 @@ data class AppSettings(
         put("theme", theme.name)
         put("fontLevel", fontLevel)
         put("uiLevel", uiLevel)
+        put("cloudBackend", cloudBackend.name)
         put("webdavAuto", webdavAuto)
         put("webdavUrl", webdavUrl)
         put("webdavUser", webdavUser)
         put("webdavPath", webdavPath)
+        put("s3Endpoint", s3Endpoint)
+        put("s3Region", s3Region)
+        put("s3Bucket", s3Bucket)
+        put("s3AccessKey", s3AccessKey)
+        put("s3Key", s3Key)
+        put("s3PathStyle", s3PathStyle)
         put("fontScale", fontScale.toDouble())
         put("uiFont", uiFont.name)
         put("codeFont", codeFont.name)
@@ -107,10 +131,17 @@ data class AppSettings(
                 fontLevel = if (o.has("fontLevel")) o.optInt("fontLevel", FONT_LEVEL_DEFAULT)
                 else nearestFontLevel(o.optDouble("fontScale", 1.0).toFloat()),
                 uiLevel = o.optInt("uiLevel", UI_LEVEL_DEFAULT),
+                cloudBackend = e(o.optString("cloudBackend"), CloudBackend.WEBDAV, CloudBackend.entries.toTypedArray()),
                 webdavAuto = o.optBoolean("webdavAuto", false),
                 webdavUrl = o.optString("webdavUrl", ""),
                 webdavUser = o.optString("webdavUser", ""),
                 webdavPath = o.optString("webdavPath", "shellstore/shellstore-backup.json"),
+                s3Endpoint = o.optString("s3Endpoint", ""),
+                s3Region = o.optString("s3Region", "auto"),
+                s3Bucket = o.optString("s3Bucket", ""),
+                s3AccessKey = o.optString("s3AccessKey", ""),
+                s3Key = o.optString("s3Key", "shellstore/shellstore-backup.json"),
+                s3PathStyle = o.optBoolean("s3PathStyle", false),
                 uiFont = e(o.optString("uiFont"), FontChoice.SYSTEM, FontChoice.entries.toTypedArray()),
                 codeFont = e(o.optString("codeFont"), FontChoice.SYSTEM, FontChoice.entries.toTypedArray()),
                 customFontPath = o.optString("customFontPath"),
