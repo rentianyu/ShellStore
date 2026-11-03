@@ -103,7 +103,6 @@ fun App() {
 
 @Composable
 private fun Root() {
-    // 首次安装（或还没走过欢迎页）先让用户明确启用官方源，不再是内置命令集
     val appSettings by Store.settings.collectAsState()
     val sourceList by Store.sources.collectAsState()
     val basicMode by Store.basicMode.collectAsState()
@@ -116,15 +115,20 @@ private fun Root() {
         )
         return
     }
+    // 老用户已有源，直接算作已初始化，不打扰
     LaunchedEffect(appSettings.onboarded, sourceList.size) {
-        // 老用户已有自己的源，直接放行，不打扰
         if (!appSettings.onboarded && sourceList.isNotEmpty()) {
             Store.updateSettings(Store.settings.value.copy(onboarded = true))
         }
     }
-    if (!appSettings.onboarded && sourceList.isEmpty()) {
-        WelcomeScreen(onDone = { Store.updateSettings(Store.settings.value.copy(onboarded = true)) })
-        return
+    // 首次启动不再拦路要用户点「启用官方源」：后台自动打开「小贝塔订阅源」并加默认项，
+    // 失败（比如没网）就不置 onboarded，下次启动再试
+    LaunchedEffect(Unit) {
+        if (appSettings.onboarded || !Store.netAllowed) return@LaunchedEffect
+        val err = withContext(Dispatchers.IO) { Store.bootstrapOnboarding() }
+        if (err == null) {
+            Store.updateSettings(Store.settings.value.copy(onboarded = true))
+        }
     }
 
     var tab by remember { mutableIntStateOf(0) }

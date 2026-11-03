@@ -31,9 +31,10 @@ object Store {
 
     /** 本地自建条目的 id 前缀，带此前缀的条目只存在于收藏里，不属于任何源 */
     const val LOCAL_PREFIX = "local-"
-    /** 官方命令库。直连不通时自动走 p.xbta.cc 反代，国内也能拉。 */
-    /** 官方源：托管在 ai 仓库的 ShellStore/sources/ 下，随 R2 同步到 f.xbta.cc */
+    /** AI 整理命令库（原「官方命令库」）：托管在 ai 仓库 ShellStore/sources/ 下，随 R2 同步到 f.xbta.cc */
     const val OFFICIAL_URL = "https://f.xbta.cc/ai/ShellStore/sources/official.md"
+    /** AI 整理命令库的显示名 */
+    const val OFFICIAL_NAME = "AI 整理命令库"
 
     /** 系列源是否参与解析：总开关关着时，系列源保留配置但不加载 */
     private fun seriesActive(cfg: SourceConfig): Boolean =
@@ -130,12 +131,15 @@ object Store {
 
         _settings.value = Repo.loadSettings(c)
 
-        // 不再有内置源：内容全部来自在线 / 本地源，首次启动由欢迎页引导启用官方源
         var loadedSources = Repo.loadSourceConfigs(c)
-        // 官方源地址迁移：老版本指向 GitHub raw，换到 f.xbta.cc
-        if (loadedSources.any { it.id == OFFICIAL_ID && it.url == OFFICIAL_URL_LEGACY }) {
+        // 老配置迁移：官方源地址换成 f.xbta.cc，并归入「小贝塔订阅源」、改名为 AI 整理命令库
+        if (loadedSources.any { it.id == OFFICIAL_ID }) {
             loadedSources = loadedSources.map {
-                if (it.id == OFFICIAL_ID) it.copy(url = OFFICIAL_URL) else it
+                if (it.id == OFFICIAL_ID) it.copy(
+                    url = OFFICIAL_URL,
+                    name = OFFICIAL_NAME,
+                    series = SeriesSources.SERIES
+                ) else it
             }
             Repo.saveSourceConfigs(c, loadedSources)
         }
@@ -499,41 +503,20 @@ object Store {
         return SmdParser.parse(text, "_probe", "_probe").source.entries.isNotEmpty()
     }
 
-    fun hasOfficial(): Boolean = _sources.value.any { it.id == OFFICIAL_ID }
-
     /**
-     * 启用（或刷新）官方命令库。返回 null 表示成功，否则是给用户看的失败原因。
-     * 纯阻塞实现，调用方自己切到 IO 线程。
+     * 首次启动的自动准备：打开「小贝塔订阅源」总开关，并把清单里的默认项（AI 整理命令库）加进来。
+     * 返回 null 表示成功，否则是失败原因（下次启动会重试）。会联网，调用方切 IO 线程。
      */
-    fun enableOfficial(): String? {
-        if (!netAllowed) return "请先同意《用户协议》和《隐私政策》"
-        val c = ctx ?: return "未初始化"
-        val existing = _sources.value.firstOrNull { it.id == OFFICIAL_ID }
-        val r = Mirrors.fetch(
-            OFFICIAL_URL,
-            prefer = _settings.value.sourceMirror,
-            validate = { looksLikeSmd(it) }
-        )
-        if (!r.ok) return r.error ?: "所有线路都拉取失败，请检查网络"
-        rememberMirror(r.via)
-        val text = r.text.orEmpty()
-        if (text.isBlank()) return "服务器返回了空内容"
-        val parsed = SmdParser.parse(text, OFFICIAL_ID, "官方命令库")
-        if (parsed.source.entries.isEmpty()) return "解析后没有条目，源格式可能不对"
-        SourceCache.write(c, OFFICIAL_ID, text)
-
-        val cfg = (existing ?: SourceConfig(id = OFFICIAL_ID, name = "官方命令库", type = SourceType.REMOTE, url = OFFICIAL_URL))
-            .copy(
-                enabled = true,
-                url = OFFICIAL_URL,
-                lastFetch = System.currentTimeMillis(),
-                count = parsed.source.entries.size,
-                etag = r.etag
-            )
-        _sources.value = if (existing == null) _sources.value + cfg
-        else _sources.value.map { if (it.id == OFFICIAL_ID) cfg else it }
-        Repo.saveSourceConfigs(c, _sources.value)
-        reloadAll()
+    fun bootstrapOnboarding(): String? {
+        if (!netAllowed) return "未同意协议"
+        if (!_settings.value.xbtaSeries) setXbtaSeries(true)
+        val err = loadSeriesCatalog()
+        val item = _seriesItems.value.firstOrNull { it.url.endsWith("/official.md") }
+            ?: return err ?: "清单里没有默认源"
+        if (seriesConfigOf(item) == null) {
+            return toggleSeriesItem(item, true)
+        }
+        if (!seriesConfigOf(item)!!.enabled) toggleSeriesItem(item, true)
         return null
     }
 

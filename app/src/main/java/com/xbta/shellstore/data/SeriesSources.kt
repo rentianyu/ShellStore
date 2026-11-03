@@ -21,7 +21,8 @@ import com.xbta.shellstore.core.SmdParser
  * ```
  *
  * 即：**代码块里放地址的条目 = 一个可选源**，其它条目一律忽略。
- * 新增源只改这个文件，App 不用发版。官方源不在此清单内（它走 OFFICIAL_ID）。
+ * 新增源只改这个文件，App 不用发版。AI 整理命令库（原官方源）也在这份清单里，
+ * 是其中普通的一项。
  */
 object SeriesSources {
 
@@ -40,8 +41,15 @@ object SeriesSources {
         val count: Int = 0
     )
 
-    /** 清单拉不到时的兜底：至少保证已知的源还能加 */
+    /** 清单拉不到时的兜底：至少保证默认源还能加 */
     private val FALLBACK = listOf(
+        Item(
+            id = "official",
+            name = "AI 整理命令库",
+            url = "https://f.xbta.cc/ai/ShellStore/sources/official.md",
+            desc = "Android 常用命令、Intent 与组件跳转，10 个分类",
+            count = 133
+        ),
         Item(
             id = "gaode",
             name = "高德地图",

@@ -565,32 +565,6 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 Spacer(Modifier.height(10.dp))
             }
 
-            if (!Store.hasOfficial()) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Radius.md))
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = .5f))
-                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .3f), RoundedCornerShape(Radius.md))
-                        .clickable(enabled = busy.isBlank()) {
-                            runAsync("启用") { Store.enableOfficial()?.let { "启用失败：$it" } ?: "官方命令库已启用" }
-                        }
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("启用官方命令库", fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "${Store.OFFICIAL_URL.takeLast(28)} · 按分类整理，支持刷新",
-                            fontSize = TypeScale.caption,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-
             // 订阅源的介绍与格式说明就放在这里，不另找地方
             Row(
                 Modifier

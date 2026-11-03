@@ -109,7 +109,7 @@ service                       → startService（App 在前台可用，后台会
 
 | 功能 | 实现 |
 |---|---|
-| 官方源 | `Store.enableOfficial()`，URL 常量 `OFFICIAL_URL`，拉 `f.xbta.cc/ai/ShellStore/sources/official.md` |
+| 默认源 | 首次启动 `Store.bootstrapOnboarding()`：打开系列总开关、拉清单、把 `official.md` 那一项加进来；老配置里的 `id=official` 会迁移成 series 源并改名「AI 整理命令库」 |
 | 在线源 | `Store.addRemote(name, url)` |
 | 本地源 | `Store.importLocal(name, text, fileName)`，正文复制进 `SourceCache` |
 | 多源合并 | `reloadAll()` 逐个解析后按 id 去重合并 |
@@ -181,11 +181,11 @@ SMD 格式本身见 [ShellStore/SKILL.md](https://github.com/rentianyu/ai/blob/m
 `UpdateCenter` 是状态机：`Idle / Checking / Downloading(progress) / Ready(apk) / Error(msg)`，
 UI 侧 `UpdateDialogs` 根据状态出弹窗。
 
-## 10. 首次引导
+## 10. 首次启动
 
-`Welcome.kt`：未 onboarded 且没有任何源时全屏引导，
-主按钮「启用官方源」（拉取 + 线路降级），也提供「先跳过，自己加源」。
-老用户（已有源）自动跳过，不打扰。
+不再有欢迎页拦路。同意协议后直接进主界面，后台跑 `Store.bootstrapOnboarding()`：
+打开「小贝塔订阅源」总开关 → 拉清单 → 把 `official.md` 那一项（AI 整理命令库）加进来。
+成功才置 `onboarded`，失败（如无网）下次启动重试；老用户已有源时直接算作已初始化。
 
 ## 版本演进（摘要）
 

@@ -37,7 +37,7 @@ ui/                      Compose 界面
   SourceHelpScreen.kt    订阅源帮助页
   RecentScreen.kt        最近使用
   HelpScreen.kt          使用帮助
-  Welcome.kt             首次启动引导
+  Agreement.kt           首次启动协议同意页 + 协议全文页
   UpdateDialogs.kt       更新相关弹窗
   Widgets.kt             公共组件：TopBar/IconBtn/CodeBlock/EntryRow/Badge/FilterChip/GroupCard…
   IntentLauncher.kt      条目 → 真实 Intent 并触发
@@ -159,7 +159,7 @@ IntentLauncher：activity/urlscheme/intent → startActivity
 | core 层不依赖 android.* | 解析器可以用 kotlinc 在无 SDK 环境编译 + 单测（`tests/SmdTest.kt`） |
 | 手写 JSON 编解码 | 无反射、无插件，包体小；字段增减靠 `optString/optInt` 的默认值容错 |
 | 收藏存快照 | 源被删/改不影响已收藏内容；代价是编辑要区分 `edited` |
-| 内容全外置 | App 不含命令，源可换；官方源托管在 `rentianyu/ai` 的 `ShellStore/sources/official.md` |
+| 内容全外置 | App 不含命令，源可换；AI 整理命令库托管在 `rentianyu/ai` 的 `ShellStore/sources/official.md`，作为「小贝塔订阅源」里的一项 |
 | 只有 3 个权限 | INTERNET / ACCESS_NETWORK_STATE / REQUEST_INSTALL_PACKAGES，无存储、无悬浮窗 |
 
 ## 代码规模（v0.19.1）

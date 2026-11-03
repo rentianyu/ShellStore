@@ -120,7 +120,7 @@ xbtaSeries     Boolean，「小贝塔订阅源」总开关。关闭时 series �
 ## 三·五、订阅源配置（`SourceConfig`）
 
 ```kotlin
-id         String，官方源固定 "official"，用户源 "r"+8位随机，系列源沿用添加时的 id
+id         String，老版本官方源固定 "official"（仅迁移识别用），其余为 "r"+8位随机
 name       String
 type       SourceType(BUILTIN / REMOTE / LOCAL)
 url        String，在线源地址
