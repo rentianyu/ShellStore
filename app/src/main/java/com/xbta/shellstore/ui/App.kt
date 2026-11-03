@@ -32,6 +32,7 @@ import com.xbta.shellstore.ui.theme.AppTheme
 import com.xbta.shellstore.ui.theme.Dimen
 import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Radius
+import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.TypeScale
 import com.xbta.shellstore.ui.theme.LocalCodeFont
 import com.xbta.shellstore.ui.theme.resolveCodeFont
