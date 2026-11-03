@@ -20,14 +20,14 @@ Android 上的命令速查台：shell / 脚本 / URL Scheme / Intent 四类内�
 从可插拔的 SMD 订阅源读入，支持浏览、搜索、复制、执行、收藏、编辑、导入导出。
 
 - Kotlin + Jetpack Compose，单 Activity，无数据库、无网络框架、无序列化框架
-- 约 9300 行 Kotlin，三个 Tab（商店 / 收藏 / 我的）
+- 约 9800 行 Kotlin，三个 Tab（商店 / 收藏 / 我的）
 - 权限只有三个：INTERNET、ACCESS_NETWORK_STATE、REQUEST_INSTALL_PACKAGES
 
 ## 五分钟上手代码
 
 ```
 1. 先看 ui/App.kt            —— Root() 里的 Page 栈 + TabBar，全 App 的骨架
-2. 再看 data/Store.kt         —— 所有 StateFlow 与业务动作都在这，12 个 Flow
+2. 再看 data/Store.kt         —— 所有 StateFlow 与业务动作都在这，14 个 Flow
 3. 然后 core/Model.kt         —— Entry 是核心模型，读懂字段就懂了整个数据形状
 4. 想改界面 → ui/Widgets.kt   —— 公共组件都在这，改一处全 App 生效
 ```
@@ -61,7 +61,7 @@ Android 上的命令速查台：shell / 脚本 / URL Scheme / Intent 四类内�
 | 项 | 说明 |
 |---|---|
 | `Tones.kt` 是固定浅色 | 深色模式下风险徽章偏亮，要改成按主题取色需动所有调用点 |
-| `MeScreen.kt` 962 行 | 设置 / 订阅源 / 备份 / 关于四块挤在一个文件，该拆 |
+| `MeScreen.kt` 1068 行 | 设置 / 订阅源 / 备份 / 关于四块挤在一个文件，该拆 |
 | `FavScreen.kt` 1193 行 | 15 个弹窗分支，可抽成独立文件 |
 | UI 无自动化测试 | 只有 CI 编译验证 + 真机手测；`core` 层有单测 |
 | 条目 id 不含 sourceId | 不同源里同分类同标题的条目会合并，改标题会导致收藏「源已失效」 |

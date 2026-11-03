@@ -20,7 +20,7 @@ import com.xbta.shellstore.ui.theme.TypeScale
 
 /**
  * 内置使用帮助。全部离线，内容随版本打包，不依赖网络。
- * 只放「不查也能看完」的要点，完整 SMD 语法指向 GitHub 上的 sources/README.md。
+ * 只放「App 怎么用」的要点。订阅源相关的一切（格式、添加、刷新）都在「我的 › 订阅源」页，这里不重复。
  */
 @Composable
 fun HelpScreen(onBack: () -> Unit) {
@@ -36,7 +36,7 @@ fun HelpScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(Space.sm))
 
             HelpH("快速上手")
-            HelpP("1. 首次打开点「启用官方源」，会拉取 133 条命令（拉不动会自动换线路，共 17 条备用）。")
+            HelpP("1. 首次打开按引导完成初始化，之后商店页就能按分类浏览。")
             HelpP("2. 商店页按分类浏览，或点右上角 ⌕ 全字段搜索；搜索框留空时会显示最近搜索过的词。")
             HelpP("3. 点进条目：有 {占位符} 的会出输入框，填完命令实时重算，底部「复制」按设置的前缀处理。")
 
@@ -61,29 +61,9 @@ fun HelpScreen(onBack: () -> Unit) {
             HelpP("收藏存的是快照：源被删了，收藏里原来的内容还在。")
             HelpP("收藏夹内长按条目可拖动排序；多选模式支持批量移动、批量打标签、批量删除。")
             HelpP("备份与恢复支持导出 JSON（收藏 + 标签 + 设置），导入时可选合并或覆盖。")
-            HelpP("「导出为订阅源」会把收藏按文件夹导出成 SMD 文件，别人导入即可用；详情页右上角菜单还能复制单条 SMD 片段。")
-
-            HelpH("写自己的订阅源")
-            HelpP("SMD 是 Markdown 的超集，只多约定几行 @字段。最小可用模板：")
-            CodeBlock(
-                """
-## 分类名
-
-### 条目标题
-@risk safe
-@need shell
-@tag 标签
-
-```sh
-你的命令
-```
-                """.trimIndent()
-            )
-            HelpP("支持的字段：@type @risk @need @tag @desc @param @verified，Intent 类另有 @action @component @data @mime @package @category @flag @extra。")
-            HelpP("完整语法见仓库 sources/README.md；也可以「我的 › 订阅源 › 添加」填在线地址，或直接选本地 .md 导入。")
+            HelpP("收藏可以按文件夹整体导出成 Markdown 文件，方便分享或存档；详情页右上角菜单还能复制单条。")
 
             HelpH("常见问题")
-            HelpQ("官方源一直拉不下来？", "内置 17 条线路自动降级，每次 10 秒。全失败通常是网络整体出不去，可以在电脑上下载 official.md 再传到手机用「本地文件」导入。")
             HelpQ("点执行提示权限不足？", "执行用的是 App 自身权限，需要 root 的命令做不了，这不是 bug。")
             HelpQ("收藏会丢吗？", "存在 App 私有目录，卸载即删除。建议定期在「备份与恢复」里导出一份 JSON。")
             HelpQ("怎么更新到新版本？", "启动时会自动检查，发现新版本后台下载，下载完弹窗点安装即可。也可以「我的 › 检查更新」手动查。")

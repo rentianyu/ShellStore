@@ -116,6 +116,9 @@ service                       → startService（App 在前台可用，后台会
 | 线路降级 | `Mirrors`：17 个节点，单节点 10s 超时，上次成功的提到最前（`settings.sourceMirror`） |
 | 更新确认 | `checkSourceUpdates()` 只比对条数算差异，用户确认后才 `applySourceUpdates()` |
 | 帮助页 | `SourceHelpScreen` + `SourceHelpText`（给人看的最小模板 + 给 AI 的完整规范，均可一键复制） |
+| 小贝塔订阅源 | `SeriesSources`：拉 `f.xbta.cc/ai/ShellStore/sources/index.md`（本身是 SMD，代码块正文为 http 地址的条目即一个可选源），用 `SmdParser` 解析；`Store.setXbtaSeries()` 管总开关，`Store.toggleSeriesItem()` 管单源，`Store.refreshSeries()` 重拉清单并刷新该系列已启用的源 |
+| 系列源门控 | `SourceConfig.series="xbta"` + `AppSettings.xbtaSeries`；总开关关闭时保留配置但不参与 `reloadAll` |
+| 系列源认源 | `Store.seriesConfigOf()` **按 url 匹配**（不是按 series 标记），用户手动加过的同一个源会被就地归入系列，不会重复添加 |
 
 SMD 格式本身见 [ShellStore/SKILL.md](https://github.com/rentianyu/ai/blob/main/ShellStore/SKILL.md)。
 

@@ -86,7 +86,9 @@ sealed interface Page {
 
 - `stack: List<Page>`，`push` 加尾、`pop` 去尾
 - 底部三个 Tab（商店 / 收藏 / 我的）是平级，切 Tab 会清空栈
-- `BackHandler` 逐层拦截：先关弹窗 → 退搜索/多选 → 再 pop 页面
+- `BackHandler` 逐层拦截（内层先拿到事件）：
+  关弹窗 → 退搜索/多选 → pop 页面 → Tab 根页「再按一次退出」
+- Tab 根页**不会一次返回就退出 App**：第一次提示「再按一次退出」，2 秒内再按才 `finish()`
 - 每页滚动位置由 `SaveableStateProvider(current?.toString() ?: "tab$tab")` 保值
 
 新增页面 = 加 Page 分支 + 在 `when (val p = current)` 里挂一个 Composable，

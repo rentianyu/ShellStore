@@ -132,7 +132,7 @@ fun SourceHelpScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(Space.lg))
             Text(
-                "完整语法（含 Intent 全部字段）见仓库 sources/README.md",
+                "完整语法（含 Intent 全部字段）见 github.com/rentianyu/ai › ShellStore/SKILL.md",
                 fontSize = TypeScale.caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

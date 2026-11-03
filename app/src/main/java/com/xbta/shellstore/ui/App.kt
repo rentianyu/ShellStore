@@ -1,5 +1,6 @@
 package com.xbta.shellstore.ui
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,6 +39,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** LocalContext 可能被包在 ContextWrapper 里，直接 as? Activity 会拿到 null */
+private fun findActivity(c: android.content.Context?): android.app.Activity? {
+    var cur = c
+    while (cur is android.content.ContextWrapper) {
+        if (cur is android.app.Activity) return cur
+        cur = cur.baseContext
+    }
+    return null
+}
 
 sealed interface Page {
     data object AllCats : Page
@@ -127,7 +138,26 @@ private fun Root() {
     fun push(p: Page) { stack = stack + p }
     fun pop() { if (stack.isNotEmpty()) stack = stack.dropLast(1) }
 
-    BackHandler(enabled = stack.isNotEmpty()) { pop() }
+    // 返回：有子页面就退一层；已经在 Tab 根页时才走「再按一次退出」，
+    // 避免误触直接关掉 App。内层页面自己的 BackHandler（搜索、多选、弹窗）
+    // 在组合树里更靠内，会先于这里拿到事件。
+    var backArmed by remember { mutableStateOf(false) }
+    val backScope = rememberCoroutineScope()
+    BackHandler {
+        if (stack.isNotEmpty()) {
+            pop()
+            backArmed = false
+        } else if (backArmed) {
+            findActivity(ctx)?.finish()
+        } else {
+            backArmed = true
+            Toast.makeText(ctx, "再按一次退出", Toast.LENGTH_SHORT).show()
+            backScope.launch {
+                delay(2000)
+                backArmed = false
+            }
+        }
+    }
 
     Column(
         Modifier

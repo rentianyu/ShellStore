@@ -82,7 +82,7 @@ object Store {
     private val _sources = MutableStateFlow<List<SourceConfig>>(emptyList())
     val sources: StateFlow<List<SourceConfig>> = _sources.asStateFlow()
 
-    /** 「小贝塔系列」可选源清单（来自 ai 仓库的 index.json） */
+    /** 「小贝塔订阅源」可选源清单（来自 ai 仓库的 index.md，本身就是一份 SMD） */
     private val _seriesItems = MutableStateFlow<List<SeriesSources.Item>>(emptyList())
     val seriesItems: StateFlow<List<SeriesSources.Item>> = _seriesItems.asStateFlow()
 
@@ -211,7 +211,7 @@ object Store {
 
     // ---------------- 源管理 ----------------
 
-    // ---------------- 小贝塔系列 ----------------
+    // ---------------- 小贝塔订阅源 ----------------
 
     /** 拉系列清单（会联网，调用方切 IO 线程）。返回错误信息，null 表示成功 */
     fun loadSeriesCatalog(): String? {

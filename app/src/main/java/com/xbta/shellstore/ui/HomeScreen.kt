@@ -365,6 +365,9 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
         }
     }
 
+    // 返回键：先把分类内的搜索清掉，再退出页面
+    BackHandler(enabled = query.isNotEmpty()) { query = "" }
+
     Column(Modifier.fillMaxSize()) {
         TopBar(cat, onBack = onBack, actions = { IconBtn("☰") { viewOptions = true } })
         Box(Modifier.padding(horizontal = Space.page, vertical = 4.dp)) {

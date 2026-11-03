@@ -19,7 +19,7 @@ data class SourceConfig(
     val etag: String = "",
     val count: Int = 0,
     val error: String = "",
-    /** 「小贝塔系列」标识（如 "xbta"）。空串 = 用户自己加的源。系列源受总开关门控 */
+    /** 「小贝塔订阅源」标识（如 "xbta"）。空串 = 用户自己加的源。系列源受总开关门控 */
     val series: String = ""
 ) {
     val typeLabel: String

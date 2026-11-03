@@ -114,7 +114,30 @@ confirmDanger  Boolean，危险条目执行前二次确认
 foldPreview    Boolean，列表卡片是否折叠命令预览
 sourceMirror   String，上次拉取成功的线路名（空 = 直连）
 onboarded      Boolean，是否走过欢迎页
+xbtaSeries     Boolean，「小贝塔订阅源」总开关。关闭时 series 源保留配置但不参与解析
 ```
+
+## 三·五、订阅源配置（`SourceConfig`）
+
+```kotlin
+id         String，官方源固定 "official"，用户源 "r"+8位随机，系列源沿用添加时的 id
+name       String
+type       SourceType(BUILTIN / REMOTE / LOCAL)
+url        String，在线源地址
+enabled    Boolean，单个源的开关
+lastFetch  Long，上次成功拉取时间
+etag       String，ETag 增量更新用
+count      Int，上次解析出的条目数
+error      String，最近一次错误
+series     String，「小贝塔订阅源」标识 "xbta"；空串 = 用户自己加的源
+```
+
+`series` 非空且 `AppSettings.xbtaSeries == false` 时，该源不参与 `reloadAll` 的合并
+（配置保留，重新打开总开关立即恢复）。**识别系列源按 `url`，不要按 `series`**——
+用户手动加过的同一个源 series 是空的，按标记判断会重复添加。
+
+系列清单在 `https://f.xbta.cc/ai/ShellStore/sources/index.md`，它本身是一份 SMD：
+代码块正文是 http 地址的条目即一个可选源（见 `SeriesSources.parse`）。
 
 ## 四、SMD 格式
 

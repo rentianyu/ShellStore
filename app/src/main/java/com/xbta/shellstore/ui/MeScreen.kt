@@ -777,7 +777,9 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
             Text(
                 "SMD 格式：## 分类 / ### 条目 / @risk safe / 代码块装命令。\n" +
                     "也支持 ● 开头的清单直接粘贴成文件导入。\n" +
-                    "在线源支持 ETag 增量更新，内容未变时不重复下载。",
+                    "在线源支持 ETag 增量更新，内容未变时不重复下载。\n" +
+                    "拉不动时自动切换备用线路（共 17 条），全失败通常是网络整体出不去，" +
+                    "可以在电脑上下载 .md 再传到手机用「导入本地文件」添加。",
                 fontSize = TypeScale.caption,
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.outline

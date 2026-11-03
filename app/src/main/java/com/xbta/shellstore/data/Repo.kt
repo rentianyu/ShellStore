@@ -37,7 +37,7 @@ data class AppSettings(
     val onboarded: Boolean = false,
     /** 上次拉取成功的线路名，空串表示直连。下次优先用它 */
     val sourceMirror: String = "",
-    /** 「小贝塔系列」订阅源总开关。关闭时系列源保留配置但不参与解析 */
+    /** 「小贝塔订阅源」总开关。关闭时系列源保留配置但不参与解析 */
     val xbtaSeries: Boolean = false
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
