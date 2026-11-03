@@ -158,7 +158,7 @@ private fun LegalLink(text: String, onClick: () -> Unit) {
             color = MaterialTheme.colorScheme.primary
         )
         Spacer(Modifier.weight(1f))
-        Text("›", fontSize = TypeScale.body, color = MaterialTheme.colorScheme.outline)
+        AppIcon("›", size = 18.dp, color = MaterialTheme.colorScheme.outline)
     }
 }
 

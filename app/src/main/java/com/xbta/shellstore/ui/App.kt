@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -18,6 +19,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -95,7 +97,15 @@ fun App() {
             CompositionLocalProvider(
                 LocalDensity provides Density(d.density, d.fontScale * settings.fontScale)
             ) {
-                Root()
+                // 导航内页面、首次协议页及协议详情统一消费安全区域。
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                ) {
+                    Root()
+                }
             }
         }
     }
@@ -183,7 +193,6 @@ private fun Root() {
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         val downloading = upState as? UpdateCenter.State.Downloading
         if (downloading != null) {
@@ -276,7 +285,7 @@ private fun Root() {
 @Composable
 private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
     // 浮动胶囊 dock：不贴边、带阴影，落到页面底色上，才有「浮起来」的层次。
-    // 选中指示器用中性色托盘（比 dock 亮一档）而不是主色药丸，色只留给图标和文字。
+    // 图标与标签共享中心轴，选中态用颜色和导航语义表达。
     Box(
         Modifier
             .fillMaxWidth()
@@ -285,7 +294,8 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .height(Dimen.tabBar)
+                .heightIn(min = Dimen.tabBar)
+                .height(IntrinsicSize.Min)
                 .shadow(10.dp, RoundedCornerShape(Radius.lg), clip = false)
                 .clip(RoundedCornerShape(Radius.lg))
                 .background(MaterialTheme.colorScheme.surface),
@@ -299,16 +309,17 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clickable { onSelect(i) },
+                        .selectable(selected = on, role = Role.Tab, onClick = { onSelect(i) })
+                        .padding(vertical = Space.xs),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     // 选中态只用颜色区分，不加托盘/胶囊底（避免看起来像一块椭圆阴影）
                     Box(
-                        Modifier.width(58.dp).height(32.dp),
+                        Modifier.widthIn(min = 58.dp).heightIn(min = 32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(pair.first, fontSize = IconSize.tab, color = fg)
+                        AppIcon(pair.first, size = IconSize.tab, color = fg)
                     }
                     Spacer(Modifier.height(2.dp))
                     Text(

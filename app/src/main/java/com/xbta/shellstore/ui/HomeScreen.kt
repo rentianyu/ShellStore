@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -204,7 +203,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                         Text("全部分类", fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         Text("共 ${cats.size} 个分类", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(Space.xs))
-                        Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
+                        AppIcon("›", size = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
                     }
                 }
                 item {
@@ -264,11 +263,9 @@ private fun CategoryGrid(
                             .clickable { onOpen(Page.CatList(c.name)) }
                             .padding(horizontal = Space.md, vertical = Space.md)
                     ) {
-                        Text(
+                        AppIcon(
                             catGlyph(idx),
-                            fontSize = TypeScale.body,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
+                            size = 18.dp,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(Modifier.height(Space.sm))
@@ -326,11 +323,9 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
+                        AppIcon(
                             catGlyph(idx),
-                            fontSize = IconSize.card,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
+                            size = IconSize.card,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -342,7 +337,7 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.width(Space.xs))
-                    Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
+                    AppIcon("›", size = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
                 }
             }
         }

@@ -247,9 +247,9 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                                     modifier = Modifier.weight(1f)
                                 )
                                 if ((values[p.key] ?: "").isNotEmpty()) {
-                                    Text(
+                                    AppIcon(
                                         "✕",
-                                        fontSize = TypeScale.small,
+                                        size = IconSize.inline,
                                         color = MaterialTheme.colorScheme.outline,
                                         modifier = Modifier.clickable { values = values + (p.key to "") }.padding(4.dp)
                                     )
@@ -430,9 +430,9 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                     .clickable { Store.toggleFav(entry) },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
+                AppIcon(
                     if (fav) "★" else "☆",
-                    fontSize = IconSize.action,
+                    size = IconSize.action,
                     color = if (fav) androidx.compose.ui.graphics.Color(0xFFF2A93B) else onVariant
                 )
             }

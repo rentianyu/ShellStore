@@ -92,20 +92,23 @@ codeFg     #1B1B1E    codeBg      #E9E6EA
 | `code` | 13sp | 卡片内命令预览 |
 | `codeLarge` | 14sp | 详情页命令正文 |
 
-### 图标字号
+### 图标尺寸
 
 | token | 值 | 用途 |
 |---|---|---|
-| `tab` | 30sp | 底部 tab |
-| `top` | 24sp | 顶栏操作按钮 |
-| `nav` | 32sp | 顶栏返回箭头 |
-| `action` | 19sp | 列表右侧 `⋯` |
-| `card` | 18sp | 分类卡片图标 |
-| `inline` | 17sp | 搜索框内 |
-| `chevron` | 18sp | 行尾 `›` |
-| `check` | 13sp | 勾选框对勾 |
+| `tab` | 26dp | 底部 tab |
+| `top` | 24dp | 顶栏操作按钮 |
+| `nav` | 24dp | 顶栏返回箭头 |
+| `action` | 22dp | 列表右侧操作 |
+| `card` | 18dp | 分类卡片图标 |
+| `inline` | 20dp | 搜索框内 |
+| `chevron` | 18dp | 行尾箭头 |
+| `check` | 13dp | 勾选框对勾 |
 
-图标全部是**字形字符**（`▦ ☆ ◍ ⌕ ☰ ☑ + ⋯ ›`），不是图片资源 —— 所以只有字号没有尺寸。
+导航、按钮、类型徽章和设置项使用 `AppIcon` 的矢量图标，共用 24×24 画布、圆角线端和统一线宽。
+现有字符参数仅用作图标索引，不交给字体渲染。尺寸使用 dp，不随系统字体、导入字体或正文行高变化；
+图标在点击热区内居中，导航图标与标签共享中心轴。顶部及列表按钮保留 48dp 热区。
+图标按钮提供操作说明；已有相邻标签的装饰图标不重复朗读。
 
 ### 固定尺寸
 
@@ -158,16 +161,16 @@ Column(fillMaxSize) {
 
 | 组件 | 说明 |
 |---|---|
-| `TopBar(title, onBack, actions)` | 56dp 顶栏，标题单行省略 |
-| `IconBtn(glyph, onClick)` | 48dp 热区的字形按钮 |
+| `TopBar(title, onBack, actions)` | 最小 56dp 顶栏，高度随字体增长，标题单行省略 |
+| `IconBtn(glyph, onClick)` | 48dp 热区的矢量按钮，带操作说明 |
 | `SearchField(...)` | 圆角搜索框，自带聚焦与取消 |
 | `FilterChip(label, selected, onClick)` | 筛选胶囊，选中填主色 |
 | `CodeBlock(text, maxLines, fontSize, background)` | 等宽代码块，默认 `Tones.codeBg` |
 | `EntryRow(...)` | 列表卡片（标题 / 徽章 / 预览 / ☆ / ⋯） |
-| `TypeBadge(t)` | 类型方块徽章（带字形图标） |
+| `TypeBadge(t)` | 类型方块徽章（带矢量图标） |
 | `RiskBadge(risk)` / `Badge(text, fg, bg)` / `MutedBadge(text)` | 三类徽章 |
 | `GroupCard { }` / `GroupTitle(text)` / `Divider()` | 设置类页面的分组容器 |
-| `SettingRow(icon, title, subtitle, onClick)` | 设置项：左图标 + 标题 + 副标题 + `›` |
+| `SettingRow(icon, title, subtitle, onClick)` | 设置项：左图标 + 上下排列的标题与说明 + 右侧箭头或开关 |
 | `Toggle(on, onChange)` / `CheckCircle(checked)` | 开关与勾选圈 |
 | `EmptyState(title, hint)` | 空态 |
 | `ViewOptionsDialog(...)` | 列表显示设置弹层 |
@@ -194,8 +197,18 @@ settings.codeFont → 代码字体（LocalCodeFont 注入，CodeBlock 与命令�
 settings.fontScale → 通过 CompositionLocalProvider(LocalDensity provides Density(density, fontScale * f))
 ```
 
-关键：**只改 fontScale、不改 density**，所以字号放大时 dp 尺寸（间距、按钮高度）不变，
-不会把布局撑爆。全局一处生效，不需要逐处改 fontSize。
+关键：**只改 fontScale、不改 density**，间距仍按 dp 计算，但文字所需的空间会增长。
+不能靠固定控件高度适配大字体：顶栏、搜索框和底栏使用最小高度，让内容撑开容器。
+全局字号设置在一处生效，不需要逐处改 fontSize。
+
+设置项的标题与说明放在同一个 `weight(1f)` 的 Column 中，右侧只放箭头或开关。
+两段文字均可自然换行，不限制行数；避免无权重的长说明先占满行宽，把标题挤成逐字换行。
+此规则适用于「我的」、设置、订阅源、备份等所有复用 `SettingRow` 的页面。
+
+系统安全区域在 App 根容器统一处理，包含首次协议页及其法律详情页，子页面不重复添加系统栏间距。
+
+适配验证应覆盖 320dp / 360dp / 412dp 窗口、横屏、系统大字体叠加应用字号，以及手势与三键导航。
+重点检查「最近使用」「使用帮助」、长字体文件名、带开关的设置行、底部导航及最后一项的滚动可达性。
 
 ## 深浅色
 
