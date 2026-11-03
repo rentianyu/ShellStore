@@ -132,8 +132,10 @@ object Store {
         _settings.value = Repo.loadSettings(c)
 
         var loadedSources = Repo.loadSourceConfigs(c)
-        // 老配置迁移：官方源地址换成 f.xbta.cc，并归入「小贝塔订阅源」、改名为 AI 整理命令库
-        if (loadedSources.any { it.id == OFFICIAL_ID }) {
+        // 老配置迁移：官方源地址换成 f.xbta.cc，并归入「小贝塔订阅源」、改名为 AI 整理命令库。
+        // 原来源是启用的，就把系列总开关一并打开，否则迁移完商店会变空。
+        val oldOfficial = loadedSources.firstOrNull { it.id == OFFICIAL_ID }
+        if (oldOfficial != null) {
             loadedSources = loadedSources.map {
                 if (it.id == OFFICIAL_ID) it.copy(
                     url = OFFICIAL_URL,
@@ -142,6 +144,10 @@ object Store {
                 ) else it
             }
             Repo.saveSourceConfigs(c, loadedSources)
+            if (oldOfficial.enabled && !_settings.value.xbtaSeries) {
+                _settings.value = _settings.value.copy(xbtaSeries = true)
+                Repo.saveSettings(c, _settings.value)
+            }
         }
         _sources.value = loadedSources
 
