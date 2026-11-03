@@ -1,5 +1,6 @@
 package com.xbta.shellstore.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -201,6 +203,8 @@ fun EntryRow(
     folded: Boolean = false,
     highlight: String = ""
 ) {
+    val ctx = LocalContext.current
+    val canOpen = IntentLauncher.canTrigger(entry)
     Column(
         Modifier
             .fillMaxWidth()
@@ -249,7 +253,7 @@ fun EntryRow(
                         .clickable { onEdit() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("⋯", fontSize = IconSize.action, color = MaterialTheme.colorScheme.outline)
+                    Text("✎", fontSize = IconSize.action, color = MaterialTheme.colorScheme.outline)
                 }
             }
         }
@@ -280,6 +284,32 @@ fun EntryRow(
             if (showCategory && entry.categoryId.isNotBlank()) {
                 Spacer(Modifier.width(Space.xs))
                 MutedBadge(entry.categoryId)
+            }
+            if (canOpen) {
+                Spacer(Modifier.weight(1f))
+                // 右下角快捷触发：不用进详情直接打开 / 发送 / 启动
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = .10f))
+                        .clickable {
+                            val err = IntentLauncher.trigger(ctx, entry, emptyMap())
+                            if (err == null) Store.recordRecent(entry.id)
+                            Toast.makeText(
+                                ctx,
+                                err ?: "${IntentLauncher.actionLabel(entry)}成功",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        IntentLauncher.actionLabel(entry),
+                        fontSize = TypeScale.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
