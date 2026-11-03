@@ -29,6 +29,7 @@ import com.xbta.shellstore.core.IntentSpec
 import com.xbta.shellstore.core.Need
 import com.xbta.shellstore.core.Param
 import com.xbta.shellstore.core.Risk
+import com.xbta.shellstore.core.Variant
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Radius
 import com.xbta.shellstore.ui.theme.Space
@@ -58,6 +59,11 @@ fun EntryEditorScreen(
     var risk by remember { mutableStateOf(seed?.risk ?: Risk.SAFE) }
     var need by remember { mutableStateOf(seed?.need ?: Need.NONE) }
     var tagText by remember { mutableStateOf(seed?.tags?.joinToString(" ") ?: "") }
+    var example by remember { mutableStateOf(seed?.example ?: "") }
+    var doc by remember { mutableStateOf(seed?.doc ?: "") }
+    var adb by remember { mutableStateOf(seed?.adb ?: "") }
+    var pinned by remember { mutableStateOf(seed?.pinned ?: false) }
+    val variants = remember { mutableStateListOf<Variant>().apply { seed?.variants?.let { addAll(it) } } }
 
     val it0 = seed?.intent
     var action by remember { mutableStateOf(it0?.action ?: "") }
@@ -93,6 +99,13 @@ fun EntryEditorScreen(
             need = need,
             body = if (type.hasBody) body.trim() else "",
             params = params.filter { it.key.isNotBlank() }.map { it.copy(key = it.key.trim()) },
+            example = example.trim(),
+            doc = doc.trim(),
+            adb = adb.trim(),
+            pinned = pinned,
+            variants = variants
+                .filter { it.name.isNotBlank() && it.body.isNotBlank() }
+                .map { it.copy(name = it.name.trim()) },
             intent = intentSpec
         )
     }
@@ -326,6 +339,61 @@ fun EntryEditorScreen(
                         }
                     }
                     Field("标签", tagText, { tagText = it }, "空格分隔，如 网络 调试")
+                }
+            }
+
+            // ---------- 更多 ----------
+            GroupTitle("更多")
+            GroupCard {
+                Column(Modifier.padding(Space.md), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "置顶（详情页与列表优先展示）",
+                            fontSize = TypeScale.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(if (pinned) "已置顶" else "未置顶", pinned) { pinned = !pinned }
+                    }
+                    Field("保真命令（可选）", adb, { adb = it }, "完整 adb shell … ，有就优先用它", mono = true)
+                    Field("示例（可选）", example, { example = it }, "执行示例或用法举例", mono = true, minLines = 2)
+                    Field("文档 / 说明（可选）", doc, { doc = it }, "补充说明、来源链接、注意事项", minLines = 3)
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("变体（同一命令的多种写法）", fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "+ 添加",
+                            fontSize = TypeScale.caption,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(Radius.sm))
+                                .clickable { variants.add(Variant("", "")) }
+                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                        )
+                    }
+                    if (variants.isEmpty()) {
+                        Text(
+                            "比如「需要 root」「Termux 写法」，不填就只按上面的命令内容执行",
+                            fontSize = TypeScale.caption,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                    variants.forEachIndexed { i, v ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) {
+                                Field("", v.name, { variants[i] = v.copy(name = it) }, "变体名，如 root 版")
+                            }
+                            Text(
+                                "✕", fontSize = TypeScale.caption,
+                                color = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier
+                                    .clickable { variants.removeAt(i) }
+                                    .padding(8.dp)
+                            )
+                        }
+                        Field("", v.body, { variants[i] = v.copy(body = it) }, "这条变体的完整命令", mono = true, minLines = 2)
+                    }
                 }
             }
 

@@ -400,16 +400,26 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                         .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
                         .background(primary)
-                        .clickable { copy() },
+                        .clickable { onOpen(Page.Editor(entry.id)) },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        if (settings.copyPrefix == CopyPrefix.NONE) entry.primaryActionLabel
-                        else "${entry.primaryActionLabel}（${settings.copyPrefix.label}）",
+                        "编辑",
                         fontSize = TypeScale.body,
                         fontWeight = FontWeight.Bold,
                         color = onPrimary
                     )
+                }
+                Box(
+                    Modifier
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(Radius.md))
+                        .background(variant)
+                        .clickable { copy() }
+                        .padding(horizontal = Space.page),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
                 }
             }
             Box(
