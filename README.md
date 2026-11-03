@@ -130,6 +130,18 @@ A：不会。收藏是入藏时的快照，源更新不影响已收藏的内容�
 A：只有三个：联网、读取网络状态（判断在线源能否更新）、安装未知应用（应用内更新）。
 不申请存储、定位、悬浮窗等任何权限。
 
+## 开发
+
+架构、数据模型、界面规范、功能实现位置、构建发版流程都在 **[docs/](docs/)**：
+
+| 文档 | 内容 |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 分层、状态管理、导航、数据流 |
+| [docs/DATA-MODEL.md](docs/DATA-MODEL.md) | 模型字段、SMD 映射、本地存储 |
+| [docs/UI-DESIGN.md](docs/UI-DESIGN.md) | 配色、尺寸 token、组件、交互约定 |
+| [docs/FEATURES.md](docs/FEATURES.md) | 每个功能的实现位置 |
+| [docs/BUILD-AND-RELEASE.md](docs/BUILD-AND-RELEASE.md) | 依赖约束、CI、签名、发版 SOP |
+
 ## 构建
 
 ```bash
