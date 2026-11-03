@@ -33,6 +33,7 @@ import com.xbta.shellstore.R
 import com.xbta.shellstore.data.AppSettings
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.FontChoice
+import com.xbta.shellstore.core.LegalText
 import com.xbta.shellstore.data.SeriesSources
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
@@ -277,7 +278,7 @@ private fun StatCell(value: String, label: String, modifier: Modifier = Modifier
 // ---------------- 设置 ----------------
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
     val settings by Store.settings.collectAsState()
     val ctx = LocalContext.current
     var confirmClear by remember { mutableStateOf(false) }
@@ -404,6 +405,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
                 Divider()
                 SettingRow("⊘", "清除收藏数据", "不可恢复", danger = true, onClick = { confirmClear = true })
+            }
+
+            GroupTitle("法律")
+            GroupCard {
+                SettingRow("§", "用户协议", "使用规则与免责说明", onClick = { onOpen(Page.Legal("user")) })
+                Divider()
+                SettingRow("§", "隐私政策", "收集什么、不收集什么", onClick = { onOpen(Page.Legal("privacy")) })
             }
         }
     }
@@ -1052,11 +1060,18 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 SettingRow("⌘", "数据格式", "SMD v1")
                 Divider()
                 SettingRow("⚖", "开源协议", "MIT")
+                Divider()
+                SettingRow("§", "用户协议", "v${LegalText.LEGAL_VERSION}", onClick = { onOpen(Page.Legal("user")) })
+                Divider()
+                SettingRow("§", "隐私政策", "v${LegalText.LEGAL_VERSION}", onClick = { onOpen(Page.Legal("privacy")) })
+                Divider()
+                SettingRow("ⓘ", "备案号", LegalText.FILING_NO)
             }
 
             Spacer(Modifier.height(Space.md))
             Text(
                 "命令与脚本均来自订阅源，App 自身不做任何联网上传。\n" +
+                    "本软件不提供、不存储任何订阅源内容，订阅源由用户自行添加并负责。\n" +
                     "标注为「危险」的条目在执行前请自行确认内容，误操作造成的后果由使用者承担。",
                 fontSize = TypeScale.caption,
                 lineHeight = 17.sp,

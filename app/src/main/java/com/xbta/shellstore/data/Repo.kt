@@ -38,7 +38,9 @@ data class AppSettings(
     /** 上次拉取成功的线路名，空串表示直连。下次优先用它 */
     val sourceMirror: String = "",
     /** 「小贝塔订阅源」总开关。关闭时系列源保留配置但不参与解析 */
-    val xbtaSeries: Boolean = false
+    val xbtaSeries: Boolean = false,
+    /** 已同意的协议版本，0 = 未同意。低于 LegalText.LEGAL_VERSION 时重新征得同意 */
+    val agreedVersion: Int = 0
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("theme", theme.name)
@@ -54,6 +56,7 @@ data class AppSettings(
         put("onboarded", onboarded)
         put("sourceMirror", sourceMirror)
         put("xbtaSeries", xbtaSeries)
+        put("agreedVersion", agreedVersion)
     }
 
     companion object {
@@ -74,7 +77,8 @@ data class AppSettings(
                 foldPreview = o.optBoolean("foldPreview", false),
                 onboarded = o.optBoolean("onboarded", false),
                 sourceMirror = o.optString("sourceMirror", ""),
-                xbtaSeries = o.optBoolean("xbtaSeries", false)
+                xbtaSeries = o.optBoolean("xbtaSeries", false),
+                agreedVersion = o.optInt("agreedVersion", 0)
             )
         }
     }

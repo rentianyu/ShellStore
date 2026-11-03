@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.BuildConfig
 import com.xbta.shellstore.core.Entry
+import com.xbta.shellstore.core.LegalText
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.UpdateCenter
 import com.xbta.shellstore.data.ThemeMode
@@ -64,6 +65,7 @@ sealed interface Page {
     data object About : Page
     data object Help : Page
     data object SourceHelp : Page
+    data class Legal(val kind: String) : Page
     /** entryId 为空 = 新建；folderId 决定新条目落在哪个收藏夹；draft 用于粘贴导入时预填 */
     data class Editor(
         val entryId: String? = null,
@@ -103,6 +105,16 @@ private fun Root() {
     // 首次安装（或还没走过欢迎页）先让用户明确启用官方源，不再是内置命令集
     val appSettings by Store.settings.collectAsState()
     val sourceList by Store.sources.collectAsState()
+    val basicMode by Store.basicMode.collectAsState()
+
+    // 协议门控：未同意（或条款升级）先进同意页，同意前不发生任何联网
+    if (appSettings.agreedVersion < LegalText.LEGAL_VERSION && !basicMode) {
+        AgreementScreen(
+            onAgree = { Store.agreeLegal() },
+            onDecline = { Store.declineLegal() }
+        )
+        return
+    }
     LaunchedEffect(appSettings.onboarded, sourceList.size) {
         // 老用户已有自己的源，直接放行，不打扰
         if (!appSettings.onboarded && sourceList.isNotEmpty()) {
@@ -124,13 +136,16 @@ private fun Root() {
     val holder = rememberSaveableStateHolder()
 
     // 启动后静默检查：先看自身有没有新版本（下完再弹窗），再看订阅源有没有变化
+    // 只有同意协议后才联网：检查更新 + 检查源变化
     LaunchedEffect(Unit) {
+        if (!Store.netAllowed) return@LaunchedEffect
         delay(2000)
         withContext(Dispatchers.IO) {
             UpdateCenter.checkAndDownload(ctx, BuildConfig.APP_VERSION)
         }
     }
     LaunchedEffect(Unit) {
+        if (!Store.netAllowed) return@LaunchedEffect
         delay(3500)
         withContext(Dispatchers.IO) { Store.checkSourceUpdates() }
     }
@@ -170,6 +185,31 @@ private fun Root() {
             DownloadBar(downloading.pct)
         }
 
+        // 基础模式：不同意隐私政策时进入，联网全部关闭，这里给一条恢复入口
+        if (basicMode) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clickable { Store.exitBasicMode() }
+                    .padding(horizontal = Space.page, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "未同意隐私政策，联网功能已关闭",
+                    fontSize = TypeScale.caption,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "去同意 ›",
+                    fontSize = TypeScale.caption,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
         Box(Modifier.weight(1f).fillMaxWidth()) {
             // 记住每页的滚动位置与临时状态：从详情返回列表不会跳回顶部
             holder.SaveableStateProvider(current?.toString() ?: "tab$tab") {
@@ -188,12 +228,13 @@ private fun Root() {
                     is Page.TagView -> TagScreen(onBack = ::pop, onOpen = ::push)
                     is Page.AllFav -> AllFavScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Recent -> RecentScreen(onBack = ::pop, onOpen = ::push)
-                    is Page.Settings -> SettingsScreen(onBack = ::pop)
+                    is Page.Settings -> SettingsScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Sources -> SourcesScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Backup -> BackupScreen(onBack = ::pop)
                     is Page.About -> AboutScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Help -> HelpScreen(onBack = ::pop)
                     is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)
+                    is Page.Legal -> LegalScreen(p.kind, onBack = ::pop)
                     is Page.Editor -> EntryEditorScreen(p.entryId, p.folderId, p.draft, onBack = ::pop)
                 }
             }

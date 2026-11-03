@@ -2,6 +2,7 @@ package com.xbta.shellstore.data
 
 import android.content.Context
 import com.xbta.shellstore.core.*
+import com.xbta.shellstore.core.LegalText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,6 +65,30 @@ object Store {
 
     private val _loaded = MutableStateFlow(false)
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+
+    /** 用户点了「不同意」后进入本次会话的基础模式：离线可用，联网关闭 */
+    private val _basicMode = MutableStateFlow(false)
+    val basicMode: StateFlow<Boolean> = _basicMode.asStateFlow()
+
+    /** 是否允许联网：同意协议且不在基础模式 */
+    val netAllowed: Boolean
+        get() = !_basicMode.value && _settings.value.agreedVersion >= LegalText.LEGAL_VERSION
+
+    /** 同意协议（记版本号，条款升级后会再次要求同意） */
+    fun agreeLegal() {
+        _basicMode.value = false
+        updateSettings(_settings.value.copy(agreedVersion = LegalText.LEGAL_VERSION))
+    }
+
+    /** 不同意：不退出 App，进入离线基础模式 */
+    fun declineLegal() {
+        _basicMode.value = true
+    }
+
+    /** 从基础模式恢复联网（设置页里的入口） */
+    fun exitBasicMode() {
+        agreeLegal()
+    }
 
     private val _favs = MutableStateFlow(FavData())
     val favs: StateFlow<FavData> = _favs.asStateFlow()
@@ -282,6 +307,7 @@ object Store {
 
     fun addRemote(name: String, url: String, series: String = ""): String? {
         val c = ctx ?: return "未初始化"
+        if (!netAllowed) return "请先同意《用户协议》和《隐私政策》"
         if (!url.startsWith("http://") && !url.startsWith("https://")) return "地址必须以 http:// 或 https:// 开头"
         val id = "r" + UUID.randomUUID().toString().replace("-", "").take(8)
         val r = if (Mirrors.isGitHub(url)) {
@@ -315,6 +341,7 @@ object Store {
 
     fun refresh(id: String): String? {
         val c = ctx ?: return "未初始化"
+        if (!netAllowed) return "请先同意《用户协议》和《隐私政策》"
         val cfg = _sources.value.firstOrNull { it.id == id } ?: return "源不存在"
         if (cfg.type != SourceType.REMOTE) {
             reloadAll(); return null
@@ -479,6 +506,7 @@ object Store {
      * 纯阻塞实现，调用方自己切到 IO 线程。
      */
     fun enableOfficial(): String? {
+        if (!netAllowed) return "请先同意《用户协议》和《隐私政策》"
         val c = ctx ?: return "未初始化"
         val existing = _sources.value.firstOrNull { it.id == OFFICIAL_ID }
         val r = Mirrors.fetch(
