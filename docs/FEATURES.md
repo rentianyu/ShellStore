@@ -113,7 +113,7 @@ service                       → startService（App 在前台可用，后台会
 | 在线源 | `Store.addRemote(name, url)` |
 | 本地源 | `Store.importLocal(name, text, fileName)`，正文复制进 `SourceCache` |
 | 多源合并 | `reloadAll()` 逐个解析后按 id 去重合并 |
-| 线路降级 | `Mirrors`：18 个节点，单节点 10s 超时，上次成功的提到最前（`settings.sourceMirror`） |
+| 线路降级 | `Mirrors`：17 个节点，单节点 10s 超时，上次成功的提到最前（`settings.sourceMirror`） |
 | 更新确认 | `checkSourceUpdates()` 只比对条数算差异，用户确认后才 `applySourceUpdates()` |
 | 帮助页 | `SourceHelpScreen` + `SourceHelpText`（给人看的最小模板 + 给 AI 的完整规范，均可一键复制） |
 

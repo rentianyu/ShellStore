@@ -112,7 +112,7 @@ App() → Root()
 ```
 Sources.kt     源配置：id / name / url / type(REMOTE|LOCAL) / enabled / lastFetch / count / error
 SourceCache    正文缓存（按源 id 存文件），离线可用
-Mirrors.kt     18 个线路节点，Form 分 FULL（要 https:// 前缀）和 BARE（不能带）
+Mirrors.kt     17 个线路节点，Form 分 FULL（要 https:// 前缀）和 BARE（不能带）
                单个节点 10s 超时，失败换下一个；上次成功的线路提到最前（存 settings.sourceMirror）
 ```
 
