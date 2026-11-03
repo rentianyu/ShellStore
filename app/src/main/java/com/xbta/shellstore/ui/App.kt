@@ -38,7 +38,10 @@ import com.xbta.shellstore.ui.theme.LocalCodeFont
 import com.xbta.shellstore.ui.theme.resolveCodeFont
 import com.xbta.shellstore.ui.theme.resolveUiFont
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -63,6 +66,7 @@ sealed interface Page {
     data object Settings : Page
     data object Sources : Page
     data object Backup : Page
+    data object WebDav : Page
     data object About : Page
     data object Help : Page
     data object SourceHelp : Page
@@ -92,8 +96,13 @@ fun App() {
     CompositionLocalProvider(LocalCodeFont provides codeFont) {
         AppTheme(darkTheme = dark, fontFamily = uiFont) {
             val d = LocalDensity.current
+            // 界面缩放作用在 density 上（dp 与 sp 一起变大）；字号只作用在 fontScale 上，
+            // 两者独立，1.20 缩放 + 140% 字号 = 既有大控件也有大字号。
             CompositionLocalProvider(
-                LocalDensity provides Density(d.density, d.fontScale * settings.fontScale)
+                LocalDensity provides Density(
+                    d.density * settings.uiScale,
+                    d.fontScale * settings.fontScale
+                )
             ) {
                 Root()
             }
@@ -128,6 +137,22 @@ private fun Root() {
         val err = withContext(Dispatchers.IO) { Store.bootstrapOnboarding() }
         if (err == null) {
             Store.updateSettings(Store.settings.value.copy(onboarded = true))
+        }
+    }
+
+    // 云备份：数据一变就重新计时 30 秒，静默期内不再变更才真正上传。
+    // collectLatest 会取消上一次的 delay，等价于防抖；上传本身用 NonCancellable 保护不被截断。
+    LaunchedEffect(Unit) {
+        var first = true
+        combine(Store.settings, Store.favs, Store.sources, Store.recent) { s, f, src, r ->
+            listOf(s.hashCode(), f.hashCode(), src.hashCode(), r.hashCode())
+        }.collectLatest {
+            if (first) {
+                first = false
+                return@collectLatest
+            }
+            delay(30_000)
+            withContext(NonCancellable) { Store.autoBackup() }
         }
     }
 
@@ -235,7 +260,8 @@ private fun Root() {
                     is Page.Recent -> RecentScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Settings -> SettingsScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Sources -> SourcesScreen(onBack = ::pop, onOpen = ::push)
-                    is Page.Backup -> BackupScreen(onBack = ::pop)
+                    is Page.Backup -> BackupScreen(onBack = ::pop, onOpen = ::push)
+                    is Page.WebDav -> WebDavScreen(onBack = ::pop)
                     is Page.About -> AboutScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Help -> HelpScreen(onBack = ::pop)
                     is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)

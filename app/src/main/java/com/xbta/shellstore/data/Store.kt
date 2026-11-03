@@ -3,9 +3,11 @@ package com.xbta.shellstore.data
 import android.content.Context
 import com.xbta.shellstore.core.*
 import com.xbta.shellstore.core.LegalText
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /** 启动时检测到的订阅源更新。text 是拉到的新内容，用户点确定才真正写入 */
@@ -130,6 +132,8 @@ object Store {
         val c = ctx!!
 
         _settings.value = Repo.loadSettings(c)
+        // WebDAV 密码单独用 Keystore 加密存，不进 settings.json
+        webdavPass = SecretBox.load(c)
 
         var loadedSources = Repo.loadSourceConfigs(c)
         // 老配置迁移：官方源地址换成 f.xbta.cc，并归入「小贝塔订阅源」、改名为 AI 整理命令库。
@@ -823,6 +827,83 @@ object Store {
         Repo.saveSettings(c, s)
     }
 
+    // ---------------- 云备份（WebDAV） ----------------
+
+    data class WebDavState(
+        val running: Boolean = false,
+        val lastAt: Long = 0L,
+        val lastOk: Boolean = false,
+        val lastMsg: String = ""
+    )
+
+    private val _webdav = MutableStateFlow(WebDavState())
+    val webdav: StateFlow<WebDavState> = _webdav.asStateFlow()
+
+    /** 密码不落 JSON，只在内存 + Keystore 加密文件里；导出备份也不含它 */
+    @Volatile
+    private var webdavPass: String = ""
+
+    fun webdavPassOf(): String = webdavPass
+
+    fun setWebdavPass(plain: String) {
+        webdavPass = plain
+        ctx?.let { SecretBox.save(it, plain) }
+    }
+
+    fun webdavReady(): Boolean = webdavConfig().ready
+
+    private fun webdavConfig() = WebDav.Config(
+        baseUrl = _settings.value.webdavUrl,
+        user = _settings.value.webdavUser,
+        pass = webdavPass,
+        path = _settings.value.webdavPath.ifBlank { "shellstore/shellstore-backup.json" }
+    )
+
+    suspend fun pingWebdav(): WebDav.Result =
+        withContext(Dispatchers.IO) { WebDav.ping(webdavConfig()) }
+
+    /** 上传整份备份，手动与自动共用同一条路径 */
+    suspend fun backupNow(): WebDav.Result = withContext(Dispatchers.IO) {
+        if (!webdavReady()) return@withContext WebDav.Result.fail(0, "还没配置 WebDAV")
+        if (_webdav.value.running) return@withContext WebDav.Result.fail(0, "备份正在进行")
+        _webdav.value = _webdav.value.copy(running = true)
+        val r = WebDav.upload(webdavConfig(), exportBackupJson())
+        _webdav.value = WebDavState(
+            running = false,
+            lastAt = System.currentTimeMillis(),
+            lastOk = r.ok,
+            lastMsg = r.msg
+        )
+        r
+    }
+
+    /**
+     * 变更触发的自动备份。
+     * 开关关着 / 没配置 / 处于离线基础模式时静默跳过，不打扰用户。
+     */
+    suspend fun autoBackup(force: Boolean = false) {
+        val s = _settings.value
+        if (!force && (!s.webdavAuto || !webdavReady() || !netAllowed)) return
+        if (_webdav.value.running) return
+        val r = backupNow()
+        if (!r.ok) {
+            _webdav.value = WebDavState(
+                lastAt = System.currentTimeMillis(),
+                lastOk = false,
+                lastMsg = r.msg
+            )
+        }
+    }
+
+    /** 从云端拉回来覆盖/合并本地；返回 null 表示成功 */
+    suspend fun restoreFromCloud(overwrite: Boolean): String? = withContext(Dispatchers.IO) {
+        if (!webdavReady()) return@withContext "还没配置 WebDAV"
+        val (text, err) = WebDav.download(webdavConfig())
+        if (err != null) return@withContext err
+        if (text.isNullOrBlank()) return@withContext "云端还没有备份文件"
+        importBackup(text, overwrite)
+    }
+
     // ---------------- 数据维护 ----------------
 
     fun clearFavorites() {
@@ -831,13 +912,27 @@ object Store {
         Repo.saveFavs(c, _favs.value)
     }
 
+    /**
+     * 导出完整备份。
+     * v2 起包含订阅源配置与最近使用记录（v1 只有收藏 + 设置），
+     * 恢复时按 schema 判断，v1 旧文件仍可导入。
+     * 注意：不导出 WebDAV 密码——密码只在本机 Keystore 里，永不进备份文件。
+     */
     fun exportBackupJson(): String {
         val o = org.json.JSONObject()
-        o.put("schema", "shellstore-backup/v1")
-        o.put("app", "0.1.0")
+        o.put("schema", "shellstore-backup/v2")
+        o.put("app", "ShellStore")
         o.put("exportedAt", System.currentTimeMillis())
         o.put("favorites", Repo.favToJson(_favs.value))
         o.put("settings", _settings.value.toJson())
+        o.put("sources", org.json.JSONArray().apply {
+            _sources.value.forEach { put(it.toJson()) }
+        })
+        o.put("recent", org.json.JSONArray().apply {
+            _recent.value.forEach {
+                put(org.json.JSONObject().apply { put("id", it.entryId); put("at", it.at) })
+            }
+        })
         return o.toString(2)
     }
 
@@ -873,11 +968,49 @@ object Store {
             // 只合并可迁移的偏好，字体路径这类本机相关的不覆盖
             _settings.value = _settings.value.copy(
                 theme = st.theme,
-                fontScale = st.fontScale,
+                fontLevel = st.fontLevel,
+                uiLevel = st.uiLevel,
                 copyPrefix = st.copyPrefix,
                 confirmDanger = st.confirmDanger
             )
             Repo.saveSettings(c, _settings.value)
+        }
+
+        // ---- v2：订阅源配置 ----
+        // 内置源由本机自带，永远不参与覆盖；同 id 或同 url 视为同一个源
+        root.optJSONArray("sources")?.let { arr ->
+            val incoming = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+                .map { SourceConfig.fromJson(it) }
+                .filter { it.type != SourceType.BUILTIN && it.url.isNotBlank() }
+            if (incoming.isNotEmpty()) {
+                val keep = if (overwrite) _sources.value.filter { it.type == SourceType.BUILTIN }
+                else _sources.value
+                val ids = keep.map { it.id }.toMutableSet()
+                val urls = keep.map { it.url }.filter { it.isNotBlank() }.toMutableSet()
+                val added = incoming.filter { ids.add(it.id) && (it.url.isBlank() || urls.add(it.url)) }
+                if (added.isNotEmpty()) {
+                    _sources.value = keep + added
+                    Repo.saveSourceConfigs(c, _sources.value)
+                }
+            }
+        }
+
+        // ---- v2：最近使用 ----
+        root.optJSONArray("recent")?.let { arr ->
+            val incoming = (0 until arr.length()).mapNotNull { i ->
+                arr.optJSONObject(i)?.let { o2 ->
+                    val id = o2.optString("id")
+                    if (id.isBlank()) null else RecentItem(id, o2.optLong("at"))
+                }
+            }
+            if (incoming.isNotEmpty()) {
+                val merged = if (overwrite) incoming
+                else (_recent.value + incoming)
+                    .groupBy { it.entryId }
+                    .map { (_, v) -> v.maxByOrNull { it.at } ?: v.first() }
+                _recent.value = merged.sortedByDescending { it.at }.take(RECENT_MAX)
+                Repo.saveRecent(c, _recent.value)
+            }
         }
         return null
     }

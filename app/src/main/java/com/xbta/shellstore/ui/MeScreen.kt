@@ -32,7 +32,9 @@ import com.xbta.shellstore.BuildConfig
 import com.xbta.shellstore.R
 import com.xbta.shellstore.data.AppSettings
 import com.xbta.shellstore.data.CopyPrefix
+import com.xbta.shellstore.data.FONT_SCALES
 import com.xbta.shellstore.data.FontChoice
+import com.xbta.shellstore.data.UI_SCALES
 import com.xbta.shellstore.core.LegalText
 import com.xbta.shellstore.data.SeriesSources
 import com.xbta.shellstore.data.Store
@@ -43,6 +45,7 @@ import com.xbta.shellstore.ui.theme.IconSize
 import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
 import com.xbta.shellstore.ui.theme.TypeScale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -134,7 +137,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     onClick = { onOpen(Page.Recent) }
                 )
                 Divider()
-                SettingRow("⇅", "备份与恢复", "导出收藏与设置", onClick = { onOpen(Page.Backup) })
+                SettingRow("⇅", "备份与恢复", "本地导出 · WebDAV 云备份", onClick = { onOpen(Page.Backup) })
             }
 
             GroupTitle("应用")
@@ -277,6 +280,21 @@ private fun StatCell(value: String, label: String, modifier: Modifier = Modifier
 
 // ---------------- 设置 ----------------
 
+/** 「字号  100%」这种一行标题：左边名称、右边当前值 */
+@Composable
+private fun SliderHeader(title: String, value: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, fontSize = TypeScale.small)
+        Spacer(Modifier.weight(1f))
+        Text(
+            value,
+            fontSize = TypeScale.small,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
     val settings by Store.settings.collectAsState()
@@ -328,15 +346,48 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
                 }
                 Divider()
                 Column(Modifier.padding(Space.md)) {
-                    Text("字号", fontSize = TypeScale.small)
+                    SliderHeader("字号", "${(settings.fontScale * 100).roundToInt()}%")
                     Spacer(Modifier.height(9.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        listOf(0.9f to "小", 1.0f to "标准", 1.15f to "大").forEach { (f, l) ->
-                            FilterChip(l, kotlin.math.abs(settings.fontScale - f) < 0.01f) {
-                                update(settings.copy(fontScale = f))
+                    // 10 级：拆成两行各 5 个，等宽等距，一眼能扫完也点得准
+                    FONT_SCALES.chunked(5).forEachIndexed { rowIdx, row ->
+                        if (rowIdx > 0) Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            row.forEachIndexed { colIdx, f ->
+                                val level = rowIdx * 5 + colIdx
+                                FilterChip(
+                                    "${(f * 100).roundToInt()}",
+                                    settings.fontLevel == level,
+                                    Modifier.weight(1f)
+                                ) { update(settings.copy(fontLevel = level)) }
                             }
                         }
                     }
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        "只放大文字，控件尺寸不变",
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Divider()
+                Column(Modifier.padding(Space.md)) {
+                    SliderHeader("界面缩放", "${(settings.uiScale * 100).roundToInt()}%")
+                    Spacer(Modifier.height(9.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        UI_SCALES.forEachIndexed { level, f ->
+                            FilterChip(
+                                "${(f * 100).roundToInt()}",
+                                settings.uiLevel == level,
+                                Modifier.weight(1f)
+                            ) { update(settings.copy(uiLevel = level)) }
+                        }
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        "文字与控件一起缩放，屏幕上显示的内容随之增减",
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.outline
+                    )
                 }
             }
 
@@ -847,7 +898,7 @@ private fun Field(label: String, value: String, onChange: (String) -> Unit) {
 // ---------------- 备份 ----------------
 
 @Composable
-fun BackupScreen(onBack: () -> Unit) {
+fun BackupScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
     val favs by Store.favs.collectAsState()
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -893,6 +944,15 @@ fun BackupScreen(onBack: () -> Unit) {
                 .padding(horizontal = Space.page)
                 .padding(bottom = 20.dp)
         ) {
+            GroupTitle("云备份")
+            GroupCard {
+                SettingRow(
+                    "☁", "WebDAV 云备份",
+                    "自动备份到自己的 WebDAV，换机可恢复",
+                    onClick = { onOpen(Page.WebDav) }
+                )
+            }
+
             GroupTitle("导出")
             GroupCard {
                 SettingRow("⇧", "导出为订阅源", "${favs.items.size} 条收藏 · 可选文件夹 · Markdown（SMD）", onClick = {

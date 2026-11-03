@@ -21,9 +21,35 @@ enum class CopyPrefix(val label: String, val fn: (String) -> String) {
     SU("su -c", { "su -c '${it.replace("'", "'\\''")}'" })
 }
 
+/**
+ * 字号 10 级（仅放大 sp，不影响 dp），第 4 级 = 100%。
+ * 取等差数列 0.80 → 1.40，每级约 +6.7%，相邻级肉眼可辨、又不会一步跳太多。
+ */
+val FONT_SCALES: List<Float> = listOf(0.80f, 0.87f, 0.93f, 1.00f, 1.07f, 1.13f, 1.20f, 1.27f, 1.33f, 1.40f)
+
+/** 界面缩放 5 级（dp 与 sp 一起缩放），第 2 级 = 100% */
+val UI_SCALES: List<Float> = listOf(0.85f, 0.92f, 1.00f, 1.10f, 1.20f)
+
+const val FONT_LEVEL_DEFAULT = 3
+const val UI_LEVEL_DEFAULT = 2
+
+/** 老版本只存了连续 fontScale，导入/升级时就近吸附到某一档 */
+fun nearestFontLevel(scale: Float): Int =
+    FONT_SCALES.indices.minByOrNull { kotlin.math.abs(FONT_SCALES[it] - scale) } ?: FONT_LEVEL_DEFAULT
+
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.LIGHT,
-    val fontScale: Float = 1.0f,
+    /** 字号档位 0..9，对应 FONT_SCALES */
+    val fontLevel: Int = FONT_LEVEL_DEFAULT,
+    /** 界面缩放档位 0..4，对应 UI_SCALES */
+    val uiLevel: Int = UI_LEVEL_DEFAULT,
+    /** WebDAV 自动备份开关（变更后 30 秒防抖上传） */
+    val webdavAuto: Boolean = false,
+    /** WebDAV 服务地址，留空 = 未配置 */
+    val webdavUrl: String = "",
+    val webdavUser: String = "",
+    /** 远端相对路径，默认 shellstore/shellstore-backup.json */
+    val webdavPath: String = "shellstore/shellstore-backup.json",
     val uiFont: FontChoice = FontChoice.SYSTEM,
     val codeFont: FontChoice = FontChoice.SYSTEM,
     val customFontPath: String = "",
@@ -42,8 +68,19 @@ data class AppSettings(
     /** 已同意的协议版本，0 = 未同意。低于 LegalText.LEGAL_VERSION 时重新征得同意 */
     val agreedVersion: Int = 0
 ) {
+    /** 实际生效的字号倍率（只放大 sp） */
+    val fontScale: Float get() = FONT_SCALES[fontLevel.coerceIn(0, FONT_SCALES.lastIndex)]
+    /** 实际生效的界面倍率（dp 与 sp 一起放大） */
+    val uiScale: Float get() = UI_SCALES[uiLevel.coerceIn(0, UI_SCALES.lastIndex)]
+
     fun toJson(): JSONObject = JSONObject().apply {
         put("theme", theme.name)
+        put("fontLevel", fontLevel)
+        put("uiLevel", uiLevel)
+        put("webdavAuto", webdavAuto)
+        put("webdavUrl", webdavUrl)
+        put("webdavUser", webdavUser)
+        put("webdavPath", webdavPath)
         put("fontScale", fontScale.toDouble())
         put("uiFont", uiFont.name)
         put("codeFont", codeFont.name)
@@ -66,7 +103,14 @@ data class AppSettings(
                 all.firstOrNull { it.name == n } ?: d
             return AppSettings(
                 theme = e(o.optString("theme"), ThemeMode.LIGHT, ThemeMode.entries.toTypedArray()),
-                fontScale = o.optDouble("fontScale", 1.0).toFloat().coerceIn(0.8f, 1.5f),
+                // 老数据只有连续 fontScale，没有 fontLevel：就近吸附，不丢用户已调过的大小
+                fontLevel = if (o.has("fontLevel")) o.optInt("fontLevel", FONT_LEVEL_DEFAULT)
+                else nearestFontLevel(o.optDouble("fontScale", 1.0).toFloat()),
+                uiLevel = o.optInt("uiLevel", UI_LEVEL_DEFAULT),
+                webdavAuto = o.optBoolean("webdavAuto", false),
+                webdavUrl = o.optString("webdavUrl", ""),
+                webdavUser = o.optString("webdavUser", ""),
+                webdavPath = o.optString("webdavPath", "shellstore/shellstore-backup.json"),
                 uiFont = e(o.optString("uiFont"), FontChoice.SYSTEM, FontChoice.entries.toTypedArray()),
                 codeFont = e(o.optString("codeFont"), FontChoice.SYSTEM, FontChoice.entries.toTypedArray()),
                 customFontPath = o.optString("customFontPath"),

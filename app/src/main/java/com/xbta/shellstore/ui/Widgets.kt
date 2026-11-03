@@ -529,9 +529,9 @@ fun SearchField(
 // ---------------- 筛选 chip ----------------
 
 @Composable
-fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+fun FilterChip(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
-        Modifier
+        modifier
             .clip(RoundedCornerShape(Radius.sm))
             .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
             .border(
@@ -541,7 +541,8 @@ fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
                 RoundedCornerShape(Radius.sm)
             )
             .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             label,
