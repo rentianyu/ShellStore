@@ -24,7 +24,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,7 +98,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     )
                 }
                 Spacer(Modifier.width(12.dp))
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text("Shell 商店", fontSize = TypeScale.body, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(3.dp))
                     Text(
@@ -521,7 +520,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
                                 Text("未导入", fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.outline)
                             }
                             Spacer(Modifier.weight(1f))
-                            if (cur == fc) Text("✓", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+                            if (cur == fc) AppIcon("✓", size = 14.dp, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                     Spacer(Modifier.height(6.dp))
@@ -633,7 +632,7 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("?", fontSize = TypeScale.body, fontWeight = FontWeight.Bold,
+                    AppIcon("?", size = 18.dp,
                         color = MaterialTheme.colorScheme.onPrimary)
                 }
                 Spacer(Modifier.width(Space.sm))
@@ -646,7 +645,7 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
+                AppIcon("›", size = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
             }
             Spacer(Modifier.height(10.dp))
 
@@ -687,13 +686,13 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                                 }
                             },
                             contentAlignment = Alignment.Center
-                        ) { Text("⟳", fontSize = 15.sp, color = MaterialTheme.colorScheme.primary) }
+                        ) { AppIcon("⟳", size = 15.dp, color = MaterialTheme.colorScheme.primary) }
                         Box(
                             Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).clickable {
                                 pendingDelete = s.id
                             },
                             contentAlignment = Alignment.Center
-                        ) { Text("✕", fontSize = 13.sp, color = MaterialTheme.colorScheme.outline) }
+                        ) { AppIcon("✕", size = 13.dp, color = MaterialTheme.colorScheme.outline) }
                     }
                     Toggle(s.enabled) { Store.toggleSource(s.id, it) }
                 }
@@ -713,7 +712,7 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                                     .clickable { runAsync("刷新") { Store.refreshSeries() } },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("↻", fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
+                                AppIcon("↻", size = 15.dp, color = MaterialTheme.colorScheme.primary)
                             }
                             Spacer(Modifier.width(4.dp))
                             Toggle(settings.xbtaSeries) { on ->
@@ -1071,7 +1070,7 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(">_", color = MaterialTheme.colorScheme.onPrimary, fontFamily = FontFamily.Monospace, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    AppIcon(">_", color = MaterialTheme.colorScheme.onPrimary, size = 18.dp)
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {

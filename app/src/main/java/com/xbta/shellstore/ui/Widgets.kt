@@ -24,7 +24,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,12 +76,10 @@ fun TypeBadge(t: EntryType, size: Int = 24) {
             .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center
     ) {
-        Text(
+        AppIcon(
             typeGlyph(t),
-            fontSize = (size / 2.05f).sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            fontFamily = FontFamily.Monospace
+            size = (size * .7f).dp,
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }
@@ -264,9 +261,10 @@ fun EntryRow(
                     .clickable { onToggleFav() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
+                AppIcon(
                     if (fav) "★" else "☆",
-                    fontSize = IconSize.action,
+                    size = IconSize.action,
+                    contentDescription = if (fav) "取消收藏" else "收藏",
                     color = if (fav) Color(0xFFF2A93B) else MaterialTheme.colorScheme.outline
                 )
             }
@@ -278,7 +276,7 @@ fun EntryRow(
                         .clickable { onEdit() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("✎", fontSize = IconSize.action, color = MaterialTheme.colorScheme.outline)
+                    AppIcon("✎", size = IconSize.action, color = MaterialTheme.colorScheme.outline, contentDescription = "编辑")
                 }
             }
         }
@@ -409,7 +407,7 @@ fun TopBar(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(Dimen.topBar)
+            .heightIn(min = Dimen.topBar)
             .padding(start = if (onBack != null) Space.sm else Space.md, end = Space.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -420,7 +418,7 @@ fun TopBar(
                     .clip(RoundedCornerShape(Radius.sm))
                     .clickable { onBack() },
                 contentAlignment = Alignment.Center
-            ) { Text("‹", fontSize = IconSize.nav, color = MaterialTheme.colorScheme.onBackground) }
+            ) { AppIcon("‹", size = IconSize.nav, color = MaterialTheme.colorScheme.onBackground, contentDescription = "返回") }
             Spacer(Modifier.width(Space.xs))
         }
         Text(
@@ -443,7 +441,9 @@ fun IconBtn(glyph: String, onClick: () -> Unit) {
             .clip(RoundedCornerShape(Radius.sm))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
-    ) { Text(glyph, fontSize = IconSize.top, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .7f)) }
+    ) {
+        AppIcon(glyph, size = IconSize.top, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .7f), contentDescription = iconActionLabel(glyph))
+    }
 }
 
 // ---------------- 搜索框 ----------------
@@ -464,7 +464,7 @@ fun SearchField(
         Row(
             Modifier
                 .weight(1f)
-                .height(40.dp)
+                .heightIn(min = Dimen.iconButton)
                 .clip(RoundedCornerShape(Radius.md))
                 .background(MaterialTheme.colorScheme.surface)
                 .border(
@@ -473,16 +473,18 @@ fun SearchField(
                     else MaterialTheme.colorScheme.outline.copy(alpha = .9f),
                     RoundedCornerShape(Radius.md)
                 )
-                .padding(horizontal = Space.md),
+                .padding(horizontal = Space.md, vertical = Space.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("⌕", fontSize = IconSize.inline, color = MaterialTheme.colorScheme.primary)
+            AppIcon("⌕", size = IconSize.inline, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(Space.sm))
             Box(Modifier.weight(1f)) {
                 if (query.isEmpty()) {
                     Text(
                         placeholder,
                         fontSize = TypeScale.small,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .75f)
                     )
                 }
@@ -505,9 +507,9 @@ fun SearchField(
                         .clickable { onQueryChange("") },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
+                    AppIcon(
                         "✕",
-                        fontSize = TypeScale.title,
+                        size = 20.dp,
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
@@ -590,25 +592,36 @@ fun SettingRow(
     ) {
         Box(
             Modifier
-                .size(24.dp)
+                .sizeIn(minWidth = Dimen.badgeIcon, minHeight = Dimen.badgeIcon)
                 .clip(RoundedCornerShape(7.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
-        ) { Text(glyph, fontSize = IconSize.card, color = MaterialTheme.colorScheme.primary) }
+        ) { AppIcon(glyph, size = IconSize.card, color = MaterialTheme.colorScheme.primary) }
         Spacer(Modifier.width(Space.md))
-        Text(
-            title,
-            fontSize = TypeScale.body,
-            fontWeight = FontWeight.Medium,
-            color = if (danger) Tones.danger else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-        if (subtitle.isNotBlank()) {
-            Text(subtitle, fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(Space.xs))
+        // 标题和说明共享剩余宽度；说明不能作为无权重的 Row 子项先把标题挤窄。
+        Column(
+            Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Space.xs)
+        ) {
+            Text(
+                title,
+                fontSize = TypeScale.body,
+                fontWeight = FontWeight.Medium,
+                color = if (danger) Tones.danger else MaterialTheme.colorScheme.onSurface
+            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    subtitle,
+                    fontSize = TypeScale.small,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-        if (trailing != null) trailing()
-        else if (onClick != null) Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
+        if (trailing != null || onClick != null) {
+            Spacer(Modifier.width(Space.sm))
+            if (trailing != null) trailing()
+            else AppIcon("›", size = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
+        }
     }
 }
 
@@ -679,10 +692,9 @@ fun CheckCircle(checked: Boolean) {
         contentAlignment = Alignment.Center
     ) {
         if (checked) {
-            Text(
+            AppIcon(
                 "✓",
-                fontSize = IconSize.check,
-                fontWeight = FontWeight.Bold,
+                size = IconSize.check,
                 color = MaterialTheme.colorScheme.onPrimary
             )
         }

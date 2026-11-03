@@ -259,8 +259,8 @@ fun EntryEditorScreen(
                                 Box(Modifier.weight(1.2f)) {
                                     Field("", item.value, { extras[i] = item.copy(value = it) }, "值")
                                 }
-                                Text(
-                                    "✕", fontSize = TypeScale.caption,
+                                AppIcon(
+                                    "✕", size = 18.dp,
                                     color = MaterialTheme.colorScheme.outline,
                                     modifier = Modifier
                                         .clickable { extras.removeAt(i) }
@@ -292,8 +292,8 @@ fun EntryEditorScreen(
                             Box(Modifier.weight(1f)) {
                                 Field("", p.label, { params[i] = p.copy(label = it) }, "显示名")
                             }
-                            Text(
-                                "✕", fontSize = TypeScale.caption,
+                            AppIcon(
+                                "✕", size = 18.dp,
                                 color = MaterialTheme.colorScheme.outline,
                                 modifier = Modifier
                                     .clickable { params.removeAt(i) }
@@ -384,8 +384,8 @@ fun EntryEditorScreen(
                             Box(Modifier.weight(1f)) {
                                 Field("", v.name, { variants[i] = v.copy(name = it) }, "变体名，如 root 版")
                             }
-                            Text(
-                                "✕", fontSize = TypeScale.caption,
+                            AppIcon(
+                                "✕", size = 18.dp,
                                 color = MaterialTheme.colorScheme.outline,
                                 modifier = Modifier
                                     .clickable { variants.removeAt(i) }

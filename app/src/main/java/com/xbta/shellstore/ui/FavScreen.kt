@@ -323,7 +323,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     .clickable { dialog = FavDialog.QuickAdd },
                 contentAlignment = Alignment.Center
             ) {
-                Text("+", fontSize = 28.sp, color = MaterialTheme.colorScheme.onPrimary)
+                AppIcon("+", size = 28.dp, color = MaterialTheme.colorScheme.onPrimary)
             }
         }
     }
@@ -656,7 +656,7 @@ private fun FolderRow(folder: Folder, count: Int, onClick: () -> Unit, onMenu: (
             Modifier.size(26.dp).clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
-        ) { Text("▣", fontSize = IconSize.card, color = MaterialTheme.colorScheme.primary) }
+        ) { AppIcon("▣", size = IconSize.card, color = MaterialTheme.colorScheme.primary) }
         Spacer(Modifier.width(10.dp))
         Text(
             folder.name, fontSize = TypeScale.small, fontWeight = FontWeight.SemiBold,
@@ -665,7 +665,7 @@ private fun FolderRow(folder: Folder, count: Int, onClick: () -> Unit, onMenu: (
         Text("$count", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(8.dp))
         Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).clickable { onMenu() }, contentAlignment = Alignment.Center) {
-            Text("⋯", fontSize = IconSize.action, color = MaterialTheme.colorScheme.outline)
+            AppIcon("⋯", size = IconSize.action, color = MaterialTheme.colorScheme.outline)
         }
     }
 }
@@ -724,7 +724,7 @@ fun FavRow(
                         .clickable { onMenu() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("⋯", fontSize = IconSize.action, color = MaterialTheme.colorScheme.outline)
+                    AppIcon("⋯", size = IconSize.action, color = MaterialTheme.colorScheme.outline)
                 }
             }
         }
@@ -958,7 +958,7 @@ fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                             Text(t.name, fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                             Text("$n 条", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(Space.xs))
-                            Text("›", fontSize = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
+                            AppIcon("›", size = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
                         }
                     }
                 }
@@ -1058,7 +1058,7 @@ private fun BatchTagDialog(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (on) Text("✓", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                            if (on) AppIcon("✓", size = 11.dp, color = MaterialTheme.colorScheme.onPrimary)
                         }
                         Spacer(Modifier.width(Space.sm))
                         Text(t.name, fontSize = TypeScale.body, modifier = Modifier.weight(1f))

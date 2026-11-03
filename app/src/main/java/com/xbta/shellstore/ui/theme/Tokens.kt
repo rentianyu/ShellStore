@@ -57,33 +57,33 @@ object TypeScale {
 }
 
 /**
- * 图标字号档位。UI 上的字形图标（非图片）统一从这里取字号，
+ * 矢量图标尺寸档位（dp），不受正文和系统字体缩放影响。
  * 调整图标大小只改这一处，避免各处散落字面量。
  */
 object IconSize {
     /** 底部 tab 图标 */
-    val tab = 30.sp
+    val tab = 26.dp
 
     /** 顶栏操作按钮（搜索、视图、加号） */
-    val top = 24.sp
+    val top = 24.dp
 
     /** 顶栏返回箭头 */
-    val nav = 32.sp
+    val nav = 24.dp
 
     /** 列表卡片右侧操作（⋯） */
-    val action = 19.sp
+    val action = 22.dp
 
     /** 分类卡片 / 卡片内装饰图标 */
-    val card = 18.sp
+    val card = 18.dp
 
     /** 搜索框内图标 */
-    val inline = 17.sp
+    val inline = 20.dp
 
     /** 行尾「›」箭头 */
-    val chevron = 18.sp
+    val chevron = 18.dp
 
     /** 勾选框内的对勾 */
-    val check = 13.sp
+    val check = 13.dp
 }
 
 object Dimen {
