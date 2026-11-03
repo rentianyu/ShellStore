@@ -34,6 +34,10 @@ object Store {
     /** 官方源：托管在 ai 仓库的 ShellStore/sources/ 下，随 R2 同步到 f.xbta.cc */
     const val OFFICIAL_URL = "https://f.xbta.cc/ai/ShellStore/sources/official.md"
 
+    /** 系列源是否参与解析：总开关关着时，系列源保留配置但不加载 */
+    private fun seriesActive(cfg: SourceConfig): Boolean =
+        cfg.series.isBlank() || _settings.value.xbtaSeries
+
     /** 老地址，升级时用来识别需要迁移的已配置源 */
     private const val OFFICIAL_URL_LEGACY =
         "https://raw.githubusercontent.com/rentianyu/ShellStore/main/sources/official.md"
@@ -77,6 +81,14 @@ object Store {
 
     private val _sources = MutableStateFlow<List<SourceConfig>>(emptyList())
     val sources: StateFlow<List<SourceConfig>> = _sources.asStateFlow()
+
+    /** 「小贝塔系列」可选源清单（来自 ai 仓库的 index.json） */
+    private val _seriesItems = MutableStateFlow<List<SeriesSources.Item>>(emptyList())
+    val seriesItems: StateFlow<List<SeriesSources.Item>> = _seriesItems.asStateFlow()
+
+    /** 清单加载错误（空串表示正常） */
+    private val _seriesError = MutableStateFlow("")
+    val seriesError: StateFlow<String> = _seriesError.asStateFlow()
 
     private val _recent = MutableStateFlow<List<RecentItem>>(emptyList())
     val recent: StateFlow<List<RecentItem>> = _recent.asStateFlow()
@@ -166,7 +178,7 @@ object Store {
         val updated = mutableListOf<SourceConfig>()
 
         _sources.value.forEach { cfg ->
-            if (!cfg.enabled) {
+            if (!cfg.enabled || !seriesActive(cfg)) {
                 updated.add(cfg.copy(count = 0))
                 return@forEach
             }
@@ -199,7 +211,44 @@ object Store {
 
     // ---------------- 源管理 ----------------
 
-    fun addRemote(name: String, url: String): String? {
+    // ---------------- 小贝塔系列 ----------------
+
+    /** 拉系列清单（会联网，调用方切 IO 线程）。返回错误信息，null 表示成功 */
+    fun loadSeriesCatalog(): String? {
+        val (items, err) = SeriesSources.fetch()
+        _seriesItems.value = items
+        _seriesError.value = err.orEmpty()
+        return err
+    }
+
+    /** 总开关：关掉后系列源保留配置但不参与解析，重新打开立即恢复 */
+    fun setXbtaSeries(on: Boolean) {
+        if (_settings.value.xbtaSeries == on) return
+        updateSettings(_settings.value.copy(xbtaSeries = on))
+        reloadAll()
+    }
+
+    /** 系列清单里某一项的当前配置（没添加过就返回 null） */
+    fun seriesConfigOf(item: SeriesSources.Item): SourceConfig? =
+        _sources.value.firstOrNull { it.series == SeriesSources.SERIES && it.url == item.url }
+
+    /**
+     * 打开/关闭系列里的某个源。还没添加过时，打开会先拉取内容再添加。
+     * 会联网，调用方切 IO 线程。
+     */
+    fun toggleSeriesItem(item: SeriesSources.Item, on: Boolean): String? {
+        val exist = seriesConfigOf(item)
+        return when {
+            exist == null && on -> addRemote(item.name, item.url, SeriesSources.SERIES)
+            exist == null -> null
+            else -> {
+                if (exist.enabled != on) toggleSource(exist.id, on)
+                null
+            }
+        }
+    }
+
+    fun addRemote(name: String, url: String, series: String = ""): String? {
         val c = ctx ?: return "未初始化"
         if (!url.startsWith("http://") && !url.startsWith("https://")) return "地址必须以 http:// 或 https:// 开头"
         val id = "r" + UUID.randomUUID().toString().replace("-", "").take(8)
@@ -223,7 +272,8 @@ object Store {
             enabled = true,
             lastFetch = System.currentTimeMillis(),
             etag = r.etag,
-            count = parsed.source.entries.size
+            count = parsed.source.entries.size,
+            series = series
         )
         _sources.value = _sources.value + cfg
         Repo.saveSourceConfigs(c, _sources.value)

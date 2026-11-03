@@ -36,7 +36,9 @@ data class AppSettings(
     /** 是否已经走过首次欢迎页（引导启用官方源） */
     val onboarded: Boolean = false,
     /** 上次拉取成功的线路名，空串表示直连。下次优先用它 */
-    val sourceMirror: String = ""
+    val sourceMirror: String = "",
+    /** 「小贝塔系列」订阅源总开关。关闭时系列源保留配置但不参与解析 */
+    val xbtaSeries: Boolean = false
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("theme", theme.name)
@@ -51,6 +53,7 @@ data class AppSettings(
         put("foldPreview", foldPreview)
         put("onboarded", onboarded)
         put("sourceMirror", sourceMirror)
+        put("xbtaSeries", xbtaSeries)
     }
 
     companion object {
@@ -70,7 +73,8 @@ data class AppSettings(
                 copyAndReturn = o.optBoolean("copyAndReturn", false),
                 foldPreview = o.optBoolean("foldPreview", false),
                 onboarded = o.optBoolean("onboarded", false),
-                sourceMirror = o.optString("sourceMirror", "")
+                sourceMirror = o.optString("sourceMirror", ""),
+                xbtaSeries = o.optBoolean("xbtaSeries", false)
             )
         }
     }

@@ -33,6 +33,7 @@ import com.xbta.shellstore.R
 import com.xbta.shellstore.data.AppSettings
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.FontChoice
+import com.xbta.shellstore.data.SeriesSources
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.ThemeMode
 import com.xbta.shellstore.data.Updater
@@ -484,6 +485,9 @@ fun SettingsScreen(onBack: () -> Unit) {
 @Composable
 fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val sources by Store.sources.collectAsState()
+    val settings by Store.settings.collectAsState()
+    val seriesItems by Store.seriesItems.collectAsState()
+    val seriesError by Store.seriesError.collectAsState()
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf("") }
@@ -491,6 +495,13 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     var addName by remember { mutableStateOf("") }
     var addUrl by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<String?>(null) }
+
+    // 开关已开但清单还没拉到（比如刚启动）→ 进页面就补拉一次
+    LaunchedEffect(settings.xbtaSeries) {
+        if (settings.xbtaSeries && seriesItems.isEmpty()) {
+            withContext(Dispatchers.IO) { Store.loadSeriesCatalog() }
+        }
+    }
 
     fun runAsync(tag: String, block: suspend () -> String?) {
         scope.launch {
@@ -606,7 +617,7 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
             }
             Spacer(Modifier.height(10.dp))
 
-            sources.forEach { s ->
+            sources.filter { it.series.isBlank() }.forEach { s ->
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -654,6 +665,87 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                     Toggle(s.enabled) { Store.toggleSource(s.id, it) }
                 }
                 Spacer(Modifier.height(8.dp))
+            }
+
+            GroupTitle("小贝塔系列")
+            GroupCard {
+                SettingRow(
+                    "✦", "启用小贝塔系列订阅源",
+                    when {
+                        !settings.xbtaSeries -> "关闭时系列源保留配置但不生效"
+                        seriesItems.isEmpty() -> "正在获取清单…"
+                        seriesError.isNotBlank() -> "清单未更新：$seriesError"
+                        else -> "${seriesItems.size} 个可选，按需单独开启"
+                    },
+                    trailing = {
+                        Toggle(settings.xbtaSeries) { on ->
+                            Store.setXbtaSeries(on)
+                            if (on) runAsync("清单") { Store.loadSeriesCatalog() }
+                        }
+                    }
+                )
+            }
+            if (settings.xbtaSeries) {
+                Spacer(Modifier.height(8.dp))
+                if (seriesItems.isEmpty()) {
+                    Text(
+                        "还没有拿到清单，检查网络后重新打开这个开关。",
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                } else {
+                    GroupCard {
+                        seriesItems.forEachIndexed { i, item ->
+                            if (i > 0) Divider()
+                            val cfg = sources.firstOrNull {
+                                it.series == SeriesSources.SERIES && it.url == item.url
+                            }
+                            val on = cfg?.enabled == true
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        runAsync(item.name) {
+                                            Store.toggleSeriesItem(item, !on)
+                                        }
+                                    }
+                                    .padding(horizontal = Space.md, vertical = Space.md),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            item.name,
+                                            fontSize = TypeScale.small,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        MutedBadge(if (cfg == null) "未添加" else "在线")
+                                    }
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(
+                                        when {
+                                            cfg == null -> listOfNotNull(
+                                                item.desc.takeIf { it.isNotBlank() },
+                                                "开启后拉取"
+                                            ).joinToString(" · ")
+                                            !on -> "已停用 · ${cfg.count} 条"
+                                            else -> "${cfg.count} 条" + if (item.desc.isNotBlank()) " · ${item.desc}" else ""
+                                        },
+                                        fontSize = TypeScale.caption,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2
+                                    )
+                                }
+                                Spacer(Modifier.width(Space.sm))
+                                Toggle(on) { v ->
+                                    runAsync(item.name) { Store.toggleSeriesItem(item, v) }
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
             }
 
             GroupTitle("添加")

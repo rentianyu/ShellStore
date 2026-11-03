@@ -18,7 +18,9 @@ data class SourceConfig(
     val lastFetch: Long = 0L,
     val etag: String = "",
     val count: Int = 0,
-    val error: String = ""
+    val error: String = "",
+    /** 「小贝塔系列」标识（如 "xbta"）。空串 = 用户自己加的源。系列源受总开关门控 */
+    val series: String = ""
 ) {
     val typeLabel: String
         get() = when (type) {
@@ -31,6 +33,7 @@ data class SourceConfig(
         put("id", id); put("name", name); put("type", type.name)
         put("url", url); put("enabled", enabled); put("lastFetch", lastFetch)
         put("etag", etag); put("count", count)
+        if (series.isNotBlank()) put("series", series)
     }
 
     companion object {
@@ -42,7 +45,8 @@ data class SourceConfig(
             enabled = o.optBoolean("enabled", true),
             lastFetch = o.optLong("lastFetch"),
             etag = o.optString("etag"),
-            count = o.optInt("count")
+            count = o.optInt("count"),
+            series = o.optString("series", "")
         )
 
         fun listToJson(list: List<SourceConfig>): String =
