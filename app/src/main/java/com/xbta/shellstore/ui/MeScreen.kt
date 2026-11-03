@@ -24,7 +24,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.BuildConfig
@@ -169,9 +175,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                 Divider()
                 SettingRow("⚙", "设置", "主题 · 字号 · 复制前缀", onClick = { onOpen(Page.Settings) })
                 Divider()
-                SettingRow("？", "使用帮助", "上手 · 类型 · 订阅源 · 常见问题", onClick = { onOpen(Page.Help) })
-                Divider()
-                SettingRow("ⓘ", "关于", "开源地址 · 许可", onClick = { onOpen(Page.About) })
+                SettingRow("ⓘ", "关于", "版本 · 更新日志 · 许可", onClick = { onOpen(Page.About) })
             }
 
             GroupTitle("即将支持")
@@ -1055,6 +1059,14 @@ fun BackupScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
 fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
     val cats by Store.categories.collectAsState()
+    val ctx = LocalContext.current
+    // 更新日志来自 assets/changelog.md（构建时由仓库根 CHANGELOG.md 覆盖）
+    val versions = remember {
+        val md = runCatching {
+            ctx.assets.open("changelog.md").bufferedReader().use { it.readText() }
+        }.getOrDefault("")
+        com.xbta.shellstore.core.Changelog.parse(md)
+    }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("关于", onBack = onBack)
@@ -1109,7 +1121,137 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.outline
             )
+
+            // ---- 更新日志（数据源 = 仓库根 CHANGELOG.md，构建时同步到 assets）----
+            Spacer(Modifier.height(24.dp))
+            GroupTitle("更新日志")
+            if (versions.isEmpty()) {
+                Text(
+                    "更新日志读取失败（assets/changelog.md 缺失）",
+                    fontSize = TypeScale.caption,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            } else {
+                GroupCard {
+                    versions.forEachIndexed { i, v ->
+                        if (i > 0) Divider()
+                        VersionBlock(v, current = v.version == BuildConfig.APP_VERSION)
+                    }
+                }
+            }
             Spacer(Modifier.height(20.dp))
         }
     }
+}
+
+/** 一个版本：标题行（版本号 / 当前徽章 / 日期）+ 版本说明 + 分组列表 */
+@Composable
+private fun VersionBlock(v: com.xbta.shellstore.core.Changelog.Version, current: Boolean) {
+    Column(Modifier.padding(horizontal = Space.md, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "v${v.version}",
+                fontSize = TypeScale.body,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (current) {
+                Spacer(Modifier.width(6.dp))
+                Badge("当前", MaterialTheme.colorScheme.onPrimary, MaterialTheme.colorScheme.primary)
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                v.date,
+                fontSize = TypeScale.caption,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+
+        if (v.lead.isNotBlank()) {
+            Spacer(Modifier.height(5.dp))
+            RichText(
+                v.lead,
+                TypeScale.caption,
+                MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 17.sp
+            )
+        }
+
+        v.sections.forEach { sec ->
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .width(3.dp)
+                        .height(11.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    sec.title,
+                    fontSize = TypeScale.caption,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            sec.entries.forEach { e ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = if (e.sub) 14.dp else 0.dp, top = 2.dp, bottom = 2.dp)
+                ) {
+                    Text(
+                        if (e.sub) "–" else "•",
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(end = 6.dp)
+                    )
+                    RichText(
+                        e.text,
+                        if (e.sub) TypeScale.caption else TypeScale.small,
+                        if (e.sub) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                        lineHeight = if (e.sub) 18.sp else 21.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 渲染 `**加粗**` 与 `` `代码` ``，其余按普通正文 */
+@Composable
+private fun RichText(
+    text: String,
+    size: TextUnit,
+    color: Color,
+    modifier: Modifier = Modifier,
+    lineHeight: TextUnit? = null
+) {
+    val spans = remember(text) { com.xbta.shellstore.core.Changelog.inline(text) }
+    val codeBg = MaterialTheme.colorScheme.surfaceVariant
+    val strong = MaterialTheme.colorScheme.onSurface
+    Text(
+        buildAnnotatedString {
+            spans.forEach { s ->
+                when {
+                    s.code -> withStyle(
+                        SpanStyle(fontFamily = FontFamily.Monospace, background = codeBg)
+                    ) { append(s.text) }
+
+                    s.bold -> withStyle(
+                        SpanStyle(fontWeight = FontWeight.SemiBold, color = strong)
+                    ) { append(s.text) }
+
+                    else -> withStyle(SpanStyle(color = color)) { append(s.text) }
+                }
+            }
+        },
+        fontSize = size,
+        lineHeight = lineHeight ?: (size * 1.45f),
+        modifier = modifier
+    )
 }

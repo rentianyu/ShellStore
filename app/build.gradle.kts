@@ -106,3 +106,15 @@ dependencies {
     // implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     // implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
+
+// 更新日志单一数据源：仓库根的 CHANGELOG.md → assets/changelog.md（关于页读取）。
+// 构建时覆盖，避免「文档改了一份、App 里还是旧的」。
+val syncChangelog = tasks.register<Copy>("syncChangelog") {
+    from(rootProject.file("CHANGELOG.md"))
+    into(layout.projectDirectory.dir("src/main/assets"))
+    rename { "changelog.md" }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(syncChangelog)
+}
