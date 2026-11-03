@@ -157,7 +157,7 @@ IntentLauncher：activity/urlscheme/intent → startActivity
 | core 层不依赖 android.* | 解析器可以用 kotlinc 在无 SDK 环境编译 + 单测（`tests/SmdTest.kt`） |
 | 手写 JSON 编解码 | 无反射、无插件，包体小；字段增减靠 `optString/optInt` 的默认值容错 |
 | 收藏存快照 | 源被删/改不影响已收藏内容；代价是编辑要区分 `edited` |
-| 内容全外置 | App 不含命令，源可换；官方源就是仓库里的 `sources/official.md` |
+| 内容全外置 | App 不含命令，源可换；官方源托管在 `rentianyu/ai` 的 `ShellStore/sources/official.md` |
 | 只有 3 个权限 | INTERNET / ACCESS_NETWORK_STATE / REQUEST_INSTALL_PACKAGES，无存储、无悬浮窗 |
 
 ## 代码规模（v0.19.1）

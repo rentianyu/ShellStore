@@ -12,7 +12,7 @@
 | [UI-DESIGN.md](UI-DESIGN.md) | 配色、尺寸 token、布局规则、组件清单、交互约定 | 改界面 / 加组件 / 调样式 |
 | [FEATURES.md](FEATURES.md) | 每个功能的实现位置与关键逻辑 | 想改某个功能但不知道在哪 |
 | [BUILD-AND-RELEASE.md](BUILD-AND-RELEASE.md) | 依赖约束、构建、CI、签名、发版 SOP、验收 | 出包 / 发版 / CI 报错 |
-| [../sources/README.md](../sources/README.md) | SMD 数据格式（面向写源的人） | 写订阅源 |
+| [ShellStore/SKILL.md](https://github.com/rentianyu/ai/blob/main/ShellStore/SKILL.md) | SMD 数据格式（面向写源的人，在 ai 仓库） | 写订阅源 |
 
 ## 项目一句话
 

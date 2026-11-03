@@ -118,7 +118,7 @@ onboarded      Boolean，是否走过欢迎页
 
 ## 四、SMD 格式
 
-完整语法见 **[../sources/README.md](../sources/README.md)**（面向写源的人）。这里只记解析器行为。
+完整语法见 **[ShellStore/SKILL.md](https://github.com/rentianyu/ai/blob/main/ShellStore/SKILL.md)**（面向写源的人）。这里只记解析器行为。
 
 ### 解析输出
 

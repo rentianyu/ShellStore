@@ -109,7 +109,7 @@ service                       → startService（App 在前台可用，后台会
 
 | 功能 | 实现 |
 |---|---|
-| 官方源 | `Store.enableOfficial()`，URL 常量 `OFFICIAL_URL`，拉 `sources/official.md` |
+| 官方源 | `Store.enableOfficial()`，URL 常量 `OFFICIAL_URL`，拉 `f.xbta.cc/ai/ShellStore/sources/official.md` |
 | 在线源 | `Store.addRemote(name, url)` |
 | 本地源 | `Store.importLocal(name, text, fileName)`，正文复制进 `SourceCache` |
 | 多源合并 | `reloadAll()` 逐个解析后按 id 去重合并 |
@@ -117,7 +117,7 @@ service                       → startService（App 在前台可用，后台会
 | 更新确认 | `checkSourceUpdates()` 只比对条数算差异，用户确认后才 `applySourceUpdates()` |
 | 帮助页 | `SourceHelpScreen` + `SourceHelpText`（给人看的最小模板 + 给 AI 的完整规范，均可一键复制） |
 
-SMD 格式本身见 [../sources/README.md](../sources/README.md)。
+SMD 格式本身见 [ShellStore/SKILL.md](https://github.com/rentianyu/ai/blob/main/ShellStore/SKILL.md)。
 
 ## 7. 导入导出
 

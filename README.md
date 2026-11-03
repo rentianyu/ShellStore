@@ -4,7 +4,7 @@ Android 上的**命令与组件速查台**。把 shell 命令、脚本、URL Sch
 同一个货架上，按分类浏览、搜索、一键复制，需要时直接执行或发送。
 
 内容不是写死在 App 里的，而是来自可插拔的 **SMD 数据源**：可以自己写、可以分享、可以在线更新。
-App 本身不含命令，首次启动会引导你启用官方源（129 条 / 10 个分类）。
+App 本身不含命令，首次启动会引导你启用官方源（133 条 / 10 个分类）。
 
 ---
 
@@ -20,7 +20,7 @@ App 本身不含命令，首次启动会引导你启用官方源（129 条 / 10 
 
 ## 首次使用
 
-1. 打开 App，欢迎页点「启用官方源」——会拉取 129 条命令，拉不动会自动换线路（共 17 条备用）
+1. 打开 App，欢迎页点「启用官方源」——会拉取 133 条命令，拉不动会自动换线路（共 17 条备用）
 2. 底部三个 Tab：
    - **商店**：分类宫格 + 全部命令 + 搜索
    - **收藏**：多级文件夹、标签、批量操作
@@ -66,11 +66,12 @@ Intent 类条目在详情页会显示字段表，以及等价的 `adb shell am .
 ### 官方源
 
 ```
-https://raw.githubusercontent.com/rentianyu/ShellStore/main/sources/official.md
+https://f.xbta.cc/ai/ShellStore/sources/official.md
 ```
 
-文件在仓库的 [sources/](sources/) 目录，129 条命令 / 10 个分类。App 启动时会检查它有没有更新
-（比对条目数量），发现变化会先问你「新增几条、删除几条」，确认后才替换。
+133 条命令 / 10 个分类，数据源在 [rentianyu/ai › ShellStore/sources](https://github.com/rentianyu/ai/tree/main/ShellStore/sources)，
+由 R2 分发（`f.xbta.cc`，国内可直连）。App 启动时会检查它有没有更新（比对条目数量），
+发现变化会先问你「新增几条、删除几条」，确认后才替换。
 
 ### 加自己的源
 
@@ -83,7 +84,7 @@ https://raw.githubusercontent.com/rentianyu/ShellStore/main/sources/official.md
 
 ### 写自己的源
 
-SMD 是 Markdown 的超集，只多约定了几行 `@字段`。完整语法见 **[sources/README.md](sources/README.md)**，
+SMD 是 Markdown 的超集，只多约定了几行 `@字段`。完整语法见 **[ShellStore/SKILL.md](https://github.com/rentianyu/ai/blob/main/ShellStore/SKILL.md)**，
 一分钟能上手：
 
 ````markdown
