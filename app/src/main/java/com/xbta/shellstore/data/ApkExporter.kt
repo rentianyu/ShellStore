@@ -3,16 +3,13 @@ package com.xbta.shellstore.data
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
+import com.xbta.shellstore.core.ApkPatcher
 import com.android.apksig.ApkSigner
 import java.io.File
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
 import java.util.UUID
-import java.util.zip.CRC32
-import java.util.zip.ZipEntry
-import java.util.zip.ZipFile
-import java.util.zip.ZipOutputStream
 
 /**
  * 把一条命令导出成独立的 APK。
@@ -29,9 +26,6 @@ import java.util.zip.ZipOutputStream
  * 等长替换把风险降到最低。
  */
 object ApkExporter {
-
-    /** 必须是 21 个字符，与 [newPackageName] 的输出长度严格一致 */
-    private const val TEMPLATE_PKG = "com.xbta.cmd.a0000000"
 
     private const val KEYSTORE_ASSET = "export.jks"
     private const val KEYSTORE_PASS = "shellstore-export"
@@ -72,113 +66,10 @@ object ApkExporter {
         return Result(finalFile, pkg)
     }
 
-    // ---------------- zip 重写 ----------------
+    // ---------------- zip 与包名改写（算法在 core/ApkPatcher，纯 Kotlin 可桌面验证） ----------------
 
     private fun rewriteApk(input: File, output: File, pkg: String, title: String, cmd: String) {
-        ZipFile(input).use { zin ->
-            ZipOutputStream(output.outputStream()).use { zout ->
-                for (entry in zin.entries()) {
-                    var bytes = zin.getInputStream(entry).readBytes()
-                    when (entry.name) {
-                        "AndroidManifest.xml" -> bytes = patchManifestPackage(bytes, pkg)
-                        "resources.arsc" -> bytes = patchArscPackage(bytes, pkg)
-                        "assets/cmd.txt" -> bytes = cmd.trim().toByteArray(Charsets.UTF_8)
-                        "assets/title.txt" -> bytes = title.take(60).toByteArray(Charsets.UTF_8)
-                    }
-                    val ne = ZipEntry(entry.name)
-                    ne.time = entry.time
-                    if (entry.method == ZipEntry.STORED) {
-                        ne.method = ZipEntry.STORED
-                        ne.size = bytes.size.toLong()
-                        ne.compressedSize = bytes.size.toLong()
-                        ne.crc = CRC32().apply { update(bytes) }.value
-                    } else {
-                        ne.method = ZipEntry.DEFLATED
-                    }
-                    zout.putNextEntry(ne)
-                    zout.write(bytes)
-                    zout.closeEntry()
-                }
-            }
-        }
-    }
-
-    // ---------------- 包名改写 ----------------
-
-    private fun patchManifestPackage(data: ByteArray, newPkg: String): ByteArray {
-        val buf = data.copyOf()
-        // 二进制 XML 头：type(2) headerSize(2) size(4)，子 chunk 从 headerSize 开始
-        var pos = readU16(buf, 2)
-        while (pos + 8 <= buf.size) {
-            val type = readU16(buf, pos)
-            val size = readI32(buf, pos + 4)
-            if (type == 0x0001) {              // RES_STRING_POOL_TYPE
-                patchStringPool(buf, pos, readU16(buf, pos + 2), TEMPLATE_PKG, newPkg)
-                return buf
-            }
-            if (size <= 0) break
-            pos += size
-        }
-        return buf
-    }
-
-    private fun patchStringPool(buf: ByteArray, chunkStart: Int, headerSize: Int, old: String, new: String) {
-        if (old.length != new.length) return   // 只支持等长替换
-        val stringCount = readI32(buf, chunkStart + 8)
-        val flags = readI32(buf, chunkStart + 16)
-        val stringsStart = readI32(buf, chunkStart + 20)
-        val isUtf8 = (flags and 0x100) != 0     // FLAG_UTF8
-        val base = chunkStart + stringsStart
-        for (i in 0 until stringCount) {
-            val off = readI32(buf, chunkStart + headerSize + i * 4)
-            val p = base + off
-            if (p < 0 || p >= buf.size) continue
-            if (isUtf8) {
-                var idx = p
-                var len = buf[idx].toInt() and 0xFF
-                if (len and 0x80 != 0) {
-                    len = ((len and 0x7F) shl 8) or (buf[idx + 1].toInt() and 0xFF)
-                    idx += 1
-                }
-                val start = idx + 1
-                if (start + len > buf.size) continue
-                if (String(buf, start, len, Charsets.UTF_8) == old) {
-                    val n = new.toByteArray(Charsets.UTF_8)
-                    System.arraycopy(n, 0, buf, start, minOf(n.size, len))
-                    return
-                }
-            } else {
-                val len = readU16(buf, p)
-                val start = p + 2
-                if (start + len * 2 > buf.size) continue
-                if (String(buf, start, len * 2, Charsets.UTF_16LE) == old) {
-                    val n = new.toByteArray(Charsets.UTF_16LE)
-                    System.arraycopy(n, 0, buf, start, minOf(n.size, len * 2))
-                    return
-                }
-            }
-        }
-    }
-
-    private fun patchArscPackage(data: ByteArray, newPkg: String): ByteArray {
-        val buf = data.copyOf()
-        var pos = readU16(buf, 2)   // RES_TABLE headerSize（通常 12）
-        while (pos + 8 <= buf.size) {
-            val type = readU16(buf, pos)
-            val size = readI32(buf, pos + 4)
-            if (type == 0x0200) {   // RES_TABLE_PACKAGE_TYPE
-                val nameOff = pos + 12                  // 包名区：128 个 UTF-16 字符定长 256 字节
-                val bytes = newPkg.toByteArray(Charsets.UTF_16LE)
-                if (nameOff + 256 <= buf.size) {
-                    System.arraycopy(bytes, 0, buf, nameOff, bytes.size)
-                    for (i in nameOff + bytes.size until nameOff + 256) buf[i] = 0
-                }
-                return buf
-            }
-            if (size <= 0) break
-            pos += size
-        }
-        return buf
+        ApkPatcher.rewrite(input, output, pkg, cmd, title)
     }
 
     // ---------------- 签名 ----------------
@@ -223,15 +114,4 @@ object ApkExporter {
         }
         return Intent.createChooser(i, "分享 APK").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-
-    // ---------------- 小端读取 ----------------
-
-    private fun readU16(b: ByteArray, off: Int): Int =
-        (b[off].toInt() and 0xFF) or ((b[off + 1].toInt() and 0xFF) shl 8)
-
-    private fun readI32(b: ByteArray, off: Int): Int =
-        (b[off].toInt() and 0xFF) or
-            ((b[off + 1].toInt() and 0xFF) shl 8) or
-            ((b[off + 2].toInt() and 0xFF) shl 16) or
-            ((b[off + 3].toInt() and 0xFF) shl 24)
 }

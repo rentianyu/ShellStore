@@ -76,6 +76,9 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     var exporting by remember { mutableStateOf(false) }
     var exportResult by remember { mutableStateOf<ApkExporter.Result?>(null) }
     var exportError by remember { mutableStateOf<String?>(null) }
+
+    // 放在函数顶层而不是底部操作栏的 lambda 里：导出对话框在顶层，作用域要够得着
+    fun toast(msg: String) = Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
     // 结果对话框要显示「真正执行的命令」（非 shell 条目执行的是生成的 am 命令）
     var executedCmd by remember { mutableStateOf("") }
 
@@ -327,8 +330,6 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         val onPrimary = MaterialTheme.colorScheme.onPrimary
         val variant = MaterialTheme.colorScheme.surfaceVariant
         val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
-
-        fun toast(msg: String) = Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
 
         // Shizuku 的授权结果从 binder 线程回来，切回主线程再提示
         // 授权状态缓存一份：组合期每次重组都调 pingBinder 是 IPC，没必要
