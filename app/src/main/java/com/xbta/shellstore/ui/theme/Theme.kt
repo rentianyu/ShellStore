@@ -4,6 +4,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.text.font.FontFamily
@@ -32,11 +33,21 @@ fun AppTheme(
 ) {
     val base = LocalTextStyle.current
     val textStyle = if (fontFamily != null) base.copy(fontFamily = fontFamily) else base
-    CompositionLocalProvider(LocalTextStyle provides textStyle) {
+    CompositionLocalProvider(
+        LocalTextStyle provides textStyle,
+        LocalSemanticColors provides if (darkTheme) DarkSemantic else LightSemantic,
+    ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColors else LightColors,
             shapes = AppShapes,
-            content = content,
-        )
+        ) {
+            // 关键：没有这一层 Surface，LocalContentColor 会回退成纯黑，
+            // 所有「没显式写 color」的 Text（分类名、卡片标题、分组标题）在深色模式下就是黑字配深底。
+            Surface(
+                color = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.onBackground,
+                content = content,
+            )
+        }
     }
 }
