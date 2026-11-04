@@ -374,12 +374,12 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         fun rootRun() = runVia("root")
 
         fun pinHome() {
-            val err = EntryShortcuts.pinToHome(ctx, entry.id, entry.title, text)
+            val err = EntryShortcuts.pinToHome(ctx, entry.id, entry.title, text, values)
             toast(err ?: "已请求添加到桌面，确认即可")
         }
 
         fun addTile() {
-            val err = EntryShortcuts.addTile(ctx, entry.title, text)
+            val err = EntryShortcuts.addTile(ctx, entry.id, entry.title, text)
             toast(err ?: "已在控制中心添加磁贴")
         }
 

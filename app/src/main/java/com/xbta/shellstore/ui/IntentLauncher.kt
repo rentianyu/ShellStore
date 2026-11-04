@@ -44,10 +44,19 @@ object IntentLauncher {
     }
 
     /** 返回 null 表示成功，否则返回给用户看的原因 */
-    fun trigger(ctx: Context, entry: Entry, values: Map<String, String>): String? = when (entry.type) {
+    /**
+     * @param newTask 从非 Activity 上下文（控制中心磁贴、快捷方式）启动时必须为 true，
+     *                直接 startActivity 会抛 AndroidRuntimeException
+     */
+    fun trigger(
+        ctx: Context,
+        entry: Entry,
+        values: Map<String, String>,
+        newTask: Boolean = false
+    ): String? = when (entry.type) {
         EntryType.BROADCAST -> sendBroadcast(ctx, entry, values)
         EntryType.SERVICE -> startService(ctx, entry, values)
-        else -> open(ctx, entry, values)
+        else -> open(ctx, entry, values, newTask)
     }
 
     private fun sendBroadcast(ctx: Context, entry: Entry, values: Map<String, String>): String? {
@@ -83,8 +92,14 @@ object IntentLauncher {
     }
 
     /** 返回 null 表示成功，否则返回给用户看的原因 */
-    fun open(ctx: Context, entry: Entry, values: Map<String, String>): String? {
+    fun open(
+        ctx: Context,
+        entry: Entry,
+        values: Map<String, String>,
+        newTask: Boolean = false
+    ): String? {
         val intent = build(ctx, entry, values) ?: return "这个条目没有可用的 Intent 字段"
+        if (newTask) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return try {
             ctx.startActivity(intent)
             null

@@ -3,8 +3,7 @@ package com.xbta.shellstore
 import android.app.Activity
 import android.os.Bundle
 import android.widget.Toast
-import com.xbta.shellstore.data.ShellExec
-import com.xbta.shellstore.data.Store
+import com.xbta.shellstore.ui.EntryRunner
 
 /**
  * 桌面快捷方式的执行入口。
@@ -22,6 +21,18 @@ class RunCommandActivity : Activity() {
         const val EXTRA_CMD = "cmd"
         const val EXTRA_TITLE = "title"
         const val EXTRA_ENTRY_ID = "entry_id"
+        const val EXTRA_VALUES = "values"
+    }
+
+    /** 参数值用 k=v 换行拼在 intent extra 里，省一个 JSON 解析依赖 */
+    private fun parseIntentValues(raw: String?): Map<String, String> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        return raw.lineSequence()
+            .mapNotNull { line ->
+                val i = line.indexOf('=')
+                if (i <= 0) null else line.substring(0, i) to line.substring(i + 1)
+            }
+            .toMap()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,20 +42,12 @@ class RunCommandActivity : Activity() {
             finish()
             return
         }
-        val title = intent?.getStringExtra(EXTRA_TITLE).orEmpty()
         val entryId = intent?.getStringExtra(EXTRA_ENTRY_ID).orEmpty()
+        val values = parseIntentValues(intent?.getStringExtra(EXTRA_VALUES))
 
         Thread {
-            runCatching { Store.init(applicationContext) }
-            val r = ShellExec.run(applicationContext, cmd)
-            if (entryId.isNotBlank()) runCatching { Store.recordRecent(entryId) }
-            val msg = when {
-                r.ok && r.hasOutput ->
-                    "已执行：" + r.out.lineSequence().firstOrNull().orEmpty().take(60)
-                r.ok -> "已执行" + if (title.isNotBlank()) "：$title" else ""
-                else ->
-                    "执行失败：" + r.err.ifBlank { r.note.ifBlank { "返回码 ${r.code}" } }.take(80)
-            }
+            // 按条目类型分流：scheme/intent 类发 Intent，shell 类走命令通道
+            val msg = EntryRunner.run(applicationContext, entryId, cmd, values)
             runOnUiThread {
                 runCatching { Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show() }
                 finish()

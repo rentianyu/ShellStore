@@ -8,7 +8,7 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import com.xbta.shellstore.data.ShellExec
+import com.xbta.shellstore.ui.EntryRunner
 import android.os.Handler
 import android.os.Looper
 
@@ -25,18 +25,24 @@ class CommandTileService : TileService() {
     companion object {
         private const val PREFS = "command_tile"
 
-        fun save(ctx: Context, cmd: String, label: String) {
+        fun save(ctx: Context, entryId: String, cmd: String, label: String) {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString("entryId", entryId)
                 .putString("cmd", cmd)
                 .putString("label", label)
                 .putLong("at", System.currentTimeMillis())
                 .apply()
         }
 
-        fun load(ctx: Context): Pair<String, String>? {
+        /** entryId 用于按条目类型正确执行；cmd 只在条目被源移除时作兜底 */
+        fun load(ctx: Context): Triple<String, String, String>? {
             val sp = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val cmd = sp.getString("cmd", null) ?: return null
-            return cmd to (sp.getString("label", "命令") ?: "命令")
+            return Triple(
+                sp.getString("entryId", "").orEmpty(),
+                cmd,
+                sp.getString("label", "命令") ?: "命令"
+            )
         }
 
         /** 让系统刷新磁贴的显示状态（改完命令后调用） */
@@ -60,8 +66,10 @@ class CommandTileService : TileService() {
             tile.state = Tile.STATE_UNAVAILABLE
         } else {
             tile.state = Tile.STATE_INACTIVE
-            tile.label = t.second.take(12)
-            if (Build.VERSION.SDK_INT >= 29) tile.subtitle = "Shell 商店"
+            tile.label = t.third.take(12)
+            if (Build.VERSION.SDK_INT >= 29) {
+                tile.subtitle = runningText.ifBlank { "Shell 商店" }
+            }
         }
         tile.updateTile()
     }
@@ -70,18 +78,13 @@ class CommandTileService : TileService() {
         super.onClick()
         val t = load(this) ?: return
         Thread {
-            val r = ShellExec.run(applicationContext, t.first)
+            val text = EntryRunner.run(applicationContext, t.first, t.second)
             runCatching {
-                val text = when {
-                    r.ok && r.hasOutput -> r.out.lineSequence().firstOrNull().orEmpty().take(40)
-                    r.ok -> "成功"
-                    else -> "失败"
-                }
                 Handler(Looper.getMainLooper()).post {
                     runningText = text
                     val tile = qsTile
                     if (tile != null) {
-                        if (Build.VERSION.SDK_INT >= 29) tile.subtitle = text
+                        if (Build.VERSION.SDK_INT >= 29) tile.subtitle = text.take(24)
                         tile.state = Tile.STATE_INACTIVE
                         tile.updateTile()
                     }

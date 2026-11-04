@@ -21,7 +21,13 @@ import com.xbta.shellstore.RunCommandActivity
 object EntryShortcuts {
 
     /** 添加到桌面。返回 null 表示已发起（系统会弹「添加到主屏幕」确认框） */
-    fun pinToHome(ctx: Context, entryId: String, title: String, cmd: String): String? {
+    fun pinToHome(
+        ctx: Context,
+        entryId: String,
+        title: String,
+        cmd: String,
+        values: Map<String, String> = emptyMap()
+    ): String? {
         val mgr = runCatching { ctx.getSystemService(ShortcutManager::class.java) }.getOrNull()
             ?: return "当前系统不支持桌面快捷方式"
         if (!mgr.isRequestPinShortcutSupported) return "这个桌面不支持固定快捷方式"
@@ -31,6 +37,12 @@ object EntryShortcuts {
             putExtra(RunCommandActivity.EXTRA_CMD, cmd)
             putExtra(RunCommandActivity.EXTRA_TITLE, title)
             putExtra(RunCommandActivity.EXTRA_ENTRY_ID, entryId)
+            // 带上用户在详情页填的参数值：k=v 逐行拼，空值不写
+            putExtra(
+                RunCommandActivity.EXTRA_VALUES,
+                values.filterValues { it.isNotBlank() }
+                    .entries.joinToString("\n") { it.key + "=" + it.value }
+            )
         }
         // id 里带时间戳：同一条命令可以放多个快捷方式，互相不冲突
         val info = ShortcutInfo.Builder(ctx, "cmd-$entryId-${System.currentTimeMillis()}")
@@ -45,9 +57,9 @@ object EntryShortcuts {
     }
 
     /** 添加到控制中心磁贴。返回 null 表示已发起；返回文案表示「已保存但需要手动添加」或失败 */
-    fun addTile(ctx: Context, label: String, cmd: String): String? {
+    fun addTile(ctx: Context, entryId: String, label: String, cmd: String): String? {
         // 先落盘：即使系统不让主动添加，磁贴被手动加上后也能立刻用
-        CommandTileService.save(ctx, cmd, label)
+        CommandTileService.save(ctx, entryId, cmd, label)
         CommandTileService.refresh(ctx)
 
         if (Build.VERSION.SDK_INT < 33) {

@@ -4,6 +4,22 @@
 
 ---
 
+## [1.3.5] - 2026-11-04 【正式版】
+
+版本号 50。
+
+### 修复
+
+- **桌面快捷方式 / 磁贴点 url scheme 条目报「执行 shell 命令失败」**：之前统一走命令通道，
+  把 `openapp.jdmobile://...` 当成命令丢给 `sh`，必然失败。现在按条目类型分流：
+  - shell / script → 命令通道（本机 → Shizuku → root → Termux）
+  - url scheme / activity / intent / broadcast / service → 发 Intent 打开
+  - 条目已从源里消失（按 id 找不到）→ 按字符串兜底：含 `://` 当链接打开，否则当命令执行
+- **磁贴点击时启动界面缺 `NEW_TASK`**：磁贴是 Service 上下文，直接 `startActivity` 会抛
+  `AndroidRuntimeException`，现在这条路径统一加标记
+- **快捷方式 / 磁贴改用你填过的参数值**：之前固定用条目默认值，现在会把详情页里填的
+  参数一并带过去
+
 ## [1.3.4] - 2026-11-04 【正式版】
 
 版本号 49。
