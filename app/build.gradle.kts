@@ -102,6 +102,12 @@ dependencies {
     // StateFlow 全局状态
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // Shizuku：借 ADB / root 身份执行命令，拿真正的 shell 权限。
+    // 锁 12.1.0：13.x 起 Shizuku.newProcess 改成 private，拿不到进程的 stdout/stderr 流；
+    // 12.1.0 的 newProcess / waitForTimeout / getErrorStream 都还是 public（已用 javap 核对）。
+    implementation("dev.rikka.shizuku:api:12.1.0")
+    implementation("dev.rikka.shizuku:provider:12.1.0")
+
     // 需要协程 / 网络时再加（不要为了「以后可能用」提前引依赖）：
     // implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     // implementation("com.squareup.okhttp3:okhttp:4.12.0")

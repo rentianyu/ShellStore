@@ -25,6 +25,35 @@
             </intent-filter>
         </activity>
 
+        <!-- 桌面快捷方式的执行入口：透明、无界面，执行完自己关闭 -->
+        <activity
+            android:name=".RunCommandActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- 快捷设置磁贴 -->
+        <service
+            android:name=".CommandTileService"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="Shell 命令"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Shizuku：authorities 必须是「包名 + .shizuku」，Shizuku 靠这个判断集成 -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

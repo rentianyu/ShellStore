@@ -63,6 +63,7 @@ private object AppVectors {
     private const val STAR = "M12,3 L14.8,8.7 L21,9.6 L16.5,14 L17.6,20.2 L12,17.3 L6.4,20.2 L7.5,14 L3,9.6 L9.2,8.7 Z"
     private const val CIRCLE = "M21,12 A9,9 0,1 1,3,12 A9,9 0,1 1,21,12 Z"
     private val grid by lazy { vector("Grid", "M3,3 H9 V9 H3 Z M15,3 H21 V9 H15 Z M3,15 H9 V21 H3 Z M15,15 H21 V21 H15 Z") }
+    private val home by lazy { vector("Home", "M4,10 L12,3 L20,10 L20,20 C20,20.5 19.5,21 19,21 L15,21 L15,15 L9,15 L9,21 L5,21 C4.5,21 4,20.5 4,20 Z") }
     private val star by lazy { vector("Star", STAR) }
     private val starFilled by lazy { vector("StarFilled", STAR, filled = true) }
     private val person by lazy { vector("Person", "M16,7 A4,4 0,1 1,8,7 A4,4 0,1 1,16,7 Z M4,21 V19 C4,15.5 7,14 12,14 C17,14 20,15.5 20,19 V21") }
@@ -125,6 +126,7 @@ private object AppVectors {
         "↗" -> external
         "◎" -> target
         "▣" -> window
+        "⌂" -> home
         "⚙" -> settings
         "◉" -> broadcast
         "◷", "◔" -> clock

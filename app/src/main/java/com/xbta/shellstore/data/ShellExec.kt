@@ -3,6 +3,7 @@ package com.xbta.shellstore.data
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import rikka.shizuku.Shizuku
 import java.util.concurrent.TimeUnit
 
 /**
@@ -15,6 +16,7 @@ object ShellExec {
 
     enum class Channel(val label: String) {
         DIRECT("本机"),
+        SHIZUKU("Shizuku"),
         ROOT("Root"),
         TERMUX("Termux")
     }
@@ -60,6 +62,12 @@ object ShellExec {
         val direct = exec(arrayOf("sh", "-c", cmd), timeoutSec)
         if (direct.code == 0) return direct
 
+        // Shizuku 有授权时优先于 root：不必每次弹 su 授权框，权限等同 ADB shell
+        if (ShizukuRunner.hasPermission()) {
+            val s = runViaShizuku(cmd, timeoutSec)
+            if (s.code == 0 || s.err.isNotBlank()) return s
+        }
+
         if (hasRoot()) {
             val r = exec(arrayOf("su", "-c", cmd), timeoutSec)
             return r.copy(channel = Channel.ROOT)
@@ -93,6 +101,68 @@ object ShellExec {
         looksLikePermissionIssue(r) -> "这条命令需要系统权限：Root 或 Termux（并开启 allow-external-apps）任一可用时才能执行。"
         r.code != 0 && r.err.isBlank() && r.out.isBlank() -> "命令没有输出，返回码 ${r.code}。"
         else -> ""
+    }
+
+    /** 强制走 Root 执行（不先试直连），对应详情页的「Root 运行」 */
+    fun runViaRoot(cmd: String, timeoutSec: Long = 60L): Result {
+        if (!hasRoot()) {
+            return Result(
+                Channel.ROOT, -1, "", "没有可用的 Root",
+                "设备没 root，或授权被拒绝。可以改用 Shizuku 运行，或复制到 Termux。"
+            )
+        }
+        return exec(arrayOf("su", "-c", cmd), timeoutSec).copy(channel = Channel.ROOT)
+    }
+
+    /**
+     * 强制走 Shizuku 执行（ADB 或 root 身份），对应详情页的「Shizuku 运行」。
+     *
+     * 注意：ShizukuRemoteProcess 的 stderr 是独立流，必须两个线程分别读，
+     * 单线程顺序读会在缓冲区写满时卡死（实测过）。
+     */
+    fun runViaShizuku(cmd: String, timeoutSec: Long = 60L): Result {
+        if (!ShizukuRunner.isRunning()) {
+            return Result(
+                Channel.SHIZUKU, -1, "", "Shizuku 服务没在运行",
+                "先打开 Shizuku App 点「启动」（或用 adb 启动服务），再回来执行。"
+            )
+        }
+        if (!ShizukuRunner.hasPermission()) {
+            return Result(
+                Channel.SHIZUKU, -1, "", "本应用还没获得 Shizuku 授权",
+                "点一下会弹出授权请求，允许之后就能执行。"
+            )
+        }
+        val process = runCatching {
+            Shizuku.newProcess(arrayOf("sh", "-c", cmd), null, null)
+        }.getOrElse { e ->
+            return Result(
+                Channel.SHIZUKU, -1, "", e.message ?: e.javaClass.simpleName,
+                "Shizuku 拒绝创建进程。"
+            )
+        }
+        val out = StringBuilder()
+        val err = StringBuilder()
+        val tOut = Thread {
+            runCatching { process.inputStream.bufferedReader().forEachLine { out.appendLine(it) } }
+        }
+        val tErr = Thread {
+            runCatching { process.errorStream.bufferedReader().forEachLine { err.appendLine(it) } }
+        }
+        tOut.start()
+        tErr.start()
+        val finished = runCatching { process.waitForTimeout(timeoutSec, TimeUnit.SECONDS) }.getOrDefault(false)
+        if (!finished) runCatching { process.destroy() }
+        tOut.join(1500)
+        tErr.join(1500)
+        val code = runCatching { process.exitValue() }.getOrDefault(-1)
+        return Result(
+            Channel.SHIZUKU,
+            if (finished) code else 124,
+            out.toString().trim(),
+            err.toString().trim(),
+            if (finished) "" else "执行超时（${timeoutSec}s），已终止"
+        )
     }
 
     private fun exec(cmd: Array<String>, timeoutSec: Long): Result {

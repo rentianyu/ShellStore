@@ -3,6 +3,7 @@ package com.xbta.shellstore.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,8 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,7 +33,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.xbta.shellstore.core.*
+import com.xbta.shellstore.data.EntryShortcuts
 import com.xbta.shellstore.data.ShellExec
+import com.xbta.shellstore.data.ShizukuRunner
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Radius
@@ -39,6 +44,7 @@ import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.Tones
 import com.xbta.shellstore.ui.theme.TypeScale
 import kotlinx.coroutines.Dispatchers
+import rikka.shizuku.Shizuku
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -65,6 +71,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     val scope = rememberCoroutineScope()
     var running by remember { mutableStateOf(false) }
     var execResult by remember { mutableStateOf<ShellExec.Result?>(null) }
+    var exportHint by remember { mutableStateOf(false) }
 
     val text = remember(entry, values, variantIndex) {
         CommandRenderer.primaryText(entry, values, variantIndex)
@@ -315,11 +322,77 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         val variant = MaterialTheme.colorScheme.surfaceVariant
         val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
-        Row(
+        fun toast(msg: String) = Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+
+        // Shizuku 的授权结果从 binder 线程回来，切回主线程再提示
+        // 授权状态缓存一份：组合期每次重组都调 pingBinder 是 IPC，没必要
+        var shizukuReady by remember { mutableStateOf(ShizukuRunner.hasPermission()) }
+
+        val permListener = remember {
+            Shizuku.OnRequestPermissionResultListener { code, grant ->
+                if (code == ShizukuRunner.REQ_CODE) {
+                    scope.launch {
+                        toast(
+                            if (grant == PackageManager.PERMISSION_GRANTED) {
+                                shizukuReady = true
+                                "已授权给 Shizuku，再点一次「Shizuku」就能执行"
+                            } else "Shizuku 授权被拒绝"
+                        )
+                    }
+                }
+            }
+        }
+        DisposableEffect(Unit) {
+            runCatching { Shizuku.addRequestPermissionResultListener(permListener) }
+            onDispose { runCatching { Shizuku.removeRequestPermissionResultListener(permListener) } }
+        }
+
+        fun runVia(kind: String) {
+            scope.launch {
+                running = true
+                val r = withContext(Dispatchers.IO) {
+                    if (kind == "shizuku") ShellExec.runViaShizuku(text) else ShellExec.runViaRoot(text)
+                }
+                running = false
+                execResult = r
+                if (r.ok) Store.recordRecent(entry.id)
+            }
+        }
+
+        fun shizukuRun() {
+            if (!ShizukuRunner.isInstalled(ctx)) { toast("没装 Shizuku：装好并启动后再回来"); return }
+            if (!ShizukuRunner.isRunning()) { toast("Shizuku 服务没在运行，打开 Shizuku 点「启动」"); return }
+            if (!ShizukuRunner.hasPermission()) {
+                ShizukuRunner.requestPermission()
+                toast("已发起授权请求，允许之后再点一次")
+                return
+            }
+            shizukuReady = true
+            runVia("shizuku")
+        }
+
+        fun rootRun() = runVia("root")
+
+        fun pinHome() {
+            val err = EntryShortcuts.pinToHome(ctx, entry.id, entry.title, text)
+            toast(err ?: "已请求添加到桌面，确认即可")
+        }
+
+        fun addTile() {
+            val err = EntryShortcuts.addTile(ctx, entry.title, text)
+            toast(err ?: "已在控制中心添加磁贴")
+        }
+
+        Column(
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(horizontal = Space.page, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+        // 第一行：主操作 + 复制 + 收藏（大小与位置保持原样）
+        Row(
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             if (runnable) {
@@ -437,6 +510,41 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 )
             }
         }
+
+            // 第二行：5 个扩展能力，全部摆在明面（不进菜单）
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                ActionChip(
+                    glyph = "⚡",
+                    label = "Shizuku",
+                    onClick = { shizukuRun() },
+                    tint = if (shizukuReady) primary else null
+                )
+                ActionChip(glyph = "⚿", label = "Root", onClick = { rootRun() })
+                ActionChip(glyph = "⇩", label = "导出APK", onClick = { exportHint = true }, enabled = false)
+                ActionChip(glyph = "⌂", label = "桌面", onClick = { pinHome() })
+                ActionChip(glyph = "▣", label = "磁贴", onClick = { addTile() })
+            }
+        }
+    }
+
+    if (exportHint) {
+        AlertDialog(
+            onDismissRequest = { exportHint = false },
+            title = { Text("导出为独立 APK", fontSize = TypeScale.body) },
+            text = {
+                Text(
+                    "把「${entry.title}」打包成一个独立的小应用：点开图标直接执行这条命令，不用先打开 Shell 商店。\n\n" +
+                        "打包与签名要在手机上现场完成，这个版本先把入口留出来，下个版本上线。",
+                    fontSize = TypeScale.small
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { exportHint = false }) { Text("知道了") }
+            }
+        )
     }
 
     val r = execResult

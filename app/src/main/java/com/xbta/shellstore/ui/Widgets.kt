@@ -111,6 +111,48 @@ fun RiskBadge(risk: Risk) {
 @Composable
 fun MutedBadge(text: String) = Badge(text, Tones.neutralFg, Tones.neutralBg)
 
+// ---------------- 详情页扩展操作按钮 ----------------
+
+/**
+ * 详情页第二行的小操作按钮：图标在上、单行文字在下，等宽平分。
+ * 只能在 RowScope 里用（依赖 weight），label 建议不超过 6 个字符。
+ */
+@Composable
+fun RowScope.ActionChip(
+    glyph: String,
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    tint: Color? = null
+) {
+    val bg = MaterialTheme.colorScheme.surfaceVariant
+    val fg = when {
+        !enabled -> MaterialTheme.colorScheme.outline.copy(alpha = .55f)
+        tint != null -> tint
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Column(
+        Modifier
+            .weight(1f)
+            .height(46.dp)
+            .clip(RoundedCornerShape(Radius.md))
+            .background(bg)
+            .clickable(enabled = enabled) { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        AppIcon(glyph, size = 15.dp, color = fg)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            label,
+            fontSize = TypeScale.caption,
+            color = fg,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 // ---------------- 卡片外壳 ----------------
 
 @Composable
