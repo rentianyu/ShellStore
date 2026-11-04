@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.xbta.shellstore.core.*
+import com.xbta.shellstore.data.ApkExporter
 import com.xbta.shellstore.data.EntryShortcuts
 import com.xbta.shellstore.data.ShellExec
 import com.xbta.shellstore.data.ShizukuRunner
@@ -71,7 +72,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     val scope = rememberCoroutineScope()
     var running by remember { mutableStateOf(false) }
     var execResult by remember { mutableStateOf<ShellExec.Result?>(null) }
-    var exportHint by remember { mutableStateOf(false) }
+    // 导出 APK 的状态机：false + null = 未开始；exporting = 进行中；result/error = 结束
+    var exporting by remember { mutableStateOf(false) }
+    var exportResult by remember { mutableStateOf<ApkExporter.Result?>(null) }
+    var exportError by remember { mutableStateOf<String?>(null) }
     // 结果对话框要显示「真正执行的命令」（非 shell 条目执行的是生成的 am 命令）
     var executedCmd by remember { mutableStateOf("") }
 
@@ -390,6 +394,23 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
 
         fun rootRun() = runVia("root")
 
+        fun exportApk() {
+            if (exporting) return
+            exporting = true
+            exportResult = null
+            exportError = null
+            scope.launch {
+                val r = runCatching {
+                    withContext(Dispatchers.IO) {
+                        ApkExporter.export(ctx, entry.title, text) { }
+                    }
+                }
+                exporting = false
+                r.onSuccess { exportResult = it }
+                    .onFailure { exportError = it.message ?: it.javaClass.simpleName }
+            }
+        }
+
         fun pinHome() {
             val err = EntryShortcuts.pinToHome(ctx, entry.id, entry.title, text, values)
             toast(err ?: "已请求添加到桌面，确认即可")
@@ -541,27 +562,72 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                     tint = if (shizukuReady) primary else null
                 )
                 ActionChip(glyph = "⚿", label = "Root", onClick = { rootRun() })
-                ActionChip(glyph = "⇩", label = "导出APK", onClick = { exportHint = true }, enabled = false)
+                ActionChip(glyph = "⇩", label = "导出APK", onClick = { exportApk() }, enabled = !exporting)
                 ActionChip(glyph = "⌂", label = "桌面", onClick = { pinHome() })
                 ActionChip(glyph = "▣", label = "磁贴", onClick = { addTile() })
             }
         }
     }
 
-    if (exportHint) {
+    if (exporting || exportResult != null || exportError != null) {
         AlertDialog(
-            onDismissRequest = { exportHint = false },
-            title = { Text("导出为独立 APK", fontSize = TypeScale.body) },
-            text = {
+            onDismissRequest = {
+                if (!exporting) { exportResult = null; exportError = null }
+            },
+            title = {
                 Text(
-                    "把「${entry.title}」打包成一个独立的小应用：点开图标直接执行这条命令，不用先打开 Shell 商店。\n\n" +
-                        "打包与签名要在手机上现场完成，这个版本先把入口留出来，下个版本上线。",
-                    fontSize = TypeScale.small
+                    when {
+                        exportError != null -> "导出失败"
+                        exporting -> "正在生成 APK"
+                        else -> "导出完成"
+                    },
+                    fontSize = TypeScale.body
                 )
             },
+            text = {
+                when {
+                    exporting -> Text(
+                        "正在改写包名、写入命令并重新签名，几秒钟。",
+                        fontSize = TypeScale.small
+                    )
+                    exportError != null -> Text(
+                        "导出失败：$exportError",
+                        fontSize = TypeScale.small
+                    )
+                    else -> {
+                        val res = exportResult!!
+                        Text(
+                            "已生成 ${res.file.name}\n包名 ${res.pkg}\n\n" +
+                                "装上就能用：点开图标直接执行这条命令，不需要 Shell 商店在后台。\n\n" +
+                                "应用名固定显示为「Shell 命令」——模板里的名称资源没法等长替换，" +
+                                "所以多条命令请靠包名区分；签名用的是导出专用密钥，和商店本体无关。",
+                            fontSize = TypeScale.small
+                        )
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = { exportHint = false }) { Text("知道了") }
-            }
+                when {
+                    exporting -> TextButton(onClick = { }) { Text("请稍候") }
+                    exportError != null -> TextButton(onClick = { exportError = null }) { Text("知道了") }
+                    else -> TextButton(onClick = {
+                        exportResult?.let { res ->
+                            runCatching { ctx.startActivity(ApkExporter.installIntent(ctx, res.file)) }
+                                .onFailure { toast("没有找到可用的安装器") }
+                        }
+                    }) { Text("安装") }
+                }
+            },
+            dismissButton = if (!exporting && exportResult != null) {
+                {
+                    TextButton(onClick = {
+                        exportResult?.let { res ->
+                            runCatching { ctx.startActivity(ApkExporter.shareIntent(ctx, res.file, entry.title)) }
+                                .onFailure { toast("分享失败") }
+                        }
+                    }) { Text("分享") }
+                }
+            } else null
         )
     }
 

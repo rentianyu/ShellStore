@@ -12,6 +12,7 @@ on:
     tags: [ 'v*' ]
     paths:
       - 'app/**'
+      - 'runner/**'
       - 'build.gradle.kts'
       - 'app/build.gradle.kts'
       - 'settings.gradle.kts'
@@ -75,6 +76,24 @@ jobs:
         with:
           gradle-version: '8.14.6'
           # 依赖与构建缓存默认开启，第二次起省掉约 2 分钟依赖下载
+
+      # 导出 APK 的模板：必须先构建出未签名的 runner APK，放进主 App 的 assets，
+      # 主 App 才能在运行时复制它、改包名、重签名后导出给用户。
+      - name: Build runner template
+        run: |
+          # 与下面的 Build 步骤一致：仓库里没有 gradlew，用 setup-gradle 提供的 gradle
+          if [ -x ./gradlew ]; then G=./gradlew; else G=gradle; fi
+          "$G" :runner:assembleRelease --no-daemon --stacktrace
+          mkdir -p app/src/main/assets
+          # 未签名时 AGP 产出的是 runner-release-unsigned.apk，名字不固定，取第一个
+          SRC=$(ls runner/build/outputs/apk/release/*.apk | head -1)
+          echo "runner apk: $SRC"
+          cp "$SRC" app/src/main/assets/runner.apk
+          ls -la app/src/main/assets/runner.apk
+          # 模板必须是「未签名」（签名由主 App 运行时用导出密钥做）
+          if command -v apksigner >/dev/null 2>&1; then
+            apksigner verify app/src/main/assets/runner.apk && { echo "模板被签名了，异常"; exit 1; } || echo "模板未签名，符合预期"
+          fi
 
       - name: Build
         run: |

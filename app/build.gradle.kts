@@ -108,6 +108,10 @@ dependencies {
     implementation("dev.rikka.shizuku:api:12.1.0")
     implementation("dev.rikka.shizuku:provider:12.1.0")
 
+    // 导出 APK 时重新签名用。apksig 的 pom 没有任何传递依赖（不拉 bouncycastle），
+    // 体积只有它自己；用官方库而不是自己手写 v2 签名块。
+    implementation("com.android.tools.build:apksig:8.13.2")
+
     // 需要协程 / 网络时再加（不要为了「以后可能用」提前引依赖）：
     // implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     // implementation("com.squareup.okhttp3:okhttp:4.12.0")

@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ShellStore"
 include(":app")
+include(":runner")

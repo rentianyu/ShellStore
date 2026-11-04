@@ -10,3 +10,6 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+
+# CI 里由 :runner:assembleRelease 生成后拷进来的模板 APK，不入库
+app/src/main/assets/runner.apk
