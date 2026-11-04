@@ -95,6 +95,14 @@ jobs:
             apksigner verify app/src/main/assets/runner.apk && { echo "模板被签名了，异常"; exit 1; } || echo "模板未签名，符合预期"
           fi
 
+      # 模板单独留一份 artifact：只有几十 KB，排查「导出 APK 失败」时不用重新构建
+      - name: Upload runner template
+        uses: actions/upload-artifact@v4
+        with:
+          name: runner-template
+          path: app/src/main/assets/runner.apk
+          retention-days: 7
+
       - name: Build
         run: |
           if [ -x ./gradlew ]; then G=./gradlew; else G=gradle; fi

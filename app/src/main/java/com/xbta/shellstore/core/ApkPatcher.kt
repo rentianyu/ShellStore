@@ -28,17 +28,18 @@ object ApkPatcher {
         output: File,
         newPkg: String,
         cmd: String,
-        title: String
+        title: String,
+        oldPkg: String = TEMPLATE_PKG
     ) {
-        require(newPkg.length == TEMPLATE_PKG.length) {
-            "包名长度必须与模板一致（${TEMPLATE_PKG.length}），当前 ${newPkg.length}"
+        require(newPkg.length == oldPkg.length) {
+            "包名长度必须与模板一致（${oldPkg.length}），当前 ${newPkg.length}"
         }
         ZipFile(input).use { zin ->
             ZipOutputStream(output.outputStream().buffered()).use { zout ->
                 for (entry in zin.entries()) {
                     var bytes = zin.getInputStream(entry).readBytes()
                     when (entry.name) {
-                        "AndroidManifest.xml" -> bytes = patchManifestPackage(bytes, newPkg)
+                        "AndroidManifest.xml" -> bytes = patchManifestPackage(bytes, oldPkg, newPkg)
                         "resources.arsc" -> bytes = patchArscPackage(bytes, newPkg)
                         "assets/cmd.txt" -> bytes = cmd.trim().toByteArray(Charsets.UTF_8)
                         "assets/title.txt" -> bytes = title.take(60).toByteArray(Charsets.UTF_8)
@@ -62,14 +63,14 @@ object ApkPatcher {
     }
 
     /** 二进制 XML（AXML）的字符串池里替换包名，等长原地覆盖 */
-    fun patchManifestPackage(data: ByteArray, newPkg: String): ByteArray {
+    fun patchManifestPackage(data: ByteArray, oldPkg: String, newPkg: String): ByteArray {
         val buf = data.copyOf()
         var pos = u16(buf, 2)          // 文件头 headerSize
         while (pos + 8 <= buf.size) {
             val type = u16(buf, pos)
             val size = i32(buf, pos + 4)
             if (type == 0x0001) {      // RES_STRING_POOL_TYPE
-                patchStringPool(buf, pos, u16(buf, pos + 2), newPkg)
+                patchStringPool(buf, pos, u16(buf, pos + 2), oldPkg, newPkg)
                 return buf
             }
             if (size <= 0) break
@@ -78,7 +79,14 @@ object ApkPatcher {
         return buf
     }
 
-    private fun patchStringPool(buf: ByteArray, chunkStart: Int, headerSize: Int, newPkg: String) {
+    private fun patchStringPool(
+        buf: ByteArray,
+        chunkStart: Int,
+        headerSize: Int,
+        oldPkg: String,
+        newPkg: String
+    ) {
+        if (oldPkg.length != newPkg.length) return   // 只支持等长替换
         val stringCount = i32(buf, chunkStart + 8)
         val flags = i32(buf, chunkStart + 16)
         val stringsStart = i32(buf, chunkStart + 20)
@@ -97,7 +105,7 @@ object ApkPatcher {
                 }
                 val start = idx + 1
                 if (start + len > buf.size) continue
-                if (String(buf, start, len, Charsets.UTF_8) == TEMPLATE_PKG) {
+                if (String(buf, start, len, Charsets.UTF_8) == oldPkg) {
                     val n = newPkg.toByteArray(Charsets.UTF_8)
                     System.arraycopy(n, 0, buf, start, minOf(n.size, len))
                     return
@@ -106,7 +114,7 @@ object ApkPatcher {
                 val len = u16(buf, p)
                 val start = p + 2
                 if (start + len * 2 > buf.size) continue
-                if (String(buf, start, len * 2, Charsets.UTF_16LE) == TEMPLATE_PKG) {
+                if (String(buf, start, len * 2, Charsets.UTF_16LE) == oldPkg) {
                     val n = newPkg.toByteArray(Charsets.UTF_16LE)
                     System.arraycopy(n, 0, buf, start, minOf(n.size, len * 2))
                     return
