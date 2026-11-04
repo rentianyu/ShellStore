@@ -72,6 +72,8 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     var running by remember { mutableStateOf(false) }
     var execResult by remember { mutableStateOf<ShellExec.Result?>(null) }
     var exportHint by remember { mutableStateOf(false) }
+    // 结果对话框要显示「真正执行的命令」（非 shell 条目执行的是生成的 am 命令）
+    var executedCmd by remember { mutableStateOf("") }
 
     val text = remember(entry, values, variantIndex) {
         CommandRenderer.primaryText(entry, values, variantIndex)
@@ -347,11 +349,26 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
             onDispose { runCatching { Shizuku.removeRequestPermissionResultListener(permListener) } }
         }
 
+        /**
+         * 提权执行时用的命令：shell/script 直接跑正文；
+         * url scheme / activity / intent / broadcast / service 必须先转成等价的 am 命令，
+         * 否则把 `openapp.jdmobile://...` 当命令丢给 sh 必然失败。
+         */
+        fun privilegedCommand(): String =
+            if (entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT) text
+            else CommandRenderer.toAdb(entry, values)
+
         fun runVia(kind: String) {
+            val cmd = privilegedCommand()
+            if (cmd.isBlank()) {
+                toast("这个条目没有等价的 am 命令，无法用提权通道执行")
+                return
+            }
+            executedCmd = cmd
             scope.launch {
                 running = true
                 val r = withContext(Dispatchers.IO) {
-                    if (kind == "shizuku") ShellExec.runViaShizuku(text) else ShellExec.runViaRoot(text)
+                    if (kind == "shizuku") ShellExec.runViaShizuku(cmd) else ShellExec.runViaRoot(cmd)
                 }
                 running = false
                 execResult = r
@@ -403,6 +420,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                         .clip(RoundedCornerShape(Radius.md))
                         .background(if (running) variant else primary)
                         .clickable(enabled = !running) {
+                            executedCmd = text
                             scope.launch {
                                 running = true
                                 val r = withContext(Dispatchers.IO) { ShellExec.run(ctx, text) }
@@ -551,7 +569,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     if (r != null) {
         ExecResultDialog(
             result = r,
-            command = text,
+            command = executedCmd.ifBlank { text },
             onCopy = {
                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cm.setPrimaryClip(ClipData.newPlainText("输出", listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n")))

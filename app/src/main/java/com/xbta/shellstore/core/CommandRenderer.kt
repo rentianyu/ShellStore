@@ -42,7 +42,7 @@ object CommandRenderer {
 
     /** 生成等价 adb 命令；@adb 存在时优先使用它 */
     fun toAdb(entry: Entry, values: Map<String, String>): String {
-        if (entry.adb.isNotBlank()) return fill(entry.adb, entry, values)
+        if (entry.adb.isNotBlank()) return ensureAction(fill(entry.adb, entry, values))
 
         val spec = entry.intent
         if (entry.type == EntryType.URLSCHEME && spec == null) {
@@ -58,7 +58,12 @@ object CommandRenderer {
             else -> "am start"
         }
         val sb = StringBuilder(verb)
-        if (spec.action.isNotBlank()) sb.append(" -a ").append(q(spec.action))
+        // url scheme 条目常常只写了 scheme 没写 action，而 am start 不给 action 只给 -d
+        // 行为不可靠（部分系统直接报 "does not specify an action"），统一补成 VIEW
+        val action = spec.action.ifBlank {
+            if (entry.type == EntryType.URLSCHEME) "android.intent.action.VIEW" else ""
+        }
+        if (action.isNotBlank()) sb.append(" -a ").append(q(action))
         val data = fill(spec.data, entry, values)
         if (data.isNotBlank()) sb.append(" -d ").append(q(data))
         if (spec.mime.isNotBlank()) sb.append(" -t ").append(q(spec.mime))
@@ -83,6 +88,21 @@ object CommandRenderer {
         return sb.toString()
     }
 
+    /**
+     * 给 `am start` 兜一层 action。
+     *
+     * 只带 `-d` 不带 `-a`/`-n` 时 am 的行为不可靠（部分系统直接报
+     * "Intent does not specify an action or component"）。现有源里 400 多条
+     * 手写的 @adb 全是这种写法，所以这里统一补，而不是逐个改源。
+     */
+    private fun ensureAction(cmd: String): String {
+        val c = cmd.trim()
+        if (!c.startsWith("am start")) return c
+        // 已经有 -a（action）或 -n（component）就原样返回
+        if (Regex("""(^|\s)-[an]\s""").containsMatchIn(c)) return c
+        return c.replaceFirst("am start", "am start -a android.intent.action.VIEW")
+    }
+
     fun flagValue(raw: String): String {
         val key = raw.trim().uppercase()
         FLAG_MAP[key]?.let { return it }
@@ -105,11 +125,21 @@ object CommandRenderer {
         }
     }
 
-    /** 含空白/引号时加单引号，内部单引号用 '\'' 转义（POSIX 兼容） */
+    /**
+     * 需要加单引号包裹的字符判定。
+     *
+     * 用「白名单」而不是黑名单：URL / scheme 里常有 ? { } $ & 这些 shell 元字符，
+     * 漏一个就会被 shell 当通配符或变量展开（? 是单字符 glob、{a,b} 是花括号展开）。
+     */
+    private fun needsQuote(s: String): Boolean = s.any { c ->
+        !(c.isLetterOrDigit() || c == '-' || c == '_' || c == '.' || c == '/' ||
+            c == ':' || c == '@' || c == '=' || c == '%' || c == '+' || c == ',')
+    }
+
+    /** 含 shell 元字符时加单引号，内部单引号用 '\'' 转义（POSIX 兼容） */
     fun q(s: String): String {
         if (s.isEmpty()) return "''"
-        val need = s.any { it.isWhitespace() || it == '\'' || it == '"' || it == '&' || it == '|' || it == '>' || it == '<' }
-        if (!need) return s
+        if (!needsQuote(s)) return s
         if (!s.contains('\'')) return "'$s'"
         return "'" + s.replace("'", "'\\''") + "'"
     }
