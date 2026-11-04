@@ -68,6 +68,25 @@ object CrashLog {
             ?.forEach { it.delete() }
     }
 
+    /** 手动记录一条（非崩溃的失败，比如导出 APK 出错），同样进「崩溃日志」列表便于复制 */
+    fun record(ctx: Context, tag: String, t: Throwable) {
+        runCatching {
+            val now = Date()
+            val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.CHINA).format(now)
+            val f = File(dir(ctx), "crash-$stamp-$tag.txt")
+            val sb = StringBuilder()
+            sb.appendLine("time=" + SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(now))
+            sb.appendLine("tag=" + tag)
+            sb.appendLine("version=" + BuildConfig.APP_VERSION + " (" + BuildConfig.APP_VERSION_CODE + ")")
+            sb.appendLine("android=" + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")")
+            sb.appendLine("---")
+            sb.append(t.stackTraceToString())
+            f.writeText(sb.toString())
+            dir(ctx).listFiles()?.filter { it.name.endsWith(".txt") }
+                ?.sortedByDescending { it.name }?.drop(MAX_FILES)?.forEach { it.delete() }
+        }
+    }
+
     fun all(ctx: Context): List<File> =
         dir(ctx).listFiles()
             ?.filter { it.name.endsWith(".txt") }

@@ -592,7 +592,8 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                         fontSize = TypeScale.small
                     )
                     exportError != null -> Text(
-                        "导出失败：$exportError",
+                        "导出失败：$exportError\n\n" +
+                            "详细堆栈已记到「我的 › 关于 › 崩溃日志」，需要我排查就复制过来。",
                         fontSize = TypeScale.small
                     )
                     else -> {

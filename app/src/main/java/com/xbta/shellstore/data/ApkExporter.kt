@@ -40,7 +40,16 @@ object ApkExporter {
      * 阻塞调用，务必放在 IO 线程。
      * @param onStep 进度文案回调（会从子线程调用）
      */
-    fun export(ctx: Context, title: String, cmd: String, onStep: (String) -> Unit): Result {
+    fun export(ctx: Context, title: String, cmd: String, onStep: (String) -> Unit): Result =
+        try {
+            doExport(ctx, title, cmd, onStep)
+        } catch (t: Throwable) {
+            // 导出失败很少见，但真机上只看一句 message 定位不了，整段堆栈留进崩溃日志
+            CrashLog.record(ctx, "export-apk", t)
+            throw t
+        }
+
+    private fun doExport(ctx: Context, title: String, cmd: String, onStep: (String) -> Unit): Result {
         val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }
         // 清掉上一次的导出，避免缓存目录堆积
         dir.listFiles()?.forEach { runCatching { it.delete() } }
