@@ -22,12 +22,15 @@ object ZipCheck {
     private const val MIN_SIZE = 1_000_000L
     private const val MAX_SIZE = 300L * 1024 * 1024
 
-    /** 通过返回 null，失败返回可读原因 */
-    fun verify(f: File): String? {
+    /**
+     * 通过返回 null，失败返回可读原因。
+     * @param minSize 体积下限（主 App 更新包用默认 1MB；导出的小 APK 传 1KB）
+     */
+    fun verify(f: File, minSize: Long = MIN_SIZE): String? {
         if (!f.exists()) return "文件不存在"
         if (!f.isFile) return "不是文件"
         val len = f.length()
-        if (len < MIN_SIZE) return "文件只有 ${len} 字节，下载不完整"
+        if (len < minSize) return "文件只有 ${len} 字节，下载不完整"
         if (len > MAX_SIZE) return "文件异常偏大（${len / 1024 / 1024}MB）"
 
         if (!hasEndRecord(f)) return "缺少 ZIP 结束记录，文件被截断"

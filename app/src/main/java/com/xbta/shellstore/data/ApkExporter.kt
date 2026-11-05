@@ -4,12 +4,12 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import com.xbta.shellstore.core.ApkPatcher
+import com.xbta.shellstore.core.ZipCheck
 import com.android.apksig.ApkSigner
 import java.io.File
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
-import java.util.UUID
 
 /**
  * 把一条命令导出成独立的 APK。
@@ -20,8 +20,8 @@ import java.util.UUID
  *  3. 同时改包名，避免多个导出 APK 互相覆盖安装
  *  4. 用内置的「导出专用」密钥重新签名（不是发布密钥），写到 cache 供安装/分享
  *
- * 包名为什么能直接改：模板包名 `com.xbta.cmd.a0000000` 与导出包名 `com.xbta.cmd.a<8位hex>`
- * **长度相同**（都是 21 个 ASCII 字符），所以 resources.arsc 的 package chunk 与
+ * 包名为什么能直接改：模板包名 `com.xbta.cmd.a0000000` 与导出包名 `com.xbta.cmd.a<7位hex>`
+ * **长度相同**（都是 21 个 ASCII 字符，生成时由模板长度反推），所以 resources.arsc 的 package chunk 与
  * AndroidManifest.xml 的字符串池都可以原地等长覆盖，不用重建字符串池——这是整套里最容易出错的一步，
  * 等长替换把风险降到最低。
  */
@@ -33,8 +33,8 @@ object ApkExporter {
 
     data class Result(val file: File, val pkg: String)
 
-    fun newPackageName(): String =
-        "com.xbta.cmd.a" + UUID.randomUUID().toString().replace("-", "").take(8)
+    /** 包名长度由模板反推（见 ApkPatcher.newPackage），这里不再手写长度 */
+    fun newPackageName(): String = ApkPatcher.newPackage()
 
     /**
      * 阻塞调用，务必放在 IO 线程。
@@ -68,6 +68,12 @@ object ApkExporter {
         onStep("签名")
         val finalFile = File(dir, "ShellStore-${pkg.substringAfterLast('.')}.apk")
         sign(ctx, patched, finalFile)
+
+        // 产物自检：签名会重写 zip，结构坏了也要当场发现，而不是让用户装的时候才报错
+        ZipCheck.verify(finalFile, minSize = 1024L)?.let { why ->
+            runCatching { finalFile.delete() }
+            error("导出的安装包自检未通过：$why")
+        }
 
         raw.delete()
         patched.delete()
