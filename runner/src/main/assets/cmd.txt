@@ -1,1 +1,0 @@
-getprop ro.product.model
