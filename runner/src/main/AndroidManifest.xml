@@ -8,8 +8,7 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="SSTPL_LABEL_PLACEHOLDER_000000"
-        android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault.Light">
+        android:supportsRtl="true">
 
         <!-- Shizuku：authorities 里的包名会在导出时随包名一起替换，
              否则多个导出 APK 会因同名 provider 冲突而装不上 -->
@@ -24,7 +23,9 @@
         <activity
             android:name="com.xbta.cmd.runner.RunActivity"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

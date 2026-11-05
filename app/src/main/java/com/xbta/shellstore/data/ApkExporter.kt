@@ -183,6 +183,7 @@ object ApkExporter {
         o.put("value", spec.value.trim())
         if (spec.action.isNotBlank()) o.put("action", spec.action.trim())
         if (spec.component.isNotBlank()) o.put("component", spec.component.trim())
+        if (spec.data.isNotBlank()) o.put("data", spec.data.trim())
         if (spec.extras.isNotBlank()) o.put("extras", spec.extras)
         o.put("exec", spec.exec)
         o.put("showOutput", spec.showOutput)

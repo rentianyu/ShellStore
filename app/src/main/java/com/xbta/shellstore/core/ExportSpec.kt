@@ -20,6 +20,8 @@ data class ExportSpec(
     val action: String = "",
     /** 可选 "pkg/.Cls" */
     val component: String = "",
+    /** 可选 data URI（broadcast / service / activity 从命令解析出来时用） */
+    val data: String = "",
     /** 可选，k=v 每行一个 */
     val extras: String = "",
     /** shell / root / shizuku */

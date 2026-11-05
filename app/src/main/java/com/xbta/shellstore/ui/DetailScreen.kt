@@ -99,11 +99,23 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         EntryType.SERVICE -> ExportSpec.TYPE_SERVICE
     }
 
-    /** 条目正文 → 导出默认内容 */
-    fun exportValue(): String = when (entry.type) {
-        EntryType.SHELL, EntryType.SCRIPT, EntryType.URLSCHEME -> text
-        else -> entry.intent?.data ?: entry.adb
-    }
+    /**
+     * 按目标动作类型算出导出的默认参数。
+     *
+     * 关键：这里会把「一条 am 命令」拆成 value / action / component / data，
+     * 导出的 App 直接用 Intent 打开目标，不经过任何 shell —— 用户要的是点开即跳转。
+     */
+    fun exportDefaults(type: String): AdbIntent.Normalized = AdbIntent.normalize(
+        type = type,
+        value = text,
+        action = entry.intent?.action.orEmpty(),
+        component = entry.intent?.component.orEmpty(),
+        extras = entry.intent?.extras
+            ?.filter { it.key.isNotBlank() }
+            ?.joinToString("\n") { "${it.key}=${it.value}" }
+            .orEmpty(),
+        data = entry.intent?.data.orEmpty()
+    )
 
     fun exportApk(spec: ExportSpec) {
         if (exporting) return
@@ -609,12 +621,16 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     }
 
     if (showExportForm) {
+        val defType = exportType()
+        val def = exportDefaults(defType)
         ExportApkDialog(
             defaultTitle = entry.title,
-            defaultType = exportType(),
-            defaultValue = exportValue(),
-            defaultAction = entry.intent?.action.orEmpty(),
-            defaultComponent = entry.intent?.component.orEmpty(),
+            defaultType = defType,
+            defaultValue = def.value,
+            defaultAction = def.action,
+            defaultComponent = def.component,
+            defaultData = def.data,
+            defaultExtras = def.extras,
             defaultExec = ExportSpec.EXEC_SHELL,
             onDismiss = { showExportForm = false },
             onConfirm = { spec ->

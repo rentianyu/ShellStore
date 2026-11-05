@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.xbta.shellstore.core.AdbIntent
 import com.xbta.shellstore.core.ExportSpec
 import com.xbta.shellstore.core.PackageRules
 import com.xbta.shellstore.data.ApkExporter
@@ -51,6 +52,8 @@ fun ExportApkDialog(
     defaultValue: String,
     defaultAction: String,
     defaultComponent: String,
+    defaultData: String = "",
+    defaultExtras: String = "",
     defaultExec: String,
     onDismiss: () -> Unit,
     onConfirm: (ExportSpec) -> Unit
@@ -64,7 +67,8 @@ fun ExportApkDialog(
     var value by remember { mutableStateOf(defaultValue) }
     var action by remember { mutableStateOf(defaultAction) }
     var component by remember { mutableStateOf(defaultComponent) }
-    var extras by remember { mutableStateOf("") }
+    var data by remember { mutableStateOf(defaultData) }
+    var extras by remember { mutableStateOf(defaultExtras) }
     var exec by remember { mutableStateOf(defaultExec) }
     var showOutput by remember { mutableStateOf(true) }
     var timeout by remember { mutableStateOf("30") }
@@ -98,6 +102,20 @@ fun ExportApkDialog(
             )
         }
         Store.updateSettings(Store.settings.value.copy(exportDirUri = uri.toString()))
+    }
+
+    /**
+     * 切动作类型时先规范化当前值：如果「详细内容」其实是一整条 am 命令，
+     * 就把它拆成 value / action / component / data，保证导出的 App 直接走 Intent。
+     */
+    fun switchType(t: String) {
+        val n = AdbIntent.normalize(t, value, action, component, extras, data)
+        value = n.value
+        action = n.action
+        component = n.component
+        data = n.data
+        extras = n.extras
+        type = t
     }
 
     val pkgError = PackageRules.validate(pkg)
@@ -239,7 +257,7 @@ fun ExportApkDialog(
                     ExportSpec.TYPES.take(3).forEach { t ->
                         FilterChip(
                             selected = type == t,
-                            onClick = { type = t },
+                            onClick = { switchType(t) },
                             label = { Text(ExportSpec.typeLabel(t), fontSize = 11.sp) }
                         )
                     }
@@ -251,7 +269,7 @@ fun ExportApkDialog(
                     ExportSpec.TYPES.drop(3).forEach { t ->
                         FilterChip(
                             selected = type == t,
-                            onClick = { type = t },
+                            onClick = { switchType(t) },
                             label = { Text(ExportSpec.typeLabel(t), fontSize = 11.sp) }
                         )
                     }
@@ -293,6 +311,16 @@ fun ExportApkDialog(
                             value = action,
                             onValueChange = { action = it.trim() },
                             label = { Text("Intent action（可留空）", fontSize = 11.sp) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        // 广播/服务：value 装的是 action 或组件名，data 单独填
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = data,
+                            onValueChange = { data = it.trim() },
+                            label = { Text("data URI（可留空）", fontSize = 11.sp) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -407,6 +435,7 @@ fun ExportApkDialog(
                                 value = value,
                                 action = action,
                                 component = component,
+                                data = data,
                                 extras = extras,
                                 exec = exec,
                                 showOutput = showOutput,
