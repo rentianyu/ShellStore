@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -220,5 +222,49 @@ fun DownloadBar(pct: Int) {
         ) {
             Text("新版本下载中 $pct%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+/**
+ * 启动时自动更新失败（下载不完整 / 校验不过 / 线路全挂）的提示条。
+ * 不弹窗打断用户，只占顶部一行，点「重试」清缓存重拉，「×」本次不再提。
+ */
+@Composable
+fun UpdateFailBar(message: String, onRetry: () -> Unit, onDismiss: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(start = Space.page, end = 4.dp, top = 5.dp, bottom = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "更新下载失败：$message",
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(
+            onClick = onRetry,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                "重试",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
+        Text(
+            "×",
+            fontSize = 16.sp,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+                .clickable { onDismiss() }
+        )
     }
 }

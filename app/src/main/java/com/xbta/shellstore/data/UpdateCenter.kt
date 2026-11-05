@@ -55,12 +55,31 @@ object UpdateCenter {
 
     fun install(ctx: Context): String? {
         val info = readyInfo ?: return "没有待安装的更新包"
-        return Updater.install(ctx, info)
+        val err = Updater.install(ctx, info)
+        if (err != null) {
+            // 包坏了不要留在缓存里假装「已就绪」，回到可重试状态
+            readyInfo = null
+            _state.value = State.Failed(err)
+        }
+        return err
     }
 
-    /** 用户点了「稍后」，本次运行不再提 */
+    /**
+     * 手动重试：清掉缓存包、重新检查并下载。阻塞，调用方放 IO 线程。
+     * 用于启动时自动更新失败后用户点顶部提示条。
+     */
+    fun retry(ctx: Context, currentVersion: String) {
+        checkedOnce = false
+        readyInfo?.let { Updater.clearCache(ctx, it.version) }
+        readyInfo = null
+        _state.value = State.Idle
+        checkAndDownload(ctx, currentVersion)
+    }
+
+    /** 用户点了「稍后」或关掉了失败提示条：本次运行不再提 */
     fun dismiss() {
-        if (_state.value is State.Ready) _state.value = State.Idle
+        val s = _state.value
+        if (s is State.Ready || s is State.Failed) _state.value = State.Idle
     }
 
     fun resetForManualCheck() {

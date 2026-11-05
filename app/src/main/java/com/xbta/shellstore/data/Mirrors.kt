@@ -64,6 +64,33 @@ object Mirrors {
     private fun nodeOf(name: String): Node? = NODES.firstOrNull { it.name == name }
 
     /**
+     * 大文件（APK）下载的线路顺序：按实测吞吐从快到慢排，
+     * 慢的排后面兜底，避免一上来就在 7KB/s 的线路上耗十分钟。
+     */
+    private val APK_ORDER = listOf(
+        "p.xbta.cc",
+        "ghfast.top",
+        "gh-proxy.com",
+        "gh.noki.icu",
+        "gh-proxy.at9.net",
+        "cors.isteed.cc",
+        "github.boki.moe",
+        "proxy.vvvv.ee",
+        "ghproxy.imciel.com",
+        "gh.llkk.cc",
+        "gh.h233.eu.org"
+    )
+
+    /** 给 APK 下载用：返回 (线路名, 完整 URL) 列表 */
+    fun apkUrls(target: String): List<Pair<String, String>> =
+        APK_ORDER.mapNotNull { name ->
+            nodeOf(name)?.let { name to urlOf(it, target) }
+        }
+
+    /** 线路总数（诊断用） */
+    fun apkLineCount(): Int = apkUrls("https://github.com/x/y").size
+
+    /**
      * 依次尝试：直连 → 上次成功的线路 → 其余节点。
      * 返回的 Result.via 记录最终走的是哪条（空串表示直连）。
      */

@@ -10,19 +10,32 @@ import java.net.URL
 /**
  * 应用内检查更新：只认正式 Release（releases/latest + 固定 asset 名）。
  *
- * 主通道抓 HTML 页面（API 未认证只有 60 次/小时，出口 IP 共享时很容易被限流），
- * 页面拿不到再走 API；下载走多线路代理，落地后校验 ZIP 文件头。
+ * 检查：主通道抓 HTML 页面（API 未认证只有 60 次/小时，出口 IP 共享时很容易被限流），
+ * 页面拿不到再走 API。
+ *
+ * 下载：逐条线路下到 `.part.apk`，**每条下完立即做完整校验**（zip 结构 + 能否解析 +
+ * 版本号 + 签名），通过才改名成正式文件；不通过就删掉换下一条线路。
+ * 只有文件头 PK\x03\x04 是不够的 —— 断流时头部完好、长度也可能好几 MB，
+ * 只看头会把半个包当成功，用户点到安装才被系统告知「解析包时出现问题」。
  */
 object Updater {
 
     const val REPO = "rentianyu/ShellStore"
     private const val ASSET_NAME = "app-release.apk"
 
+    /** 抓页面/接口用的线路（这几条实测能返回 HTML 或 JSON） */
     private val PROXIES = listOf(
         "https://p.xbta.cc/",
         "https://gh-proxy.com/",
         "https://ghfast.top/"
     )
+
+    /** 两次 read 之间的最长间隔，超时算断流 */
+    private const val READ_TIMEOUT_MS = 25_000
+    private const val CONNECT_TIMEOUT_MS = 12_000
+
+    /** 整体下载预算：所有线路 + 重试加起来不超过这个时长 */
+    private const val TOTAL_BUDGET_MS = 15L * 60 * 1000
 
     /** version 已去掉前缀 v，用于比较与展示 */
     data class Info(val version: String, val apkUrl: String)
@@ -75,61 +88,133 @@ object Updater {
         return CheckResult(null, "检查失败：网络不可达或发布页结构变化")
     }
 
+    /** 正式安装包路径（文件名带版本，避免不同版本互相覆盖） */
+    fun cacheFile(ctx: Context, version: String): File =
+        File(ctx.cacheDir, "update-$version.apk")
+
+    /** 下载中的半成品；后缀保留 .apk，个别 ROM 的包解析对后缀敏感 */
+    private fun partFile(ctx: Context, version: String): File =
+        File(ctx.cacheDir, "update-$version.part.apk")
+
+    /** 清掉已下载的包与半成品，供「重新下载」用 */
+    fun clearCache(ctx: Context, version: String) {
+        runCatching { cacheFile(ctx, version).delete() }
+        runCatching { partFile(ctx, version).delete() }
+    }
+
+    /** 本地是否已有可用安装包：null 表示可用，否则返回原因（未下载 / 校验不通过） */
+    fun localCheck(ctx: Context, version: String): String? {
+        val f = cacheFile(ctx, version)
+        if (!f.exists()) return "尚未下载"
+        return ApkVerify.check(ctx, f, version)
+    }
+
     /**
-     * 下载 APK 到缓存目录；成功返回 null，失败返回原因。
-     * 文件名带版本号，避免同版本重复下载，也避免旧包残留被误用。
+     * 下载并校验安装包。成功返回 null，失败返回可读原因。
+     *
+     * 已有缓存先校验：**通过才复用，不通过直接删**（旧代码只判长度 > 1MB，
+     * 一个坏包会被永远当成「已下载好」，这是之前反复装不上包的根源）。
      */
     fun download(ctx: Context, info: Info, onProgress: (Int) -> Unit = {}): String? {
-        val dest = File(ctx.cacheDir, "update-${info.version}.apk")
-        if (dest.exists() && dest.length() > 1_000_000) return null
+        val dest = cacheFile(ctx, info.version)
+        if (dest.exists()) {
+            if (ApkVerify.check(ctx, dest, info.version) == null) return null
+            runCatching { dest.delete() }
+        }
+        clearCache(ctx, info.version)
 
-        for (p in PROXIES) {
-            val ok = runCatching {
-                val conn = (URL(p + info.apkUrl).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 20000
-                    readTimeout = 30000
-                    instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "ShellStore/0.4 (Android)")
+        val part = partFile(ctx, info.version)
+        val started = System.currentTimeMillis()
+        var last = "所有下载线路都失败了"
+        var rounds = 0
+
+        while (rounds < 2 && System.currentTimeMillis() - started < TOTAL_BUDGET_MS) {
+            rounds++
+            for ((name, url) in Mirrors.apkUrls(info.apkUrl)) {
+                if (System.currentTimeMillis() - started >= TOTAL_BUDGET_MS) break
+                runCatching { part.delete() }
+                onProgress(0)
+
+                val err = fetchTo(url, part, onProgress)
+                if (err != null) {
+                    last = "$name：$err"
+                    continue
                 }
-                val total = conn.contentLengthLong
-                conn.inputStream.use { input ->
-                    dest.outputStream().use { out ->
-                        val buf = ByteArray(32 * 1024)
-                        var read = 0L
-                        var last = 0
-                        while (true) {
-                            val n = input.read(buf)
-                            if (n <= 0) break
-                            out.write(buf, 0, n)
-                            read += n
-                            if (total > 0) {
-                                val pct = (read * 100 / total).toInt()
-                                if (pct / 5 != last / 5) { last = pct; onProgress(pct) }
+
+                val why = ApkVerify.check(ctx, part, info.version)
+                if (why == null) {
+                    if (part.renameTo(dest)) {
+                        onProgress(100)
+                        return null
+                    }
+                    last = "无法保存安装包到缓存目录"
+                    continue
+                }
+                last = "$name：$why"
+                runCatching { part.delete() }
+            }
+        }
+        runCatching { part.delete() }
+        return if (rounds > 1) "$last（已重试 $rounds 轮）" else last
+    }
+
+    /** 单条线路下到文件；成功返回 null，失败返回原因 */
+    private fun fetchTo(url: String, out: File, onProgress: (Int) -> Unit): String? {
+        var conn: HttpURLConnection? = null
+        return try {
+            conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "ShellStore (Android)")
+                setRequestProperty("Accept", "application/octet-stream, */*")
+            }
+            val code = conn.responseCode
+            if (code !in 200..299) return "HTTP $code"
+
+            val total = conn.contentLengthLong
+            var written = 0L
+            var lastPct = -1
+            conn.inputStream.use { input ->
+                out.outputStream().use { o ->
+                    val buf = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n <= 0) break
+                        o.write(buf, 0, n)
+                        written += n
+                        if (total > 0) {
+                            val pct = (written * 100 / total).toInt().coerceIn(0, 100)
+                            if (pct / 3 != lastPct / 3) {
+                                lastPct = pct
+                                onProgress(pct)
                             }
                         }
                     }
                 }
-                conn.disconnect()
-                dest.length() > 1_000_000
-            }.getOrDefault(false)
-            if (ok) {
-                // 校验 zip 文件头 PK\x03\x04，防止代理返回 HTML 错误页
-                val head = ByteArray(4)
-                runCatching { dest.inputStream().use { it.read(head) } }
-                if (head[0] == 0x50.toByte() && head[1] == 0x4B.toByte() &&
-                    head[2] == 0x03.toByte() && head[3] == 0x04.toByte()
-                ) {
-                    return null
-                }
-                runCatching { dest.delete() }
             }
+            // 有 Content-Length 就要求字节数对得上，断了立刻换线路（不必等完整校验）
+            if (total > 0 && written != total) return "下载中断（$written/$total 字节）"
+            if (written < 1_000_000) return "内容太短（$written 字节）"
+            null
+        } catch (e: Exception) {
+            e.javaClass.simpleName + (e.message?.let { "：$it" } ?: "")
+        } finally {
+            runCatching { conn?.disconnect() }
         }
-        return "所有下载线路都失败了"
     }
 
+    /**
+     * 唤起系统安装器。装之前再校验一遍：缓存里的包可能被系统清理工具破坏，
+     * 校验不过就顺手删掉，让用户走「重新下载」而不是看着系统报解析失败。
+     */
     fun install(ctx: Context, info: Info): String? {
-        val f = File(ctx.cacheDir, "update-${info.version}.apk")
-        if (!f.exists() || f.length() < 1_000_000) return "安装包不存在，请先下载"
+        val f = cacheFile(ctx, info.version)
+        if (!f.exists()) return "安装包不存在，请先下载"
+        ApkVerify.check(ctx, f, info.version)?.let { why ->
+            runCatching { f.delete() }
+            return "安装包校验未通过（$why），已清除，请重新下载"
+        }
         return runCatching {
             val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", f)
             val i = Intent(Intent.ACTION_VIEW).apply {

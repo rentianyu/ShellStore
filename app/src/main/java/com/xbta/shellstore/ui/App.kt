@@ -223,6 +223,21 @@ private fun Root() {
         if (downloading != null) {
             DownloadBar(downloading.pct)
         }
+        // 启动时自动更新下载失败：给一行可重试的提示，不弹窗打断
+        val upFailed = upState as? UpdateCenter.State.Failed
+        if (upFailed != null && Store.netAllowed) {
+            UpdateFailBar(
+                message = upFailed.message,
+                onRetry = {
+                    backScope.launch {
+                        withContext(Dispatchers.IO) {
+                            UpdateCenter.retry(ctx, BuildConfig.APP_VERSION)
+                        }
+                    }
+                },
+                onDismiss = { UpdateCenter.dismiss() }
+            )
+        }
 
         // 基础模式：不同意隐私政策时进入，联网全部关闭，这里给一条恢复入口
         if (basicMode) {
@@ -294,8 +309,12 @@ private fun Root() {
             currentVersion = BuildConfig.APP_VERSION,
             onInstall = {
                 val err = UpdateCenter.install(ctx)
-                if (err != null) android.widget.Toast.makeText(ctx, err, android.widget.Toast.LENGTH_LONG).show()
-                UpdateCenter.dismiss()
+                if (err != null) {
+                    // 校验不过/安装器唤不起来：留在 Failed 态，顶部条可以重试下载
+                    android.widget.Toast.makeText(ctx, err, android.widget.Toast.LENGTH_LONG).show()
+                } else {
+                    UpdateCenter.dismiss()
+                }
             },
             onLater = { UpdateCenter.dismiss() }
         )

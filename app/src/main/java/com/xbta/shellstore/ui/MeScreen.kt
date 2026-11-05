@@ -70,6 +70,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
     var updateMsg by remember { mutableStateOf("") }
     var progress by remember { mutableIntStateOf(-1) }
     var downloaded by remember { mutableStateOf(false) }
+    var dlError by remember { mutableStateOf("") }
     var updateSub by remember { mutableStateOf("v${BuildConfig.VERSION_NAME}") }
 
     Column(Modifier.fillMaxSize()) {
@@ -154,6 +155,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                         updateMsg = "正在检查…"
                         latest = null
                         downloaded = false
+                        dlError = ""
                         scope.launch {
                             val r = withContext(Dispatchers.IO) { Updater.checkLatest() }
                             checking = false
@@ -165,6 +167,12 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                                 latest = info
                                 updateMsg = ""
                                 updateSub = "发现 v${info.version}"
+                                // 之前下好的包要当场验一遍，坏了就当作没下过
+                                val local = withContext(Dispatchers.IO) {
+                                    Updater.localCheck(ctx, info.version)
+                                }
+                                downloaded = local == null
+                                if (!downloaded && local != "尚未下载") dlError = local.orEmpty()
                             } else {
                                 updateMsg = "已是最新版本（v${info.version}）"
                                 updateSub = "已是最新"
@@ -215,14 +223,34 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(Modifier.height(6.dp))
-                            Text(
-                                "下载后交由系统安装器处理，需允许「安装未知应用」。",
-                                fontSize = TypeScale.small,
-                                lineHeight = 17.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (dlError.isNotBlank()) {
+                                Text(
+                                    "上次下载没通过校验：$dlError",
+                                    fontSize = TypeScale.small,
+                                    lineHeight = 17.sp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "点「重新下载」会清掉缓存、换线路重新拉一遍。",
+                                    fontSize = TypeScale.small,
+                                    lineHeight = 17.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Text(
+                                    "下载后交由系统安装器处理，需允许「安装未知应用」。",
+                                    fontSize = TypeScale.small,
+                                    lineHeight = 17.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                        downloaded -> Text("安装包已就绪", fontSize = 12.sp)
+                        downloaded -> Text(
+                            "安装包已就绪（已校验结构与签名）",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     if (progress >= 0) {
                         Spacer(Modifier.height(10.dp))
@@ -242,8 +270,12 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                                 showUpdate = false
                             } else {
                                 progress = 0
+                                val hadError = dlError.isNotBlank()
+                                dlError = ""
+                                updateMsg = ""
                                 scope.launch {
                                     val err = withContext(Dispatchers.IO) {
+                                        if (hadError) Updater.clearCache(ctx, l.version)
                                         Updater.download(ctx, l) { p -> progress = p }
                                     }
                                     progress = -1
@@ -251,13 +283,20 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                                         downloaded = true
                                         updateSub = "待安装 v${l.version}"
                                     } else {
-                                        updateMsg = err
+                                        dlError = err
+                                        updateSub = "下载失败"
                                     }
                                 }
                             }
                         }
                     ) {
-                        Text(if (downloaded) "立即安装" else "下载（v${latest!!.version}）")
+                        Text(
+                            when {
+                                downloaded -> "立即安装"
+                                dlError.isNotBlank() -> "重新下载"
+                                else -> "下载（v${latest!!.version}）"
+                            }
+                        )
                     }
                 } else {
                     TextButton(onClick = { showUpdate = false }) { Text("关闭") }
