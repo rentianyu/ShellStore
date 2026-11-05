@@ -76,6 +76,8 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     var exporting by remember { mutableStateOf(false) }
     var exportResult by remember { mutableStateOf<ApkExporter.Result?>(null) }
     var exportError by remember { mutableStateOf<String?>(null) }
+    // 导出表单（名称/包名/图标/类型/内容/身份）
+    var showExportForm by remember { mutableStateOf(false) }
 
     // 放在函数顶层而不是底部操作栏的 lambda 里：导出对话框在顶层，作用域要够得着
     fun toast(msg: String) = Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
@@ -395,7 +397,22 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
 
         fun rootRun() = runVia("root")
 
-        fun exportApk() {
+        /** 条目类型 → 导出默认动作类型 */
+        fun exportType(): String = when (entry.type) {
+            EntryType.SHELL, EntryType.SCRIPT -> ExportSpec.TYPE_SHELL
+            EntryType.URLSCHEME -> ExportSpec.TYPE_URL
+            EntryType.ACTIVITY, EntryType.INTENT -> ExportSpec.TYPE_ACTIVITY
+            EntryType.BROADCAST -> ExportSpec.TYPE_BROADCAST
+            EntryType.SERVICE -> ExportSpec.TYPE_SERVICE
+        }
+
+        /** 条目正文 → 导出默认内容 */
+        fun exportValue(): String = when (entry.type) {
+            EntryType.SHELL, EntryType.SCRIPT, EntryType.URLSCHEME -> text
+            else -> entry.intent?.data ?: entry.adb
+        }
+
+        fun exportApk(spec: ExportSpec) {
             if (exporting) return
             exporting = true
             exportResult = null
@@ -403,7 +420,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
             scope.launch {
                 val r = runCatching {
                     withContext(Dispatchers.IO) {
-                        ApkExporter.export(ctx, entry.title, text) { }
+                        ApkExporter.export(ctx, spec) { }
                     }
                 }
                 exporting = false
@@ -563,11 +580,27 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                     tint = if (shizukuReady) primary else null
                 )
                 ActionChip(glyph = "⚿", label = "Root", onClick = { rootRun() })
-                ActionChip(glyph = "⇩", label = "导出APK", onClick = { exportApk() }, enabled = !exporting)
+                ActionChip(glyph = "⇩", label = "导出APK", onClick = { showExportForm = true }, enabled = !exporting)
                 ActionChip(glyph = "⌂", label = "桌面", onClick = { pinHome() })
                 ActionChip(glyph = "▣", label = "磁贴", onClick = { addTile() })
             }
         }
+    }
+
+    if (showExportForm) {
+        ExportApkDialog(
+            defaultTitle = entry.title,
+            defaultType = exportType(),
+            defaultValue = exportValue(),
+            defaultAction = entry.intent?.action.orEmpty(),
+            defaultComponent = entry.intent?.component.orEmpty(),
+            defaultExec = ExportSpec.EXEC_SHELL,
+            onDismiss = { showExportForm = false },
+            onConfirm = { spec ->
+                showExportForm = false
+                exportApk(spec)
+            }
+        )
     }
 
     if (exporting || exportResult != null || exportError != null) {

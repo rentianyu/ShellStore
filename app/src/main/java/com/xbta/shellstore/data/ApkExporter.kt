@@ -2,10 +2,17 @@ package com.xbta.shellstore.data
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import androidx.core.content.FileProvider
-import com.xbta.shellstore.core.ApkPatcher
-import com.xbta.shellstore.core.ZipCheck
 import com.android.apksig.ApkSigner
+import com.xbta.shellstore.core.ApkEntry
+import com.xbta.shellstore.core.ApkKit
+import com.xbta.shellstore.core.ArscEditor
+import com.xbta.shellstore.core.AxmlEditor
+import com.xbta.shellstore.core.ExportSpec
+import com.xbta.shellstore.core.PackageRules
+import com.xbta.shellstore.core.ZipCheck
+import org.json.JSONObject
 import java.io.File
 import java.security.KeyStore
 import java.security.PrivateKey
@@ -14,16 +21,16 @@ import java.security.cert.X509Certificate
 /**
  * 把一条命令导出成独立的 APK。
  *
- * 做法是「模板 + 现场改写」：
- *  1. CI 里先构建一个极简执行器（runner 模块）的**未签名** APK，放进主 App 的 assets
- *  2. 导出时把它复制出来，替换里面的 assets/cmd.txt（命令）与 title.txt（标题）
- *  3. 同时改包名，避免多个导出 APK 互相覆盖安装
- *  4. 用内置的「导出专用」密钥重新签名（不是发布密钥），写到 cache 供安装/分享
+ * 做法是「CI 预构建模板 + 运行时改造」，改造点：
+ *  1. **改名/改包名**：重建 AndroidManifest 的字符串池（变长替换，支持任意长度）
+ *  2. **改包名（资源表）**：resources.arsc 的 package chunk 是 128 个 UTF-16 定长区，
+ *     直接写入 + 余下清零，同样支持任意长度
+ *  3. **换图标**：替换各密度 `res/mipmap-<density>-v4/ic_launcher.png`
+ *  4. **写配置**：`assets/config.json` 存动作类型 / 内容 / 执行身份
+ *  5. **重签名**：内置「导出专用」keystore（不是发布密钥），签 v1/v2/v3
  *
- * 包名为什么能直接改：模板包名 `com.xbta.cmd.a0000000` 与导出包名 `com.xbta.cmd.a<7位hex>`
- * **长度相同**（都是 21 个 ASCII 字符，生成时由模板长度反推），所以 resources.arsc 的 package chunk 与
- * AndroidManifest.xml 的字符串池都可以原地等长覆盖，不用重建字符串池——这是整套里最容易出错的一步，
- * 等长替换把风险降到最低。
+ * 全部算法在 `core/` 里（ApkKit / AxmlEditor / ArscEditor / ExportSpec），不依赖 android，
+ * 所以能拿真实模板在桌面上跑同一份代码做验证。
  */
 object ApkExporter {
 
@@ -31,27 +38,43 @@ object ApkExporter {
     private const val KEYSTORE_PASS = "shellstore-export"
     private const val KEY_ALIAS = "shellstore-export"
 
+    /** 模板里预埋的三个标记，导出时按字符串池替换 */
+    private const val TPL_PKG = "com.xbta.cmd.tpl"
+    private const val TPL_LABEL = "SSTPL_LABEL_PLACEHOLDER_000000"
+    private const val TPL_AUTH = "com.xbta.cmd.tpl.shizuku"
+
     data class Result(val file: File, val pkg: String)
 
-    /** 包名长度由模板反推（见 ApkPatcher.newPackage），这里不再手写长度 */
-    fun newPackageName(): String = ApkPatcher.newPackage()
+    /** 自动生成包名（表单留空时用） */
+    fun autoPackage(): String = PackageRules.auto()
+
+    /** 返回 null 表示合法 */
+    fun validatePackage(pkg: String): String? = PackageRules.validate(pkg)
 
     /**
      * 阻塞调用，务必放在 IO 线程。
      * @param onStep 进度文案回调（会从子线程调用）
      */
-    fun export(ctx: Context, title: String, cmd: String, onStep: (String) -> Unit): Result =
-        try {
-            doExport(ctx, title, cmd, onStep)
-        } catch (t: Throwable) {
-            // 导出失败很少见，但真机上只看一句 message 定位不了，整段堆栈留进崩溃日志
-            CrashLog.record(ctx, "export-apk", t)
-            throw t
+    fun export(
+        ctx: Context,
+        spec: ExportSpec,
+        onStep: (String) -> Unit
+    ): Result = try {
+        doExport(ctx, spec, onStep)
+    } catch (t: Throwable) {
+        CrashLog.record(ctx, "export-apk", t)
+        throw t
+    }
+
+    private fun doExport(ctx: Context, spec: ExportSpec, onStep: (String) -> Unit): Result {
+        val title = spec.title.trim().ifBlank { "Shell 命令" }.take(48)
+        val pkg = spec.packageName.trim().ifBlank { autoPackage() }
+        PackageRules.validate(pkg)?.let { error("包名校验未通过：$it") }
+        if (spec.value.trim().isEmpty() && spec.type == ExportSpec.TYPE_SHELL) {
+            error("命令内容为空")
         }
 
-    private fun doExport(ctx: Context, title: String, cmd: String, onStep: (String) -> Unit): Result {
         val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }
-        // 清掉上一次的导出，避免缓存目录堆积
         dir.listFiles()?.forEach { runCatching { it.delete() } }
 
         onStep("读取模板")
@@ -60,31 +83,137 @@ object ApkExporter {
             raw.outputStream().use { out -> input.copyTo(out) }
         }
 
-        val pkg = newPackageName()
-        onStep("改写包名与命令")
-        val patched = File(dir, "patched.apk")
-        rewriteApk(raw, patched, pkg, title, cmd)
+        onStep("生成图标")
+        val photo = spec.iconPng?.let {
+            runCatching {
+                BitmapFactory.decodeByteArray(it, 0, it.size)
+            }.getOrNull()
+        }
+        val icons = IconMaker.allSizes(spec.iconText, spec.type, photo)
+
+        onStep("改写包名与内容")
+        val entries = ApkKit.read(raw)
+        val cfg = buildConfigJson(spec, title).toByteArray(Charsets.UTF_8)
+        val rebuilt = ArrayList<ApkEntry>(entries.size)
+
+        var manifestHits = 0
+        for (e in entries) {
+            val name = e.name
+            when {
+                name == "AndroidManifest.xml" -> {
+                    val before = AxmlEditor.readStrings(e.data)
+                    val edited = AxmlEditor.replaceStrings(
+                        e.data,
+                        mapOf(TPL_PKG to pkg, TPL_LABEL to title, TPL_AUTH to "$pkg.shizuku")
+                    )
+                    val after = AxmlEditor.readStrings(edited)
+                    manifestHits = countHits(before, after)
+                    rebuilt.add(ApkEntry(name, 8, edited))
+                }
+
+                name == "resources.arsc" -> rebuilt.add(
+                    ApkEntry(name, 0, ArscEditor.setPackage(e.data, pkg))
+                )
+
+                name == "assets/config.json" -> rebuilt.add(ApkEntry(name, 8, cfg))
+
+                isSignatureFile(name) -> Unit          // 模板自带的 v1 签名丢掉，后面统一重签
+                name.startsWith("res/mipmap-anydpi") -> Unit  // 自适应图标 XML 会遮住 PNG，删掉
+
+                isLauncherPng(name) -> {
+                    val px = densityOf(name)
+                    val png = if (px != null) icons[px] else icons[192]
+                    if (png != null) rebuilt.add(ApkEntry(name, 0, png)) else rebuilt.add(e)
+                }
+
+                else -> rebuilt.add(e)
+            }
+        }
+        if (manifestHits < 2) {
+            error("模板 manifest 改写失败（只命中 $manifestHits 处），模板结构可能变了")
+        }
+
+        onStep("打包")
+        val unsigned = File(dir, "unsigned.apk")
+        ApkKit.write(rebuilt, unsigned)
 
         onStep("签名")
         val finalFile = File(dir, "ShellStore-${pkg.substringAfterLast('.')}.apk")
-        sign(ctx, patched, finalFile)
-
-        // 产物自检：签名会重写 zip，结构坏了也要当场发现，而不是让用户装的时候才报错
-        ZipCheck.verify(finalFile, minSize = 1024L)?.let { why ->
-            runCatching { finalFile.delete() }
-            error("导出的安装包自检未通过：$why")
-        }
-
+        sign(ctx, unsigned, finalFile)
         raw.delete()
-        patched.delete()
+        unsigned.delete()
+
+        onStep("校验")
+        verifyResult(finalFile, pkg, title, spec)
+
         onStep("完成")
         return Result(finalFile, pkg)
     }
 
-    // ---------------- zip 与包名改写（算法在 core/ApkPatcher，纯 Kotlin 可桌面验证） ----------------
+    /** 读回产物做三道校验：zip 结构、manifest 包名/名称、arsc 包名 */
+    private fun verifyResult(file: File, pkg: String, title: String, spec: ExportSpec) {
+        ZipCheck.verify(file, minSize = 1024L)?.let { error("产物自检未通过：$it") }
 
-    private fun rewriteApk(input: File, output: File, pkg: String, title: String, cmd: String) {
-        ApkPatcher.rewrite(input, output, pkg, cmd, title)
+        val manifest = ApkKit.entry(file, "AndroidManifest.xml")
+            ?: error("产物里找不到 AndroidManifest.xml")
+        val strings = AxmlEditor.readStrings(manifest)
+        if (!strings.contains(pkg)) error("产物 manifest 里没有新包名 $pkg，改写失败")
+        if (!strings.contains(title)) error("产物里没有应用名「$title」，名称替换失败")
+        if (strings.any { it == TPL_LABEL || it == TPL_PKG || it == TPL_AUTH }) {
+            error("产物里还残留模板占位符")
+        }
+
+        ApkKit.entry(file, "resources.arsc")?.let { arsc ->
+            val arscPkg = ArscEditor.readPackage(arsc)
+            if (arscPkg.isNotEmpty() && arscPkg != pkg) {
+                error("resources.arsc 里的包名没改成功：$arscPkg")
+            }
+        }
+        val cfg = ApkKit.entry(file, "assets/config.json")?.toString(Charsets.UTF_8)
+            ?: error("产物里找不到 assets/config.json")
+        if (!cfg.contains(spec.type)) error("配置文件写入异常")
+    }
+
+    private fun buildConfigJson(spec: ExportSpec, title: String): String {
+        val o = JSONObject()
+        o.put("title", title)
+        o.put("type", spec.type)
+        o.put("value", spec.value.trim())
+        if (spec.action.isNotBlank()) o.put("action", spec.action.trim())
+        if (spec.component.isNotBlank()) o.put("component", spec.component.trim())
+        if (spec.extras.isNotBlank()) o.put("extras", spec.extras)
+        o.put("exec", spec.exec)
+        o.put("showOutput", spec.showOutput)
+        o.put("timeoutSec", spec.timeoutSec.coerceIn(1, 600))
+        return o.toString(2)
+    }
+
+    private fun countHits(before: List<String>, after: List<String>): Int {
+        var n = 0
+        for (i in before.indices) {
+            if (i < after.size && before[i] != after[i]) n++
+        }
+        return n
+    }
+
+    private fun isSignatureFile(name: String): Boolean {
+        if (!name.startsWith("META-INF/")) return false
+        val lower = name.lowercase()
+        return lower.endsWith(".rsa") || lower.endsWith(".dsa") ||
+            lower.endsWith(".ec") || lower.endsWith(".sf") || lower.endsWith(".mf")
+    }
+
+    /** 模板的启动图标 PNG（mipmap 下、非 .9、非 anydpi 的 png） */
+    private fun isLauncherPng(name: String): Boolean =
+        name.startsWith("res/mipmap") && name.endsWith(".png") && !name.contains("anydpi")
+
+    private fun densityOf(name: String): Int? = when {
+        name.contains("mipmap-mdpi") -> 48
+        name.contains("mipmap-hdpi") -> 72
+        name.contains("mipmap-xhdpi") && !name.contains("xxhdpi") -> 96
+        name.contains("mipmap-xxhdpi") -> 144
+        name.contains("mipmap-xxxhdpi") -> 192
+        else -> null
     }
 
     // ---------------- 签名 ----------------
@@ -92,10 +221,9 @@ object ApkExporter {
     private fun sign(ctx: Context, input: File, output: File) {
         val ks = KeyStore.getInstance("PKCS12")
         ctx.assets.open(KEYSTORE_ASSET).use { ks.load(it, KEYSTORE_PASS.toCharArray()) }
-        val alias = ks.aliases().nextElement()
+        val alias = if (ks.containsAlias(KEY_ALIAS)) KEY_ALIAS else ks.aliases().nextElement()
         val key = ks.getKey(alias, KEYSTORE_PASS.toCharArray()) as PrivateKey
         val cert = ks.getCertificate(alias) as X509Certificate
-
         val signer = ApkSigner.SignerConfig.Builder(alias, key, listOf(cert)).build()
         ApkSigner.Builder(listOf(signer))
             .setInputApk(input)
@@ -112,21 +240,19 @@ object ApkExporter {
 
     fun installIntent(ctx: Context, file: File): Intent {
         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
-        val i = Intent(Intent.ACTION_VIEW).apply {
+        return Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        return i
     }
 
     fun shareIntent(ctx: Context, file: File, title: String): Intent {
         val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
-        val i = Intent(Intent.ACTION_SEND).apply {
+        return Intent(Intent.ACTION_SEND).apply {
             type = "application/vnd.android.package-archive"
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, title)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        return Intent.createChooser(i, "分享 APK").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }

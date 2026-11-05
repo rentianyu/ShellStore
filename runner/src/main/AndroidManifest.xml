@@ -1,18 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 模板 App：只有一个界面，执行 assets/cmd.txt 里的命令并把输出显示出来。
-         导出时主 App 会替换 cmd.txt、改包名、重新签名，所以这里不写任何逻辑相关的配置。 -->
+    <!-- 模板 App：读 assets/config.json → 按类型执行 → 显示结果。
+         导出时主 App 会替换 config.json、改包名与名称、换图标、重新签名，
+         所以这里除了「必须随包名一起变」的 authorities，不写任何业务相关配置。 -->
     <application
         android:allowBackup="false"
-        android:icon="@android:drawable/sym_def_app_icon"
-        android:label="Shell 命令"
+        android:icon="@mipmap/ic_launcher"
+        android:label="SSTPL_LABEL_PLACEHOLDER_000000"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.Light">
 
+        <!-- Shizuku：authorities 里的包名会在导出时随包名一起替换，
+             否则多个导出 APK 会因同名 provider 冲突而装不上 -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="com.xbta.cmd.tpl.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
         <activity
-            android:name=".RunActivity"
-            android:exported="true">
+            android:name="com.xbta.cmd.runner.RunActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

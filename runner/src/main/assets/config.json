@@ -1,0 +1,8 @@
+{
+  "title": "Shell 命令",
+  "type": "shell",
+  "value": "getprop ro.product.model",
+  "exec": "shell",
+  "showOutput": true,
+  "timeoutSec": 30
+}
