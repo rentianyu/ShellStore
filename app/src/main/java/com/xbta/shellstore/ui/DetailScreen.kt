@@ -78,6 +78,9 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     var exportError by remember { mutableStateOf<String?>(null) }
     // 导出表单（名称/包名/图标/类型/内容/身份）
     var showExportForm by remember { mutableStateOf(false) }
+    // 导出后自动保存到用户选的目录：成功给路径，失败给原因
+    var exportSavedTo by remember { mutableStateOf<String?>(null) }
+    var exportSaveErr by remember { mutableStateOf<String?>(null) }
 
     // 放在函数顶层而不是底部操作栏的 lambda 里：导出对话框在顶层，作用域要够得着
     fun toast(msg: String) = Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
@@ -107,15 +110,33 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         exporting = true
         exportResult = null
         exportError = null
+        exportSavedTo = null
+        exportSaveErr = null
+        // 目录要在开始前读好：导出过程中用户可能还在改设置
+        val saveDir = settings.exportDirUri
         scope.launch {
             val r = runCatching {
                 withContext(Dispatchers.IO) {
                     ApkExporter.export(ctx, spec) { }
                 }
             }
-            exporting = false
-            r.onSuccess { exportResult = it }
-                .onFailure { exportError = it.message ?: it.javaClass.simpleName }
+            r.onSuccess { res ->
+                exportResult = res
+                exporting = false
+                if (saveDir.isNotBlank()) {
+                    // 缓存那份用于安装/分享，这里再存一份到用户选的目录留档
+                    val saved = withContext(Dispatchers.IO) {
+                        runCatching {
+                            ApkExporter.saveToFolder(ctx, res.file, saveDir, spec.title)
+                        }.getOrNull()
+                    }
+                    if (saved != null) exportSavedTo = saved
+                    else exportSaveErr = "没有写入权限，或目录已被删除"
+                }
+            }.onFailure {
+                exporting = false
+                exportError = it.message ?: it.javaClass.simpleName
+            }
         }
     }
 
@@ -606,7 +627,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     if (exporting || exportResult != null || exportError != null) {
         AlertDialog(
             onDismissRequest = {
-                if (!exporting) { exportResult = null; exportError = null }
+                if (!exporting) {
+                    exportResult = null; exportError = null
+                    exportSavedTo = null; exportSaveErr = null
+                }
             },
             title = {
                 Text(
@@ -631,13 +655,33 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                     )
                     else -> {
                         val res = exportResult!!
-                        Text(
-                            "已生成 ${res.file.name}\n包名 ${res.pkg}\n\n" +
-                                "装上就能用：点开图标直接执行这条命令，不需要 Shell 商店在后台。\n\n" +
-                                "应用名固定显示为「Shell 命令」——模板里的名称资源没法等长替换，" +
-                                "所以多条命令请靠包名区分；签名用的是导出专用密钥，和商店本体无关。",
-                            fontSize = TypeScale.small
-                        )
+                        Column {
+                            Text(
+                                "已生成 ${res.file.name}\n包名 ${res.pkg}",
+                                fontSize = TypeScale.small
+                            )
+                            if (exportSavedTo != null) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    "已保存到：\n$exportSavedTo",
+                                    fontSize = TypeScale.small,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            if (exportSaveErr != null) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    "保存到目录失败：$exportSaveErr\n缓存里那份仍可安装或分享。",
+                                    fontSize = TypeScale.small,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "装上就能用：点开图标直接执行，不需要 Shell 商店在后台。",
+                                fontSize = TypeScale.small
+                            )
+                        }
                     }
                 }
             },

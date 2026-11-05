@@ -83,7 +83,9 @@ data class AppSettings(
     /** 「小贝塔订阅源」总开关。关闭时系列源保留配置但不参与解析 */
     val xbtaSeries: Boolean = false,
     /** 已同意的协议版本，0 = 未同意。低于 LegalText.LEGAL_VERSION 时重新征得同意 */
-    val agreedVersion: Int = 0
+    val agreedVersion: Int = 0,
+    /** 导出 APK 的保存目录（SAF tree uri），空串 = 只留在应用缓存里供安装/分享 */
+    val exportDirUri: String = ""
 ) {
     /** 实际生效的字号倍率（只放大 sp） */
     val fontScale: Float get() = FONT_SCALES[fontLevel.coerceIn(0, FONT_SCALES.lastIndex)]
@@ -118,6 +120,7 @@ data class AppSettings(
         put("sourceMirror", sourceMirror)
         put("xbtaSeries", xbtaSeries)
         put("agreedVersion", agreedVersion)
+        put("exportDirUri", exportDirUri)
     }
 
     companion object {
@@ -153,7 +156,8 @@ data class AppSettings(
                 onboarded = o.optBoolean("onboarded", false),
                 sourceMirror = o.optString("sourceMirror", ""),
                 xbtaSeries = o.optBoolean("xbtaSeries", false),
-                agreedVersion = o.optInt("agreedVersion", 0)
+                agreedVersion = o.optInt("agreedVersion", 0),
+                exportDirUri = o.optString("exportDirUri", "")
             )
         }
     }

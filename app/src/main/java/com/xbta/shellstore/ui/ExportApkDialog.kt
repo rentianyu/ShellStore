@@ -1,5 +1,6 @@
 package com.xbta.shellstore.ui
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +33,7 @@ import com.xbta.shellstore.core.ExportSpec
 import com.xbta.shellstore.core.PackageRules
 import com.xbta.shellstore.data.ApkExporter
 import com.xbta.shellstore.data.IconMaker
+import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Radius
 import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.TypeScale
@@ -81,6 +83,21 @@ fun ExportApkDialog(
                 BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
             }
         }.getOrNull()
+    }
+
+    // 导出后自动保存的目录（SAF），设过就记住，下次默认用
+    val settings by Store.settings.collectAsState()
+    val dirUri = settings.exportDirUri
+    val dirPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        // 不申请持久化权限的话，重启 App 后这个目录就用不了了
+        runCatching {
+            ctx.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        }
+        Store.updateSettings(Store.settings.value.copy(exportDirUri = uri.toString()))
     }
 
     val pkgError = PackageRules.validate(pkg)
@@ -304,6 +321,33 @@ fun ExportApkDialog(
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.outline
                 )
+
+                // 保存位置
+                Spacer(Modifier.height(10.dp))
+                Text("保存位置", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if (dirUri.isBlank()) "仅应用缓存（安装 / 分享时取出）"
+                            else ApkExporter.folderLabel(dirUri),
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            if (dirUri.isBlank()) "选一个目录，导出后自动留一份到那里"
+                            else "导出后自动存一份到这里，文件名带时间",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                    TextButton(onClick = { dirPicker.launch(null) }) {
+                        Text(if (dirUri.isBlank()) "选择" else "更改", fontSize = 11.sp)
+                    }
+                    if (dirUri.isNotBlank()) {
+                        TextButton(onClick = {
+                            Store.updateSettings(Store.settings.value.copy(exportDirUri = ""))
+                        }) { Text("清除", fontSize = 11.sp) }
+                    }
+                }
 
                 // 高级
                 Spacer(Modifier.height(8.dp))

@@ -1035,7 +1035,8 @@ object Store {
         o.put("app", "ShellStore")
         o.put("exportedAt", System.currentTimeMillis())
         o.put("favorites", Repo.favToJson(_favs.value))
-        o.put("settings", _settings.value.toJson())
+        // 导出目录是本机的 SAF 授权，换设备/重装后无效，不进备份
+        o.put("settings", _settings.value.toJson().apply { remove("exportDirUri") })
         o.put("sources", org.json.JSONArray().apply {
             _sources.value.forEach { put(it.toJson()) }
         })

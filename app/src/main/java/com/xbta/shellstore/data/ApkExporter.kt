@@ -3,6 +3,8 @@ package com.xbta.shellstore.data
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.core.content.FileProvider
 import com.android.apksig.ApkSigner
 import com.xbta.shellstore.core.ApkEntry
@@ -234,6 +236,56 @@ object ApkExporter {
             .setMinSdkVersion(26)
             .build()
             .sign()
+    }
+
+    // ---------------- 保存到用户选的目录（SAF） ----------------
+
+    /**
+     * 把导出好的 APK 复制一份到用户选的目录（SAF tree uri）。
+     * 文件名带时间戳，避免覆盖同名的旧版本。成功返回给人看的路径，失败返回 null。
+     *
+     * 注意：发给系统安装器的仍然是缓存里那一份（FileProvider），
+     * 这里保存的是「留档」副本 —— 有些 ROM 的安装器不认 SAF 的 content:// 地址。
+     */
+    fun saveToFolder(ctx: Context, file: File, treeUri: String, baseName: String): String? {
+        if (treeUri.isBlank()) return null
+        return runCatching {
+            val tree = Uri.parse(treeUri)
+            val parent = DocumentsContract.buildDocumentUriUsingTree(
+                tree, DocumentsContract.getTreeDocumentId(tree)
+            )
+            val name = safeName(baseName) + "-" + stamp() + ".apk"
+            val doc = DocumentsContract.createDocument(
+                ctx.contentResolver, parent, "application/vnd.android.package-archive", name
+            ) ?: return null
+            ctx.contentResolver.openOutputStream(doc)?.use { out ->
+                file.inputStream().use { it.copyTo(out) }
+            } ?: return null
+            folderLabel(treeUri) + "/" + name
+        }.getOrNull()
+    }
+
+    /** SAF 目录的展示名：primary:Download/foo → 内部存储/Download/foo */
+    fun folderLabel(treeUri: String): String {
+        if (treeUri.isBlank()) return ""
+        return runCatching {
+            val id = DocumentsContract.getTreeDocumentId(Uri.parse(treeUri))
+            val p = id.split(":", limit = 2)
+            val root = if (p[0] == "primary") "内部存储" else p[0]
+            if (p.size > 1 && p[1].isNotBlank()) "$root/${p[1].trim('/')}" else root
+        }.getOrDefault("")
+    }
+
+    private fun safeName(s: String): String {
+        val cleaned = s.trim().replace(Regex("[\\\\/:*?\"<>|\\s]+"), "_").trim('_')
+        return cleaned.ifBlank { "shellstore" }.take(40)
+    }
+
+    private fun stamp(): String {
+        val tz = java.util.TimeZone.getTimeZone("Asia/Shanghai")
+        val f = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.CHINA)
+        f.timeZone = tz
+        return f.format(java.util.Date())
     }
 
     // ---------------- 安装 / 分享 ----------------

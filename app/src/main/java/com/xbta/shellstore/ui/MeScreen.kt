@@ -186,18 +186,6 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                 SettingRow("ⓘ", "关于", "版本 · 更新日志 · 许可", onClick = { onOpen(Page.About) })
             }
 
-            GroupTitle("即将支持")
-            GroupCard {
-                SettingRow("▶", "执行通道", "Shizuku / Termux", enabled = false)
-            }
-
-            Spacer(Modifier.height(Space.md))
-            Text(
-                "首版仅支持复制到剪贴板，不申请任何执行权限。\nShizuku / Termux 执行通道在后续版本提供。",
-                fontSize = TypeScale.caption,
-                lineHeight = 17.sp,
-                color = MaterialTheme.colorScheme.outline
-            )
         }
     }
 
