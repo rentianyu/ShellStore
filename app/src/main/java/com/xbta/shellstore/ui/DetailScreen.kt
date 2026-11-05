@@ -374,19 +374,37 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 item { CodeBlock(entry.origin, fontSize = 11) }
             }
 
-            item { SectionLabel("来源") }
             item {
                 val src = Store.sourceOf(entry.sourceId)
                 val meta = src?.name ?: "内置命令集"
                 val ver = Store.sourceVersion.collectAsState().value
-                Text(
-                    "来源　$meta" + (if (ver.isNotBlank() && src?.type == com.xbta.shellstore.core.SourceType.BUILTIN) " · v$ver" else "") + "\n" +
-                        "条目　${entry.id}" +
-                        (if (entry.verifiedAt.isNotBlank()) "\n验证　${entry.verifiedAt}" else ""),
-                    fontSize = TypeScale.caption,
-                    lineHeight = 17.sp,
-                    color = MaterialTheme.colorScheme.outline
-                )
+                // 只有这一行：来源 + 条目号，条目号点一下复制。不再有「条目」「验证」等下文
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "来源　$meta" + (if (ver.isNotBlank() && src?.type == com.xbta.shellstore.core.SourceType.BUILTIN) " · v$ver" else ""),
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        entry.id,
+                        fontSize = TypeScale.caption,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(Radius.sm))
+                            .clickable {
+                                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                cm.setPrimaryClip(ClipData.newPlainText("条目", entry.id))
+                                Toast.makeText(ctx, "已复制　${entry.id}", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
             }
         }
 
