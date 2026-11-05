@@ -185,7 +185,12 @@ object ApkExporter {
         if (spec.component.isNotBlank()) o.put("component", spec.component.trim())
         if (spec.data.isNotBlank()) o.put("data", spec.data.trim())
         if (spec.extras.isNotBlank()) o.put("extras", spec.extras)
-        o.put("exec", spec.exec)
+        // shell 类型必须有身份；其余类型空串表示「直接调 Intent，不经过 shell」
+        o.put(
+            "exec",
+            if (spec.type == ExportSpec.TYPE_SHELL) spec.exec.ifBlank { ExportSpec.EXEC_SHELL }
+            else spec.exec.trim()
+        )
         o.put("showOutput", spec.showOutput)
         o.put("timeoutSec", spec.timeoutSec.coerceIn(1, 600))
         return o.toString(2)

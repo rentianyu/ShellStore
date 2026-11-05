@@ -115,6 +115,8 @@ fun ExportApkDialog(
         component = n.component
         data = n.data
         extras = n.extras
+        // 执行身份只对 shell 类型必需；切到其它类型时清空 = 默认不勾选（直接调 Intent）
+        exec = if (t == ExportSpec.TYPE_SHELL) exec.ifBlank { ExportSpec.EXEC_SHELL } else ""
         type = t
     }
 
@@ -327,26 +329,41 @@ fun ExportApkDialog(
                     }
                 }
 
-                // 执行身份
+                // 执行身份：shell 类型必须选；其余类型是「可选开关」，不选就直接调 Intent
+                val isShellType = type == ExportSpec.TYPE_SHELL
                 Spacer(Modifier.height(10.dp))
-                Text("执行身份", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (isShellType) "执行身份" else "执行身份（可选）",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ExportSpec.EXECS.forEach { e ->
                         FilterChip(
                             selected = exec == e,
-                            onClick = { exec = e },
+                            onClick = {
+                                // 非 shell 类型再点一次就是取消
+                                exec = if (!isShellType && exec == e) "" else e
+                            },
                             label = { Text(ExportSpec.execLabel(e), fontSize = 11.sp) }
                         )
                     }
                 }
                 Text(
-                    when (exec) {
-                        ExportSpec.EXEC_ROOT -> "直接 su 执行，需要设备已 root 且授权"
-                        ExportSpec.EXEC_SHIZUKU -> "借 Shizuku 的 ADB 权限执行，第一次打开会请求授权"
-                        else -> "以本应用身份执行，不需要额外授权，权限和普通 App 一样"
+                    when {
+                        isShellType -> when (exec) {
+                            ExportSpec.EXEC_ROOT -> "直接 su 执行，需要设备已 root 且授权"
+                            ExportSpec.EXEC_SHIZUKU -> "借 Shizuku 的 ADB 权限执行，第一次打开会请求授权"
+                            else -> "以本应用身份执行，不需要额外授权，权限和普通 App 一样"
+                        }
+                        exec.isEmpty() -> "不勾选：点开直接调用系统接口，最稳、最快，没有任何中间层" +
+                            "（需要系统权限的操作可能被系统拒绝时，再回来勾一个身份）"
+                        else -> "勾选后改用 ${ExportSpec.execLabel(exec)} 执行等价的 am 命令" +
+                            "（有些系统限制直接调用，走 shell 反而能成）"
                     },
                     fontSize = 10.sp,
+                    lineHeight = 15.sp,
                     color = MaterialTheme.colorScheme.outline
                 )
 

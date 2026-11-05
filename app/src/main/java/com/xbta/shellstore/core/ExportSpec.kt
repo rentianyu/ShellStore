@@ -24,7 +24,10 @@ data class ExportSpec(
     val data: String = "",
     /** 可选，k=v 每行一个 */
     val extras: String = "",
-    /** shell / root / shizuku */
+    /**
+     * shell / root / shizuku；空串 = 不指定。
+     * shell 类型必须有身份；其余类型为空时直接走 Intent（不经过任何 shell）。
+     */
     val exec: String = EXEC_SHELL,
     val showOutput: Boolean = true,
     val timeoutSec: Int = 30,
@@ -60,6 +63,7 @@ data class ExportSpec(
             EXEC_SHELL -> "普通 shell"
             EXEC_ROOT -> "Root"
             EXEC_SHIZUKU -> "Shizuku"
+            "" -> "不指定"
             else -> e
         }
     }

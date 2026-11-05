@@ -631,7 +631,8 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
             defaultComponent = def.component,
             defaultData = def.data,
             defaultExtras = def.extras,
-            defaultExec = ExportSpec.EXEC_SHELL,
+            // shell 类型必须有身份；其余类型默认不勾选（直接调 Intent）
+            defaultExec = if (defType == ExportSpec.TYPE_SHELL) ExportSpec.EXEC_SHELL else "",
             onDismiss = { showExportForm = false },
             onConfirm = { spec ->
                 showExportForm = false
