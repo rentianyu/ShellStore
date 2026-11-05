@@ -87,6 +87,38 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     val text = remember(entry, values, variantIndex) {
         CommandRenderer.primaryText(entry, values, variantIndex)
     }
+    /** 条目类型 → 导出默认动作类型 */
+    fun exportType(): String = when (entry.type) {
+        EntryType.SHELL, EntryType.SCRIPT -> ExportSpec.TYPE_SHELL
+        EntryType.URLSCHEME -> ExportSpec.TYPE_URL
+        EntryType.ACTIVITY, EntryType.INTENT -> ExportSpec.TYPE_ACTIVITY
+        EntryType.BROADCAST -> ExportSpec.TYPE_BROADCAST
+        EntryType.SERVICE -> ExportSpec.TYPE_SERVICE
+    }
+
+    /** 条目正文 → 导出默认内容 */
+    fun exportValue(): String = when (entry.type) {
+        EntryType.SHELL, EntryType.SCRIPT, EntryType.URLSCHEME -> text
+        else -> entry.intent?.data ?: entry.adb
+    }
+
+    fun exportApk(spec: ExportSpec) {
+        if (exporting) return
+        exporting = true
+        exportResult = null
+        exportError = null
+        scope.launch {
+            val r = runCatching {
+                withContext(Dispatchers.IO) {
+                    ApkExporter.export(ctx, spec) { }
+                }
+            }
+            exporting = false
+            r.onSuccess { exportResult = it }
+                .onFailure { exportError = it.message ?: it.javaClass.simpleName }
+        }
+    }
+
     val fav = favs.isFav(entry.id)
 
     fun copy(silent: Boolean = false) {
@@ -396,38 +428,6 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         }
 
         fun rootRun() = runVia("root")
-
-        /** 条目类型 → 导出默认动作类型 */
-        fun exportType(): String = when (entry.type) {
-            EntryType.SHELL, EntryType.SCRIPT -> ExportSpec.TYPE_SHELL
-            EntryType.URLSCHEME -> ExportSpec.TYPE_URL
-            EntryType.ACTIVITY, EntryType.INTENT -> ExportSpec.TYPE_ACTIVITY
-            EntryType.BROADCAST -> ExportSpec.TYPE_BROADCAST
-            EntryType.SERVICE -> ExportSpec.TYPE_SERVICE
-        }
-
-        /** 条目正文 → 导出默认内容 */
-        fun exportValue(): String = when (entry.type) {
-            EntryType.SHELL, EntryType.SCRIPT, EntryType.URLSCHEME -> text
-            else -> entry.intent?.data ?: entry.adb
-        }
-
-        fun exportApk(spec: ExportSpec) {
-            if (exporting) return
-            exporting = true
-            exportResult = null
-            exportError = null
-            scope.launch {
-                val r = runCatching {
-                    withContext(Dispatchers.IO) {
-                        ApkExporter.export(ctx, spec) { }
-                    }
-                }
-                exporting = false
-                r.onSuccess { exportResult = it }
-                    .onFailure { exportError = it.message ?: it.javaClass.simpleName }
-            }
-        }
 
         fun pinHome() {
             val err = EntryShortcuts.pinToHome(ctx, entry.id, entry.title, text, values)
