@@ -624,7 +624,22 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("订阅源", onBack = onBack)
+        TopBar(
+            "订阅源",
+            onBack = onBack,
+            actions = {
+                // 进度放在工具栏右侧：不占正文高度，操作时不会把下面的内容顶来顶去
+                if (busy.isNotEmpty()) {
+                    Text(
+                        "${busy}中…",
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                }
+            }
+        )
         Column(
             Modifier
                 .fillMaxSize()
@@ -632,19 +647,6 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 .padding(horizontal = Space.page)
                 .padding(bottom = 20.dp)
         ) {
-            if (busy.isNotEmpty()) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Radius.sm))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("${busy}中…", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-                Spacer(Modifier.height(10.dp))
-            }
 
             // 订阅源的介绍与格式说明就放在这里，不另找地方
             Row(
@@ -776,14 +778,18 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                             if (i > 0) Divider()
                             val cfg = sources.firstOrNull { it.url.trim() == item.url.trim() }
                             val on = cfg?.enabled == true
+                            // 已在源列表里的直接切（纯本地，不联网），只有首次添加才需要联网拉取
+                            val applySeries: (Boolean) -> Unit = { v ->
+                                if (cfg != null) {
+                                    Store.toggleSeriesItem(item, v)
+                                } else {
+                                    runAsync("添加") { Store.toggleSeriesItem(item, v) }
+                                }
+                            }
                             Row(
                                 Modifier
                                     .fillMaxWidth()
-                                    .clickable {
-                                        runAsync(item.name) {
-                                            Store.toggleSeriesItem(item, !on)
-                                        }
-                                    }
+                                    .clickable { applySeries(!on) }
                                     .padding(horizontal = Space.md, vertical = Space.md),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -813,9 +819,7 @@ fun SourcesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                                     )
                                 }
                                 Spacer(Modifier.width(Space.sm))
-                                Toggle(on) { v ->
-                                    runAsync(item.name) { Store.toggleSeriesItem(item, v) }
-                                }
+                                Toggle(on) { v -> applySeries(v) }
                             }
                         }
                     }

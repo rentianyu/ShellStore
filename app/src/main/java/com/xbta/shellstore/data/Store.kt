@@ -3,7 +3,10 @@ package com.xbta.shellstore.data
 import android.content.Context
 import com.xbta.shellstore.core.*
 import com.xbta.shellstore.core.LegalText
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -53,6 +56,18 @@ object Store {
     private const val SEARCH_MAX = 10
 
     private var ctx: Context? = null
+
+    /**
+     * 后台重算用的常驻协程。开关类操作（启用/停用某个源）只改了配置，
+     * 重算条目要读所有源的缓存文件再解析，源多时要几百毫秒——
+     * 放在点击线程上做会让界面卡一下，看起来像「页面刷新了」。
+     * 这里改成后台跑：开关状态立刻反映，条目在算完后自动推给界面。
+     */
+    private val bg = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private fun reloadAsync() {
+        bg.launch { reloadAll() }
+    }
 
     private val _entries = MutableStateFlow<List<Entry>>(emptyList())
     val entries: StateFlow<List<Entry>> = _entries.asStateFlow()
@@ -330,7 +345,7 @@ object Store {
     fun setXbtaSeries(on: Boolean) {
         if (_settings.value.xbtaSeries == on) return
         updateSettings(_settings.value.copy(xbtaSeries = on))
-        reloadAll()
+        reloadAsync()
     }
 
     /**
@@ -497,7 +512,7 @@ object Store {
         val c = ctx ?: return
         _sources.value = _sources.value.map { if (it.id == id) it.copy(enabled = on) else it }
         Repo.saveSourceConfigs(c, _sources.value)
-        reloadAll()
+        reloadAsync()
     }
 
     /**
