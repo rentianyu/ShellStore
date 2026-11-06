@@ -326,7 +326,8 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             Box(
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 18.dp, bottom = 18.dp)
+                    // 稍微往里收：贴太近容易顶到屏幕边缘，也容易和列表最后一项的操作区抢位置
+                    .padding(end = 30.dp, bottom = 34.dp)
                     .size(52.dp)
                     .shadow(10.dp, CircleShape)
                     .clip(CircleShape)

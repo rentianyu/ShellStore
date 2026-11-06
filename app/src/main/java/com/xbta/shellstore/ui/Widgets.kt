@@ -341,15 +341,17 @@ fun EntryQuickAction(
                 -1
             ),
             onCopy = {
+                val text = listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n")
                 val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                     as android.content.ClipboardManager
-                cm.setPrimaryClip(
-                    android.content.ClipData.newPlainText(
-                        "输出",
-                        listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n")
-                    )
-                )
-                Toast.makeText(ctx, "输出已复制", Toast.LENGTH_SHORT).show()
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("输出", text))
+                val first = text.lineSequence().firstOrNull().orEmpty().trim()
+                    .let { if (it.length > 30) it.take(30) + "…" else it }
+                Toast.makeText(
+                    ctx,
+                    if (first.isEmpty()) "已复制输出" else "已复制输出　$first（共 ${text.length} 字）",
+                    Toast.LENGTH_SHORT
+                ).show()
             },
             onOpenTermux = { ShellExec.openTermux(ctx) },
             onDismiss = { execResult = null }

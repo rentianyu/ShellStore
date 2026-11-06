@@ -40,6 +40,36 @@ object CommandRenderer {
         return toAdb(entry, values)
     }
 
+    /**
+     * 条目「内容」本身（不带任何命令包装），供「复制内容」用：
+     *   shell / script / urlscheme → body（参数已填）
+     *   Intent 类                  → action / component / data / extras 逐行罗列
+     * 与 [primaryText] 的区别：后者对 Intent 类返回的是生成的 am 命令。
+     */
+    fun contentText(entry: Entry, values: Map<String, String>, variantIndex: Int = -1): String {
+        if (entry.type.hasBody) {
+            val raw = if (variantIndex >= 0 && variantIndex < entry.variants.size)
+                entry.variants[variantIndex].body else entry.body
+            return fill(raw, entry, values)
+        }
+        val spec = entry.intent ?: return ""
+        val sb = StringBuilder()
+        if (spec.action.isNotBlank()) {
+            sb.append("action: ").append(fill(spec.action, entry, values)).append('\n')
+        }
+        if (spec.component.isNotBlank()) sb.append("component: ").append(spec.component).append('\n')
+        if (spec.data.isNotBlank()) {
+            sb.append("data: ").append(fill(spec.data, entry, values)).append('\n')
+        }
+        if (spec.mime.isNotBlank()) sb.append("mime: ").append(spec.mime).append('\n')
+        spec.extras.forEach { e ->
+            sb.append(e.key).append(" = ")
+                .append(fill(e.value, entry, values))
+                .append(" (").append(e.type.name.lowercase()).append(")\n")
+        }
+        return sb.toString().trim()
+    }
+
     /** 生成等价 adb 命令；@adb 存在时优先使用它 */
     fun toAdb(entry: Entry, values: Map<String, String>): String {
         if (entry.adb.isNotBlank()) return ensureAction(fill(entry.adb, entry, values))

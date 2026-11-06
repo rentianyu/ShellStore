@@ -78,6 +78,8 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     var exportError by remember { mutableStateOf<String?>(null) }
     // 动作表单目标："" = 关闭；apk / shortcut / tile。三种出口共用同一个表单与 ExportSpec
     var actionMode by remember { mutableStateOf("") }
+    // 非命令类条目点「复制」时的选择框：复制内容 / 复制为 Shell 命令
+    var copyChooser by remember { mutableStateOf(false) }
     // 导出后自动保存到用户选的目录：成功给路径，失败给原因
     var exportSavedTo by remember { mutableStateOf<String?>(null) }
     var exportSaveErr by remember { mutableStateOf<String?>(null) }
@@ -181,11 +183,34 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
 
     val fav = favs.isFav(entry.id)
 
-    fun copy(silent: Boolean = false) {
-        val out = settings.copyPrefix.fn(text)
+    /**
+     * 复制。
+     * @param asShell true = 复制成等价的 Shell / adb 命令（带前缀）；false = 只复制内容本身
+     *                （scheme、原始写法、Intent 字段），不加任何前缀，贴到别处就能直接用
+     */
+    fun copy(asShell: Boolean) {
+        val raw = if (asShell) {
+            CommandRenderer.toAdb(entry, values).ifBlank { text }
+        } else {
+            CommandRenderer.contentText(entry, values, variantIndex).ifBlank { text }
+        }
+        // 只有「当命令用」的文本才加前缀（sudo / termux 之类），原始内容不加
+        val out = if (asShell) settings.copyPrefix.fn(raw) else raw
         val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("命令", out))
-        Toast.makeText(ctx, if (settings.copyPrefix == CopyPrefix.NONE) "已复制" else "已复制（含 ${settings.copyPrefix.label} 前缀）", Toast.LENGTH_SHORT).show()
+        cm.setPrimaryClip(ClipData.newPlainText(if (asShell) "命令" else "内容", out))
+        // Toast 把复制到的内容回显出来：一眼能确认复制的是什么
+        val first = out.lineSequence().firstOrNull().orEmpty().trim()
+        val preview = when {
+            first.isEmpty() -> ""
+            first.length > 42 -> first.take(42) + "…"
+            else -> first
+        }
+        val head = if (asShell) "已复制命令" else "已复制内容"
+        Toast.makeText(
+            ctx,
+            if (preview.isEmpty()) head else "$head　$preview",
+            Toast.LENGTH_SHORT
+        ).show()
         Store.recordRecent(entry.id)
     }
 
@@ -438,6 +463,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         // 底部操作栏：能执行的给「执行」，能触发的给「打开 / 发送 / 启动」，其余只有复制
         val runnable = entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT
         val triggerable = IntentLauncher.canTrigger(entry)
+        // 命令类只有一个「内容」（就是命令本身）；其它类型要区分「复制内容」还是「复制为 Shell」
+        fun onCopyClick() {
+            if (runnable) copy(true) else copyChooser = true
+        }
         val primary = MaterialTheme.colorScheme.primary
         val onPrimary = MaterialTheme.colorScheme.onPrimary
         val variant = MaterialTheme.colorScheme.surfaceVariant
@@ -551,7 +580,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                         .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
                         .background(variant)
-                        .clickable { copy() },
+                        .clickable { onCopyClick() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
@@ -586,7 +615,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                         .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
                         .background(variant)
-                        .clickable { copy() },
+                        .clickable { onCopyClick() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
@@ -614,7 +643,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                         .height(42.dp)
                         .clip(RoundedCornerShape(Radius.md))
                         .background(variant)
-                        .clickable { copy() },
+                        .clickable { onCopyClick() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("复制", fontSize = TypeScale.body, fontWeight = FontWeight.Bold, color = onVariant)
@@ -679,6 +708,40 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 }
             },
             mode = mode
+        )
+    }
+
+    // 非命令类条目点「复制」：先选清楚要复制的是内容还是命令
+    if (copyChooser) {
+        val content = CommandRenderer.contentText(entry, values, variantIndex)
+        val shellCmd = CommandRenderer.toAdb(entry, values)
+        AlertDialog(
+            onDismissRequest = { copyChooser = false },
+            title = { Text("复制方式", fontSize = TypeScale.body) },
+            text = {
+                Column {
+                    CopyOption(
+                        title = "复制内容",
+                        fallback = "原始写法，贴到别处直接能用",
+                        preview = content
+                    ) {
+                        copyChooser = false
+                        copy(false)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    CopyOption(
+                        title = "复制为 Shell",
+                        fallback = "等价 adb 命令，可在终端 / Shizuku 里跑",
+                        preview = shellCmd
+                    ) {
+                        copyChooser = false
+                        copy(true)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { copyChooser = false }) { Text("取消") }
+            }
         )
     }
 
@@ -774,9 +837,17 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
             result = r,
             command = executedCmd.ifBlank { text },
             onCopy = {
+                val text = listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n")
                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("输出", listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n")))
-                Toast.makeText(ctx, "输出已复制", Toast.LENGTH_SHORT).show()
+                cm.setPrimaryClip(ClipData.newPlainText("输出", text))
+                // 输出通常很长：回显首行 + 总字数，比一句「已复制」有用
+                val first = text.lineSequence().firstOrNull().orEmpty().trim()
+                    .let { if (it.length > 30) it.take(30) + "…" else it }
+                Toast.makeText(
+                    ctx,
+                    if (first.isEmpty()) "已复制输出" else "已复制输出　$first（共 ${text.length} 字）",
+                    Toast.LENGTH_SHORT
+                ).show()
             },
             onOpenTermux = { ShellExec.openTermux(ctx) },
             onDismiss = { execResult = null }
@@ -941,5 +1012,41 @@ private fun IntentFieldTable(spec: IntentSpec) {
             }
             if (i != rows.lastIndex) Divider()
         }
+    }
+}
+
+/** 复制方式里的一行：标题 + 内容预览（预览为空时显示说明） */
+@Composable
+private fun CopyOption(
+    title: String,
+    fallback: String,
+    preview: String,
+    onClick: () -> Unit
+) {
+    val first = preview.lineSequence().firstOrNull().orEmpty().trim()
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.sm))
+            .clickable { onClick() }
+            .padding(vertical = 8.dp)
+    ) {
+        Text(
+            title,
+            fontSize = TypeScale.small,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            (if (first.isEmpty()) fallback else first).let {
+                if (it.length > 80) it.take(80) + "…" else it
+            },
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
     }
 }
