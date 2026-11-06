@@ -86,6 +86,14 @@ fun FavScreen(onOpen: (Page) -> Unit) {
     val exporter = rememberSmdExporter()
     val ctx = LocalContext.current
 
+    // 滑到底时手指还压在卡片上，容易误触右下角的「执行 / 打开」→ 记住滚动结束时刻，
+    // FavRow 内部据此忽略刚停下那一瞬间的点击
+    val listState = rememberLazyListState()
+    var scrollEndAt by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) scrollEndAt = System.currentTimeMillis()
+    }
+
     // 返回键优先退选择模式 / 关弹窗 / 退搜索，最后才交给系统
     BackHandler(enabled = multiMode) {
         multiMode = false
@@ -162,6 +170,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
 
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
+            state = listState,
             contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 8.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
@@ -229,7 +238,8 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                         onMenu = { dialog = FavDialog.FavActions(fi) },
                         multiMode = multiMode,
                         checked = fi.entryId in selected,
-                        folded = settings.foldPreview
+                        folded = settings.foldPreview,
+                        scrollEndAt = scrollEndAt
                     )
                 }
             }
@@ -281,7 +291,8 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                             onMenu = { dialog = FavDialog.FavActions(fi) },
                             multiMode = multiMode,
                             checked = fi.entryId in selected,
-                            folded = settings.foldPreview
+                            folded = settings.foldPreview,
+                            scrollEndAt = scrollEndAt
                         )
                     }
                 }
@@ -677,7 +688,9 @@ fun FavRow(
     onMenu: () -> Unit,
     multiMode: Boolean = false,
     checked: Boolean = false,
-    folded: Boolean = false
+    folded: Boolean = false,
+    /** 列表滚动结束时刻（毫秒）。刚停下 350ms 内的点击忽略，防滑动误触右下角的执行/打开 */
+    scrollEndAt: Long = 0L
 ) {
     val e: Entry = item.entry
     Column(
@@ -748,8 +761,16 @@ fun FavRow(
                 Spacer(Modifier.width(Space.xs))
                 Text(
                     "备注：${item.note}", fontSize = TypeScale.caption,
-                    color = MaterialTheme.colorScheme.outline, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    color = MaterialTheme.colorScheme.outline, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+            }
+            // 右下角快捷动作：与商店列表同一套逻辑（命令类执行、Intent 类打开）
+            if (!multiMode) {
+                if (item.note.isBlank()) Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(Space.xs))
+                EntryQuickAction(e, scrollEndAt)
             }
         }
     }

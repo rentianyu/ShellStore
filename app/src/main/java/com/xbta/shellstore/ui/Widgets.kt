@@ -235,26 +235,24 @@ fun highlightSpan(text: String, keyword: String): AnnotatedString {
 }
 
 
+/**
+ * 卡片右下角的快捷动作：命令类「执行」、Intent 类「打开」。
+ * 自带危险命令二次确认与执行结果弹窗，EntryRow（商店列表）与 FavRow（收藏列表）共用，
+ * 保证两个列表的快捷操作行为完全一致（含防误触）。
+ *
+ * @param scrollEndAt 列表滚动结束时刻（毫秒）。刚停下 350ms 内的点击一律忽略，
+ *                    否则滑到底松手那一下会误触卡片里的按钮、直接执行命令或唤起别的 App。
+ */
 @Composable
-fun EntryRow(
+fun EntryQuickAction(
     entry: Entry,
-    fav: Boolean,
-    onClick: () -> Unit,
-    onToggleFav: () -> Unit,
-    onEdit: (() -> Unit)? = null,
-    showCategory: Boolean = true,
-    folded: Boolean = false,
-    highlight: String = "",
-    /** 列表滚动结束时刻（毫秒）。刚停下 350ms 内的点击一律忽略，防滑动误触 */
     scrollEndAt: Long = 0L
 ) {
-    // 滑到底时手指常压在最后一张卡片上，误触「执行 / 打开」会直接执行命令或唤起别的 App
-    fun tapAllowed(): Boolean = System.currentTimeMillis() - scrollEndAt >= 350L
     val ctx = LocalContext.current
-    val canOpen = IntentLauncher.canTrigger(entry)
-    val canRun = entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT
     val settings by Store.settings.collectAsState()
     val scope = rememberCoroutineScope()
+    val canRun = entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT
+    val canOpen = IntentLauncher.canTrigger(entry)
     var running by remember { mutableStateOf(false) }
     var confirmExec by remember { mutableStateOf(false) }
     var execResult by remember { mutableStateOf<ShellExec.Result?>(null) }
@@ -273,6 +271,107 @@ fun EntryRow(
             Store.recordRecent(entry.id)
         }
     }
+
+    if (canRun || canOpen) {
+        val dim = canRun && running
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(Radius.sm))
+                .background(
+                    MaterialTheme.colorScheme.primary.copy(alpha = if (dim) .06f else .10f)
+                )
+                .clickable(enabled = !dim) {
+                    if (System.currentTimeMillis() - scrollEndAt < 350L) return@clickable
+                    if (canRun) {
+                        if (entry.risk == Risk.DANGER && settings.confirmDanger) confirmExec = true
+                        else runNow()
+                    } else {
+                        val err = IntentLauncher.trigger(ctx, entry, emptyMap())
+                        if (err == null) Store.recordRecent(entry.id)
+                        Toast.makeText(
+                            ctx,
+                            err ?: "${IntentLauncher.actionLabel(entry)}成功",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text(
+                when {
+                    canRun && running -> "执行中…"
+                    canRun -> "执行"
+                    else -> IntentLauncher.actionLabel(entry)
+                },
+                fontSize = TypeScale.caption,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = if (dim) .5f else 1f)
+            )
+        }
+    }
+
+    // 危险命令二次确认
+    if (confirmExec) {
+        AlertDialog(
+            onDismissRequest = { confirmExec = false },
+            title = { Text("执行危险命令？", fontSize = TypeScale.body) },
+            text = {
+                Text(
+                    entry.title + "\n\n这条命令标记为「危险」，执行可能造成不可逆的改动。",
+                    fontSize = TypeScale.small
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { confirmExec = false; runNow() }) {
+                    Text("仍然执行", color = Tones.danger)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmExec = false }) { Text("取消") }
+            }
+        )
+    }
+
+    execResult?.let { r ->
+        ExecResultDialog(
+            result = r,
+            command = CommandRenderer.primaryText(
+                entry,
+                entry.params.associate { it.key to it.default },
+                -1
+            ),
+            onCopy = {
+                val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                    as android.content.ClipboardManager
+                cm.setPrimaryClip(
+                    android.content.ClipData.newPlainText(
+                        "输出",
+                        listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n")
+                    )
+                )
+                Toast.makeText(ctx, "输出已复制", Toast.LENGTH_SHORT).show()
+            },
+            onOpenTermux = { ShellExec.openTermux(ctx) },
+            onDismiss = { execResult = null }
+        )
+    }
+}
+
+@Composable
+fun EntryRow(
+    entry: Entry,
+    fav: Boolean,
+    onClick: () -> Unit,
+    onToggleFav: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    showCategory: Boolean = true,
+    folded: Boolean = false,
+    highlight: String = "",
+    /** 列表滚动结束时刻（毫秒）。刚停下 350ms 内的点击一律忽略，防滑动误触 */
+    scrollEndAt: Long = 0L
+) {
+    // 滑到底时手指常压在最后一张卡片上，误触会直接执行命令或唤起别的 App
+    fun tapAllowed(): Boolean = System.currentTimeMillis() - scrollEndAt >= 350L
     Column(
         Modifier
             .fillMaxWidth()
@@ -354,92 +453,10 @@ fun EntryRow(
                 Spacer(Modifier.width(Space.xs))
                 MutedBadge(entry.categoryId)
             }
-            if (canRun || canOpen) {
-                Spacer(Modifier.weight(1f))
-                // 右下角快捷操作：命令类直接执行，Intent 类直接唤起
-                val dim = canRun && running
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(Radius.sm))
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = if (dim) .06f else .10f)
-                        )
-                        .clickable(enabled = !dim) {
-                            if (!tapAllowed()) return@clickable
-                            if (canRun) {
-                                if (entry.risk == Risk.DANGER && settings.confirmDanger) confirmExec = true
-                                else runNow()
-                            } else {
-                                val err = IntentLauncher.trigger(ctx, entry, emptyMap())
-                                if (err == null) Store.recordRecent(entry.id)
-                                Toast.makeText(
-                                    ctx,
-                                    err ?: "${IntentLauncher.actionLabel(entry)}成功",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        when {
-                            canRun && running -> "执行中…"
-                            canRun -> "执行"
-                            else -> IntentLauncher.actionLabel(entry)
-                        },
-                        fontSize = TypeScale.caption,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = if (dim) .5f else 1f)
-                    )
-                }
-            }
+            Spacer(Modifier.weight(1f))
+            // 右下角快捷操作：命令类直接执行，Intent 类直接唤起（实现见 EntryQuickAction）
+            EntryQuickAction(entry, scrollEndAt)
         }
-    }
-
-    // 危险命令二次确认
-    if (confirmExec) {
-        AlertDialog(
-            onDismissRequest = { confirmExec = false },
-            title = { Text("执行危险命令？", fontSize = TypeScale.body) },
-            text = {
-                Text(
-                    entry.title + "\n\n这条命令标记为「危险」，执行可能造成不可逆的改动。",
-                    fontSize = TypeScale.small
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { confirmExec = false; runNow() }) {
-                    Text("仍然执行", color = Tones.danger)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmExec = false }) { Text("取消") }
-            }
-        )
-    }
-
-    execResult?.let { r ->
-        ExecResultDialog(
-            result = r,
-            command = CommandRenderer.primaryText(
-                entry,
-                entry.params.associate { it.key to it.default },
-                -1
-            ),
-            onCopy = {
-                val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                    as android.content.ClipboardManager
-                cm.setPrimaryClip(
-                    android.content.ClipData.newPlainText(
-                        "输出",
-                        listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n")
-                    )
-                )
-                Toast.makeText(ctx, "输出已复制", Toast.LENGTH_SHORT).show()
-            },
-            onOpenTermux = { ShellExec.openTermux(ctx) },
-            onDismiss = { execResult = null }
-        )
     }
 }
 
