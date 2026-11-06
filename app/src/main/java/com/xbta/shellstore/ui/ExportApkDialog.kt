@@ -40,10 +40,17 @@ import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.TypeScale
 import java.io.ByteArrayOutputStream
 
+/** 表单要产出的东西：独立 APK / 桌面快捷方式 / 控制中心磁贴 */
+const val MODE_APK = "apk"
+const val MODE_SHORTCUT = "shortcut"
+const val MODE_TILE = "tile"
+
 /**
- * 「导出 APK」表单：名称 / 包名 / 图标 / 动作类型 / 详细内容 / 执行身份。
+ * 动作规格表单：名称 / 图标 / 动作类型 / 详细内容 / 执行身份（APK 模式多一个包名）。
  *
- * 六项都可改，默认值从条目本身推导，用户什么都不动也能直接生成。
+ * 三个出口（导出 APK、添加到桌面、添加到控制中心）共用这一份表单与同一个 [ExportSpec]，
+ * 用户在哪儿配都是同一组语义，不会出现「导出的是打开链接、桌面图标却去跑 shell」。
+ * 默认值从条目本身推导，什么都不改也能直接用。
  */
 @Composable
 fun ExportApkDialog(
@@ -56,8 +63,10 @@ fun ExportApkDialog(
     defaultExtras: String = "",
     defaultExec: String,
     onDismiss: () -> Unit,
-    onConfirm: (ExportSpec) -> Unit
+    onConfirm: (ExportSpec) -> Unit,
+    mode: String = MODE_APK
 ) {
+    val isApk = mode == MODE_APK
     val ctx = LocalContext.current
     var title by remember { mutableStateOf(defaultTitle) }
     var pkg by remember { mutableStateOf("") }
@@ -149,7 +158,11 @@ fun ExportApkDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "导出为独立 App",
+                    when (mode) {
+                        MODE_SHORTCUT -> "添加到桌面"
+                        MODE_TILE -> "添加到控制中心"
+                        else -> "导出为独立 App"
+                    },
                     fontSize = TypeScale.body,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -224,6 +237,7 @@ fun ExportApkDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                if (isApk) {
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = pkg,
@@ -248,6 +262,7 @@ fun ExportApkDialog(
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+                }
 
                 // 动作类型
                 Text("动作类型", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -367,7 +382,8 @@ fun ExportApkDialog(
                     color = MaterialTheme.colorScheme.outline
                 )
 
-                // 保存位置
+                // 保存位置（只有导出 APK 才有「文件存哪」这回事）
+                if (isApk) {
                 Spacer(Modifier.height(10.dp))
                 Text("保存位置", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -392,6 +408,7 @@ fun ExportApkDialog(
                             Store.updateSettings(Store.settings.value.copy(exportDirUri = ""))
                         }) { Text("清除", fontSize = 11.sp) }
                     }
+                }
                 }
 
                 // 高级
@@ -436,13 +453,18 @@ fun ExportApkDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (pkgError != null) "包名不合法" else "",
+                    when {
+                        !isApk -> ""
+                        pkgError != null -> "包名不合法"
+                        else -> ""
+                    },
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(
-                    enabled = pkgError == null && title.isNotBlank() && value.isNotBlank(),
+                    enabled = (!isApk || pkgError == null) && title.isNotBlank() &&
+                        (value.isNotBlank() || type == ExportSpec.TYPE_ACTIVITY),
                     onClick = {
                         onConfirm(
                             ExportSpec(
@@ -468,7 +490,14 @@ fun ExportApkDialog(
                         )
                     }
                 ) {
-                    Text("生成 APK", fontWeight = FontWeight.Bold)
+                    Text(
+                        when (mode) {
+                            MODE_SHORTCUT -> "添加到桌面"
+                            MODE_TILE -> "添加磁贴"
+                            else -> "生成 APK"
+                        },
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }

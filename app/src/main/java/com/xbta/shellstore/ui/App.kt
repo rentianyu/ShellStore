@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.BuildConfig
+import com.xbta.shellstore.core.Changelog
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.core.LegalText
 import com.xbta.shellstore.data.Store
@@ -193,6 +194,29 @@ private fun Root() {
     fun push(p: Page) { stack = stack + p }
     fun pop() { if (stack.isNotEmpty()) stack = stack.dropLast(1) }
 
+    // 更新后首次打开：弹一次「本次更新内容」。
+    // 首次安装（lastSeenVersionCode == 0）不弹，免得新用户一进来先看一屏更新说明；
+    // 内容取自 assets/changelog.md 当前版本那一段，与「关于 › 更新日志」同源。
+    var whatsNew by remember { mutableStateOf<Changelog.Version?>(null) }
+    fun markVersionSeen() {
+        Store.updateSettings(
+            Store.settings.value.copy(lastSeenVersionCode = BuildConfig.APP_VERSION_CODE)
+        )
+    }
+    LaunchedEffect(Unit) {
+        val s = Store.settings.value
+        val cur = BuildConfig.APP_VERSION_CODE
+        if (s.lastSeenVersionCode == 0) {
+            markVersionSeen()   // 首次安装只记录，不打扰
+        } else if (s.lastSeenVersionCode < cur) {
+            val md = runCatching {
+                ctx.assets.open("changelog.md").bufferedReader().use { it.readText() }
+            }.getOrNull()
+            val first = md?.takeIf { it.isNotBlank() }?.let { Changelog.parse(it).firstOrNull() }
+            if (first != null) whatsNew = first else markVersionSeen()
+        }
+    }
+
     // 返回：有子页面就退一层；已经在 Tab 根页时才走「再按一次退出」，
     // 避免误触直接关掉 App。内层页面自己的 BackHandler（搜索、多选、弹窗）
     // 在组合树里更靠内，会先于这里拿到事件。
@@ -299,6 +323,22 @@ private fun Root() {
             tab = it
             stack = emptyList()
         }
+    }
+
+    // 本次更新内容
+    whatsNew?.let { v ->
+        WhatsNewDialog(
+            version = v,
+            onShowAll = {
+                whatsNew = null
+                markVersionSeen()
+                push(Page.About)
+            },
+            onDismiss = {
+                whatsNew = null
+                markVersionSeen()
+            }
+        )
     }
 
     // 启动检查的两个提示：先自身更新，再订阅源差异

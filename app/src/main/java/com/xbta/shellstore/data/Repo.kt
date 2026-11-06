@@ -85,7 +85,9 @@ data class AppSettings(
     /** 已同意的协议版本，0 = 未同意。低于 LegalText.LEGAL_VERSION 时重新征得同意 */
     val agreedVersion: Int = 0,
     /** 导出 APK 的保存目录（SAF tree uri），空串 = 只留在应用缓存里供安装/分享 */
-    val exportDirUri: String = ""
+    val exportDirUri: String = "",
+    /** 上次已经给用户看过的版本号（versionCode）。用来判断「这次更新后要不要弹更新内容」 */
+    val lastSeenVersionCode: Int = 0
 ) {
     /** 实际生效的字号倍率（只放大 sp） */
     val fontScale: Float get() = FONT_SCALES[fontLevel.coerceIn(0, FONT_SCALES.lastIndex)]
@@ -121,6 +123,7 @@ data class AppSettings(
         put("xbtaSeries", xbtaSeries)
         put("agreedVersion", agreedVersion)
         put("exportDirUri", exportDirUri)
+        put("lastSeenVersionCode", lastSeenVersionCode)
     }
 
     companion object {
@@ -157,7 +160,8 @@ data class AppSettings(
                 sourceMirror = o.optString("sourceMirror", ""),
                 xbtaSeries = o.optBoolean("xbtaSeries", false),
                 agreedVersion = o.optInt("agreedVersion", 0),
-                exportDirUri = o.optString("exportDirUri", "")
+                exportDirUri = o.optString("exportDirUri", ""),
+                lastSeenVersionCode = o.optInt("lastSeenVersionCode", 0)
             )
         }
     }

@@ -76,8 +76,8 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     var exporting by remember { mutableStateOf(false) }
     var exportResult by remember { mutableStateOf<ApkExporter.Result?>(null) }
     var exportError by remember { mutableStateOf<String?>(null) }
-    // 导出表单（名称/包名/图标/类型/内容/身份）
-    var showExportForm by remember { mutableStateOf(false) }
+    // 动作表单目标："" = 关闭；apk / shortcut / tile。三种出口共用同一个表单与 ExportSpec
+    var actionMode by remember { mutableStateOf("") }
     // 导出后自动保存到用户选的目录：成功给路径，失败给原因
     var exportSavedTo by remember { mutableStateOf<String?>(null) }
     var exportSaveErr by remember { mutableStateOf<String?>(null) }
@@ -149,6 +149,21 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 exporting = false
                 exportError = it.message ?: it.javaClass.simpleName
             }
+        }
+    }
+
+    /** 桌面快捷方式 / 控制中心磁贴：按同一份规格生成，图标现场画好再交出去 */
+    fun pinOut(spec: ExportSpec, tile: Boolean) {
+        scope.launch {
+            val icon = withContext(Dispatchers.IO) { EntryShortcuts.iconFor(spec) }
+            val err = withContext(Dispatchers.IO) {
+                if (tile) EntryShortcuts.addTile(ctx, spec, icon)
+                else EntryShortcuts.pinToHome(ctx, spec, icon)
+            }
+            toast(
+                err ?: if (tile) "已请求添加磁贴，确认即可"
+                else "已请求添加到桌面，确认即可"
+            )
         }
     }
 
@@ -480,16 +495,6 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
 
         fun rootRun() = runVia("root")
 
-        fun pinHome() {
-            val err = EntryShortcuts.pinToHome(ctx, entry.id, entry.title, text, values)
-            toast(err ?: "已请求添加到桌面，确认即可")
-        }
-
-        fun addTile() {
-            val err = EntryShortcuts.addTile(ctx, entry.id, entry.title, text)
-            toast(err ?: "已在控制中心添加磁贴")
-        }
-
         Column(
             Modifier
                 .fillMaxWidth()
@@ -631,16 +636,17 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                     tint = if (shizukuReady) primary else null
                 )
                 ActionChip(glyph = "⚿", label = "Root", onClick = { rootRun() })
-                ActionChip(glyph = "⇩", label = "导出APK", onClick = { showExportForm = true }, enabled = !exporting)
-                ActionChip(glyph = "⌂", label = "桌面", onClick = { pinHome() })
-                ActionChip(glyph = "▣", label = "磁贴", onClick = { addTile() })
+                ActionChip(glyph = "⇩", label = "导出APK", onClick = { actionMode = MODE_APK }, enabled = !exporting)
+                ActionChip(glyph = "⌂", label = "桌面", onClick = { actionMode = MODE_SHORTCUT })
+                ActionChip(glyph = "▣", label = "磁贴", onClick = { actionMode = MODE_TILE })
             }
         }
     }
 
-    if (showExportForm) {
+    if (actionMode.isNotEmpty()) {
         val defType = exportType()
         val def = exportDefaults(defType)
+        val mode = actionMode
         ExportApkDialog(
             defaultTitle = entry.title,
             defaultType = defType,
@@ -651,11 +657,16 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
             defaultExtras = def.extras,
             // shell 类型必须有身份；其余类型默认不勾选（直接调 Intent）
             defaultExec = if (defType == ExportSpec.TYPE_SHELL) ExportSpec.EXEC_SHELL else "",
-            onDismiss = { showExportForm = false },
+            onDismiss = { actionMode = "" },
             onConfirm = { spec ->
-                showExportForm = false
-                exportApk(spec)
-            }
+                actionMode = ""
+                when (mode) {
+                    MODE_SHORTCUT -> pinOut(spec, tile = false)
+                    MODE_TILE -> pinOut(spec, tile = true)
+                    else -> exportApk(spec)
+                }
+            },
+            mode = mode
         )
     }
 

@@ -3,13 +3,18 @@ package com.xbta.shellstore
 import android.app.Activity
 import android.os.Bundle
 import android.widget.Toast
+import com.xbta.shellstore.data.ActionRunner
 import com.xbta.shellstore.ui.EntryRunner
 
 /**
  * 桌面快捷方式的执行入口。
  *
- * 透明、无界面：拿到命令 → 执行 → Toast 结果 → 结束自己。
+ * 透明、无界面：拿到规格 → 执行 → Toast 结果 → 结束自己。
  * 不做成页面，是因为从桌面点进来只想「跑一下就完」，多一层界面反而多一次跳转。
+ *
+ * 两种来源：
+ *   1. 新版快捷方式（2.2.0 起）带完整 ExportSpec（名称/类型/详细内容/执行身份都可自定义）；
+ *   2. 老版快捷方式只有 cmd + entryId，继续按条目类型分流（[EntryRunner]），升级不失效。
  *
  * 注意：进度与结果都在子线程里跑，只把 Toast 与 finish 切回主线程；
  * 这条路径上任何异常都不能让快捷方式卡在透明页面上（所以全程 runCatching）。
@@ -37,8 +42,9 @@ class RunCommandActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val spec = ActionRunner.readSpec(intent)
         val cmd = intent?.getStringExtra(EXTRA_CMD)
-        if (cmd.isNullOrBlank()) {
+        if (spec == null && cmd.isNullOrBlank()) {
             finish()
             return
         }
@@ -46,8 +52,14 @@ class RunCommandActivity : Activity() {
         val values = parseIntentValues(intent?.getStringExtra(EXTRA_VALUES))
 
         Thread {
-            // 按条目类型分流：scheme/intent 类发 Intent，shell 类走命令通道
-            val msg = EntryRunner.run(applicationContext, entryId, cmd, values)
+            val msg = if (spec != null) {
+                // 新版：完全按用户在表单里配的类型与执行身份走，不再依赖条目本身
+                runCatching { ActionRunner.run(applicationContext, spec) }
+                    .getOrElse { "执行失败：${it.message ?: it.javaClass.simpleName}" }
+            } else {
+                // 老版快捷方式（1.x 建的），继续按条目类型分流
+                EntryRunner.run(applicationContext, entryId, cmd!!, values)
+            }
             runOnUiThread {
                 runCatching { Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show() }
                 finish()
