@@ -206,9 +206,10 @@ private fun Root() {
     LaunchedEffect(Unit) {
         val s = Store.settings.value
         val cur = BuildConfig.APP_VERSION_CODE
-        if (s.lastSeenVersionCode == 0) {
-            markVersionSeen()   // 首次安装只记录，不打扰
-        } else if (s.lastSeenVersionCode < cur) {
+        // lastSeenVersionCode 为 0 有两种情况：
+        //   · 老用户从旧版本升上来 —— 要弹本次更新内容；
+        //   · 新装用户 —— 同意协议那一刻已把当前版本写进去了（Store.agreeLegal），走不到这里。
+        if (s.lastSeenVersionCode < cur) {
             val md = runCatching {
                 ctx.assets.open("changelog.md").bufferedReader().use { it.readText() }
             }.getOrNull()

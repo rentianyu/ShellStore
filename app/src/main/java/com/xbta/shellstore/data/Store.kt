@@ -95,7 +95,16 @@ object Store {
     /** 同意协议（记版本号，条款升级后会再次要求同意） */
     fun agreeLegal() {
         _basicMode.value = false
-        updateSettings(_settings.value.copy(agreedVersion = LegalText.LEGAL_VERSION))
+        val cur = _settings.value.lastSeenVersionCode
+        updateSettings(
+            _settings.value.copy(
+                agreedVersion = LegalText.LEGAL_VERSION,
+                // 走到这里说明是首次安装（老用户早就同意过协议，不会再到这一屏）。
+                // 把当前版本直接记成「已看过」，新用户第一次进来就不会被更新说明挡一下；
+                // 而老用户升级时这个值还是 0，正好触发「本次更新内容」弹窗。
+                lastSeenVersionCode = if (cur == 0) com.xbta.shellstore.BuildConfig.APP_VERSION_CODE else cur
+            )
+        )
     }
 
     /** 不同意：不退出 App，进入离线基础模式 */
