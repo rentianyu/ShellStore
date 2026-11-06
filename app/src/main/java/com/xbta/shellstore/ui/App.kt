@@ -71,6 +71,8 @@ sealed interface Page {
     data object Backup : Page
     data object Cloud : Page
     data object About : Page
+    /** 历史更新日志（从关于页进去） */
+    data object Changelog : Page
     data object Help : Page
     data object SourceHelp : Page
     data class Legal(val kind: String) : Page
@@ -312,6 +314,7 @@ private fun Root() {
                     is Page.Backup -> BackupScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Cloud -> CloudBackupScreen(onBack = ::pop)
                     is Page.About -> AboutScreen(onBack = ::pop, onOpen = ::push)
+                    is Page.Changelog -> ChangelogScreen(onBack = ::pop)
                     is Page.Help -> HelpScreen(onBack = ::pop)
                     is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)
                     is Page.Legal -> LegalScreen(p.kind, onBack = ::pop)
@@ -333,7 +336,7 @@ private fun Root() {
             onShowAll = {
                 whatsNew = null
                 markVersionSeen()
-                push(Page.About)
+                push(Page.Changelog)
             },
             onDismiss = {
                 whatsNew = null

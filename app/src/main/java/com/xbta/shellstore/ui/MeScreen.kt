@@ -40,6 +40,7 @@ import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.FONT_SCALES
 import com.xbta.shellstore.data.FontChoice
 import com.xbta.shellstore.data.UI_SCALES
+import com.xbta.shellstore.core.Changelog
 import com.xbta.shellstore.core.LegalText
 import com.xbta.shellstore.data.SeriesSources
 import com.xbta.shellstore.data.Store
@@ -1144,6 +1145,13 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                     onClick = if (crashCount > 0) ({ showCrash = true }) else null
                 )
                 Divider()
+                SettingRow(
+                    "≡",
+                    "更新日志",
+                    if (versions.isEmpty()) "读取失败" else "共 ${versions.size} 个版本 · 当前 v${BuildConfig.APP_VERSION}",
+                    onClick = { onOpen(Page.Changelog) }
+                )
+                Divider()
                 SettingRow("⌘", "数据格式", "SMD v1")
                 Divider()
                 SettingRow("⚖", "开源协议", "MIT")
@@ -1164,23 +1172,6 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 color = MaterialTheme.colorScheme.outline
             )
 
-            // ---- 更新日志（数据源 = 仓库根 CHANGELOG.md，构建时同步到 assets）----
-            Spacer(Modifier.height(24.dp))
-            GroupTitle("更新日志")
-            if (versions.isEmpty()) {
-                Text(
-                    "更新日志读取失败（assets/changelog.md 缺失）",
-                    fontSize = TypeScale.caption,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            } else {
-                GroupCard {
-                    versions.forEachIndexed { i, v ->
-                        if (i > 0) Divider()
-                        VersionBlock(v, current = v.version == BuildConfig.APP_VERSION)
-                    }
-                }
-            }
             Spacer(Modifier.height(20.dp))
         }
     }
@@ -1216,6 +1207,54 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 }) { Text("清空") }
             }
         )
+    }
+}
+
+/**
+ * 历史更新日志（「我的 › 关于 › 更新日志」）。
+ *
+ * 数据源与「更新后首次启动弹窗」同一份：assets/changelog.md（构建时由仓库根 CHANGELOG.md 覆盖），
+ * 不再在关于页里铺一长串，关于页只留一行入口。
+ */
+@Composable
+fun ChangelogScreen(onBack: () -> Unit) {
+    val ctx = LocalContext.current
+    val versions = remember {
+        val md = runCatching {
+            ctx.assets.open("changelog.md").bufferedReader().use { it.readText() }
+        }.getOrDefault("")
+        Changelog.parse(md)
+    }
+    Column(Modifier.fillMaxSize()) {
+        TopBar("更新日志", onBack = onBack)
+        Column(
+            Modifier
+                .padding(horizontal = Space.page)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Spacer(Modifier.height(8.dp))
+            if (versions.isEmpty()) {
+                Text(
+                    "更新日志读取失败（assets/changelog.md 缺失）",
+                    fontSize = TypeScale.caption,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            } else {
+                Text(
+                    "共 ${versions.size} 个版本 · 当前 v${BuildConfig.APP_VERSION} (${BuildConfig.APP_VERSION_CODE})",
+                    fontSize = TypeScale.caption,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Spacer(Modifier.height(10.dp))
+                GroupCard {
+                    versions.forEachIndexed { i, v ->
+                        if (i > 0) Divider()
+                        VersionBlock(v, current = v.version == BuildConfig.APP_VERSION)
+                    }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+        }
     }
 }
 
