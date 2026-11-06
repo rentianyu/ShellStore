@@ -31,7 +31,7 @@ object ActionRunner {
             val r = when (spec.exec) {
                 ExportSpec.EXEC_ROOT -> ShellExec.runViaRoot(cmd, spec.timeoutSec.toLong())
                 ExportSpec.EXEC_SHIZUKU -> ShellExec.runViaShizuku(cmd, spec.timeoutSec.toLong())
-                else -> ShellExec.run(cmd, spec.timeoutSec.toLong())
+                else -> ShellExec.run(ctx, cmd, spec.timeoutSec.toLong())
             }
             if (r.code == 0) {
                 val first = r.out.lineSequence().firstOrNull().orEmpty().trim()
@@ -157,7 +157,7 @@ object ActionRunner {
         when (exec) {
             ExportSpec.EXEC_ROOT -> ShellExec.runViaRoot(cmd, timeoutSec)
             ExportSpec.EXEC_SHIZUKU -> ShellExec.runViaShizuku(cmd, timeoutSec)
-            else -> ShellExec.run(cmd, timeoutSec)
+            else -> ShellExec.run(ctx, cmd, timeoutSec)
         }
 
     private fun typeLabel(t: String): String = when (t) {
