@@ -15,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -80,6 +79,7 @@ fun ExportApkDialog(
     var extras by remember { mutableStateOf(defaultExtras) }
     var exec by remember { mutableStateOf(defaultExec) }
     var showOutput by remember { mutableStateOf(true) }
+    var resultMode by remember { mutableStateOf(ExportSpec.RESULT_TOAST) }
     var timeout by remember { mutableStateOf("30") }
     var advanced by remember { mutableStateOf(false) }
     var photo by remember { mutableStateOf<Bitmap?>(null) }
@@ -382,6 +382,35 @@ fun ExportApkDialog(
                     color = MaterialTheme.colorScheme.outline
                 )
 
+                // 执行结果的提示方式：命令/脚本跑完、Intent 类唤起后用哪种方式告诉用户
+                Spacer(Modifier.height(10.dp))
+                Text("执行结果提示", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ExportSpec.RESULT_MODES.take(2).forEach { m ->
+                        FilterChip(
+                            selected = resultMode == m,
+                            onClick = { resultMode = m },
+                            label = { Text(ExportSpec.resultLabel(m), fontSize = 11.sp) }
+                        )
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ExportSpec.RESULT_MODES.drop(2).forEach { m ->
+                        FilterChip(
+                            selected = resultMode == m,
+                            onClick = { resultMode = m },
+                            label = { Text(ExportSpec.resultLabel(m), fontSize = 11.sp) }
+                        )
+                    }
+                }
+                Text(
+                    ExportSpec.resultHint(resultMode),
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp,
+                    color = MaterialTheme.colorScheme.outline
+                )
+
                 // 保存位置（只有导出 APK 才有「文件存哪」这回事）
                 if (isApk) {
                 Spacer(Modifier.height(10.dp))
@@ -437,10 +466,6 @@ fun ExportApkDialog(
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("显示执行输出", fontSize = 11.sp, modifier = Modifier.weight(1f))
-                        Switch(checked = showOutput, onCheckedChange = { showOutput = it })
-                    }
                 }
 
                 Spacer(Modifier.height(10.dp))
@@ -477,7 +502,8 @@ fun ExportApkDialog(
                                 data = data,
                                 extras = extras,
                                 exec = exec,
-                                showOutput = showOutput,
+                                showOutput = resultMode != ExportSpec.RESULT_NONE,
+                                resultMode = resultMode,
                                 timeoutSec = timeout.toIntOrNull() ?: 30,
                                 iconText = iconText,
                                 iconPng = photo?.let { bmp ->

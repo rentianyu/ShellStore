@@ -29,6 +29,8 @@ data class ExportSpec(
      * shell 类型必须有身份；其余类型为空时直接走 Intent（不经过任何 shell）。
      */
     val exec: String = EXEC_SHELL,
+    /** 执行结果怎么给用户看：toast / notification / dialog / none（旧字段 showOutput 保留仅为兼容） */
+    val resultMode: String = RESULT_TOAST,
     val showOutput: Boolean = true,
     val timeoutSec: Int = 30,
     /** 图标上的文字（空则取名称首字）；纯文字图标用 */
@@ -42,6 +44,13 @@ data class ExportSpec(
         const val TYPE_ACTIVITY = "activity"
         const val TYPE_BROADCAST = "broadcast"
         const val TYPE_SERVICE = "service"
+
+        /** 结果展示方式 */
+        const val RESULT_TOAST = "toast"
+        const val RESULT_NOTIFICATION = "notification"
+        const val RESULT_DIALOG = "dialog"
+        const val RESULT_NONE = "none"
+        val RESULT_MODES = listOf(RESULT_TOAST, RESULT_NOTIFICATION, RESULT_DIALOG, RESULT_NONE)
 
         const val EXEC_SHELL = "shell"
         const val EXEC_ROOT = "root"
@@ -57,6 +66,23 @@ data class ExportSpec(
             TYPE_BROADCAST -> "发送广播"
             TYPE_SERVICE -> "启动服务"
             else -> t
+        }
+
+        fun resultLabel(m: String): String = when (m) {
+            RESULT_TOAST -> "Toast"
+            RESULT_NOTIFICATION -> "通知"
+            RESULT_DIALOG -> "弹窗"
+            RESULT_NONE -> "不提示"
+            else -> m
+        }
+
+        /** 状态栏通知对「输出很长」最友好，弹窗适合想直接复制输出的场景 */
+        fun resultHint(m: String): String = when (m) {
+            RESULT_TOAST -> "轻量提示，几秒消失，适合只想知道成没成功"
+            RESULT_NOTIFICATION -> "结果留在通知栏，长输出也能展开看，随时回头查"
+            RESULT_DIALOG -> "执行完弹一个结果框，可以直接复制输出"
+            RESULT_NONE -> "执行完什么都不显示（成功后静默，失败仍会提示）"
+            else -> ""
         }
 
         fun execLabel(e: String): String = when (e) {

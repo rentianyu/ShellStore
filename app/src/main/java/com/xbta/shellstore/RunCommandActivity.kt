@@ -52,17 +52,28 @@ class RunCommandActivity : Activity() {
         val values = parseIntentValues(intent?.getStringExtra(EXTRA_VALUES))
 
         Thread {
-            val msg = if (spec != null) {
-                // 新版：完全按用户在表单里配的类型与执行身份走，不再依赖条目本身
-                runCatching { ActionRunner.run(applicationContext, spec) }
-                    .getOrElse { "执行失败：${it.message ?: it.javaClass.simpleName}" }
+            if (spec != null) {
+                // 新版：完全按用户在表单里配的类型、执行身份、结果提示方式走
+                // 注意传 this（Activity）：选「弹窗」时需要 Activity 才能弹，
+                // 交给应用上下文会被降级成通知
+                runCatching {
+                    ActionRunner.runAndReport(this, spec) {
+                        runOnUiThread { runCatching { finish() } }
+                    }
+                }.onFailure { e ->
+                    val msg = "执行失败：${e.message ?: e.javaClass.simpleName}"
+                    runOnUiThread {
+                        runCatching { Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show() }
+                        finish()
+                    }
+                }
             } else {
                 // 老版快捷方式（1.x 建的），继续按条目类型分流
-                EntryRunner.run(applicationContext, entryId, cmd!!, values)
-            }
-            runOnUiThread {
-                runCatching { Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show() }
-                finish()
+                val msg = EntryRunner.run(applicationContext, entryId, cmd!!, values)
+                runOnUiThread {
+                    runCatching { Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show() }
+                    finish()
+                }
             }
         }.start()
     }

@@ -40,6 +40,7 @@ class CommandTileService : TileService() {
                 .putString("data", spec.data)
                 .putString("extras", spec.extras)
                 .putString("exec", spec.exec)
+                .putString("result", spec.resultMode)
                 .putInt("timeout", spec.timeoutSec)
                 .putString("label", label)
                 .putString("icon", iconPath)
@@ -60,7 +61,8 @@ class CommandTileService : TileService() {
                 data = sp.getString("data", "").orEmpty(),
                 extras = sp.getString("extras", "").orEmpty(),
                 exec = sp.getString("exec", "").orEmpty(),
-                timeoutSec = sp.getInt("timeout", 30)
+                timeoutSec = sp.getInt("timeout", 30),
+                resultMode = sp.getString("result", null) ?: ExportSpec.RESULT_TOAST
             )
         }
 
@@ -131,7 +133,8 @@ class CommandTileService : TileService() {
         if (spec == null && legacy == null) return
         Thread {
             val text = if (spec != null) {
-                runCatching { ActionRunner.run(applicationContext, spec) }
+                // 按用户选的「结果提示方式」走：磁贴场景没有界面，弹窗会自动降级为通知
+                runCatching { ActionRunner.runAndReport(applicationContext, spec) }
                     .getOrElse { "执行失败：${it.message ?: it.javaClass.simpleName}" }
             } else {
                 EntryRunner.run(applicationContext, legacy!!.first, legacy.second)

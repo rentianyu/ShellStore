@@ -192,6 +192,8 @@ object ApkExporter {
             else spec.exec.trim()
         )
         o.put("showOutput", spec.showOutput)
+        // 结果提示方式：toast / notification / dialog / none（老执行器只认 showOutput，会走兼容分支）
+        o.put("resultMode", spec.resultMode.ifBlank { ExportSpec.RESULT_DIALOG })
         o.put("timeoutSec", spec.timeoutSec.coerceIn(1, 600))
         return o.toString(2)
     }

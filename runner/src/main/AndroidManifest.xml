@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 结果可以用通知栏展示（导出时若选了「通知」需要；Android 13+ 首次执行会请求授权） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- 模板 App：读 assets/config.json → 按类型执行 → 显示结果。
          导出时主 App 会替换 config.json、改包名与名称、换图标、重新签名，
          所以这里除了「必须随包名一起变」的 authorities，不写任何业务相关配置。 -->

@@ -1,6 +1,10 @@
 package com.xbta.cmd.runner;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
@@ -8,6 +12,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -17,6 +22,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONObject;
 
@@ -76,7 +82,11 @@ public class RunActivity extends Activity {
         normalizeFields();
 
         if ("shell".equals(curType)) {
-            buildUi(curType, cfg.optString("title", "Shell 命令"));
+            // 只有「弹窗」模式才先建界面；Toast / 通知 / 不提示 都要零界面，
+            // 否则用户点图标会看到执行器窗口闪一下
+            if ("dialog".equals(resultMode()) || resultMode().isEmpty()) {
+                buildUi(curType, cfg.optString("title", "Shell 命令"));
+            }
             doShell();
             return;
         }
@@ -86,10 +96,9 @@ public class RunActivity extends Activity {
             // 直接调系统接口：必须主线程
             String err = fireIntent(curType);
             if (err == null) {
-                finish();
+                report(actionDoneLabel(), true);
             } else {
-                buildUi(curType, "执行失败");
-                output.setText(err);
+                report(err, false);
             }
             return;
         }
@@ -98,11 +107,8 @@ public class RunActivity extends Activity {
         new Thread(() -> {
             String err = fireViaShell(curType, useExec);
             new Handler(Looper.getMainLooper()).post(() -> {
-                if (err == null) {
-                    finish();
-                } else {
-                    ensureUi(err);
-                }
+                if (err == null) report(actionDoneLabel(), true);
+                else report(err, false);
             });
         }).start();
     }
@@ -312,6 +318,102 @@ public class RunActivity extends Activity {
         }
     }
 
+    // ---------------- 结果展示（Toast / 通知 / 弹窗 / 不提示） ----------------
+
+    /** config 里的结果展示方式；老配置没有这个字段时按「弹窗」处理（保持原行为） */
+    private String resultMode() {
+        String m = cfg.optString("resultMode", "").trim();
+        if (m.isEmpty()) {
+            // 兼容 2.3.0 之前导出的包：那时只有 showOutput，false 相当于「不提示」
+            return cfg.optBoolean("showOutput", true) ? "dialog" : "none";
+        }
+        return m;
+    }
+
+    private String actionDoneLabel() {
+        switch (curType) {
+            case "url":
+                return "打开成功";
+            case "broadcast":
+                return "发送成功";
+            case "service":
+            case "activity":
+                return "启动成功";
+            default:
+                return "已执行";
+        }
+    }
+
+    /**
+     * 按模式把结果交出去。
+     * 两条硬规则：失败一定提示（选了「不提示」也发 Toast）；弹窗模式复用原有界面（可复制输出）。
+     */
+    private void report(final String message, final boolean ok) {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            String mode = resultMode();
+            if (!ok && "none".equals(mode)) mode = "toast";
+            switch (mode) {
+                case "none":
+                    finish();
+                    break;
+                case "toast":
+                    Toast.makeText(this, firstLine(message), Toast.LENGTH_LONG).show();
+                    finish();
+                    break;
+                case "notification":
+                    notifyResult(message);
+                    finish();
+                    break;
+                default:
+                    if (output == null) buildUi(curType, cfg.optString("title", "执行结果"));
+                    if (output != null) output.setText(message);
+                    break;
+            }
+        });
+    }
+
+    /** 通知栏：长输出可展开，执行完还能回头查 */
+    private void notifyResult(String message) {
+        try {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                // 没授权就先要一次；本次先用 Toast 兜底，下次点击就能正常发通知
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 0x5A18);
+                Toast.makeText(this, firstLine(message), Toast.LENGTH_LONG).show();
+                return;
+            }
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm == null) {
+                Toast.makeText(this, firstLine(message), Toast.LENGTH_LONG).show();
+                return;
+            }
+            String ch = "cmd_result";
+            if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(ch) == null) {
+                nm.createNotificationChannel(
+                        new NotificationChannel(ch, "命令执行结果", NotificationManager.IMPORTANCE_DEFAULT));
+            }
+            Notification n = new Notification.Builder(this, ch)
+                    .setSmallIcon(getApplicationInfo().icon)
+                    .setContentTitle(cfg.optString("title", "Shell 命令"))
+                    .setContentText(firstLine(message))
+                    .setStyle(new Notification.BigTextStyle().bigText(message))
+                    .setAutoCancel(true)
+                    .build();
+            nm.notify(4201, n);
+        } catch (Exception e) {
+            Toast.makeText(this, firstLine(message), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Toast 只放一行，太长会把屏幕铺满 */
+    private static String firstLine(String s) {
+        if (s == null) return "";
+        String t = s.trim();
+        int i = t.indexOf('\n');
+        String line = i > 0 ? t.substring(0, i) : t;
+        return line.length() > 120 ? line.substring(0, 120) + "…" : line;
+    }
+
     private void doShell() {
         final String cmd = cfg.optString("value", "").trim();
         if (cmd.isEmpty()) {
@@ -325,7 +427,7 @@ public class RunActivity extends Activity {
             StringBuilder sb = new StringBuilder("$ ").append(cmd).append("\n\n");
             if (!r.text.isEmpty()) sb.append(r.text);
             if (r.code >= 0) sb.append("\n[退出码 ").append(r.code).append("]");
-            post(sb.toString());
+            report(sb.toString(), r.code == 0);
         }).start();
     }
 

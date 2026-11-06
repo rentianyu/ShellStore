@@ -23,22 +23,38 @@ import com.xbta.shellstore.core.ExportSpec
 object ActionRunner {
 
     /** 执行并返回一句结果文案。不会抛异常。 */
-    fun run(ctx: Context, spec: ExportSpec): String {
+    fun run(ctx: Context, spec: ExportSpec): String = runDetailed(ctx, spec).first
+
+    /**
+     * 执行并**按 `spec.resultMode` 展示结果**（Toast / 通知 / 弹窗 / 不提示）。
+     * 桌面快捷方式与磁贴都走这里；返回值仍给出去（磁贴拿它当副标题）。
+     *
+     * @param onDone 展示动作结束后回调（弹窗是关闭之后），Activity 用它来 finish
+     */
+    fun runAndReport(ctx: Context, spec: ExportSpec, onDone: (() -> Unit)? = null): String {
+        val (msg, ok) = runDetailed(ctx, spec)
+        ResultNotifier.show(ctx, spec, msg, ok, onDone)
+        return msg
+    }
+
+    /** @return first = 给用户看的文案，second = 是否算成功 */
+    fun runDetailed(ctx: Context, spec: ExportSpec): Pair<String, Boolean> {
         val type = spec.type
         if (type == ExportSpec.TYPE_SHELL) {
             val cmd = spec.value.trim()
-            if (cmd.isEmpty()) return "命令为空，请先在详情页填写"
+            if (cmd.isEmpty()) return "命令为空，请先在详情页填写" to false
             val r = when (spec.exec) {
                 ExportSpec.EXEC_ROOT -> ShellExec.runViaRoot(cmd, spec.timeoutSec.toLong())
                 ExportSpec.EXEC_SHIZUKU -> ShellExec.runViaShizuku(cmd, spec.timeoutSec.toLong())
                 else -> ShellExec.run(ctx, cmd, spec.timeoutSec.toLong())
             }
             if (r.code == 0) {
-                val first = r.out.lineSequence().firstOrNull().orEmpty().trim()
-                return if (first.isNotBlank()) "已执行：${first.take(50)}" else "已执行"
+                // 输出可能很长：通知/弹窗模式下给全量，Toast 模式下由 UI 侧截断
+                val out = listOf(r.out, r.err).filter { it.isNotBlank() }.joinToString("\n").trim()
+                return (if (out.isNotBlank()) out else "已执行") to true
             }
             val why = r.err.ifBlank { r.note }.ifBlank { "返回码 ${r.code}" }
-            return "执行失败：${why.take(80)}"
+            return "执行失败：${why.take(400)}" to false
         }
 
         // 非 shell：勾了执行身份就先试 am 命令，失败再退回直接发 Intent
@@ -46,42 +62,44 @@ object ActionRunner {
             val am = buildAmCommand(spec)
             if (am != null) {
                 val r = runAsIdentity(ctx, spec.exec, am, spec.timeoutSec.toLong())
-                if (r.code == 0) return "${typeLabel(spec.type)}成功（经 ${spec.exec} 执行 am 命令）"
+                if (r.code == 0) {
+                    return "${typeLabel(spec.type)}成功（经 ${spec.exec} 执行 am 命令）" to true
+                }
             }
         }
         return fireIntent(ctx, spec)
     }
 
-    /** 直接用系统接口发 Intent。返回错误文案，成功返回「xxx成功」 */
-    fun fireIntent(ctx: Context, spec: ExportSpec): String {
+    /** 直接用系统接口发 Intent。成功返回「xxx成功」，失败返回可读原因 */
+    fun fireIntent(ctx: Context, spec: ExportSpec): Pair<String, Boolean> {
         return try {
             val extras = parseExtras(spec.extras)
             val dataUri = spec.data.trim().ifBlank { if (spec.type == ExportSpec.TYPE_URL) spec.value.trim() else "" }
             when (spec.type) {
                 ExportSpec.TYPE_URL -> {
                     val uri = dataUri.ifBlank { spec.value.trim() }
-                    if (uri.isEmpty()) return "链接为空"
+                    if (uri.isEmpty()) return "链接为空" to false
                     val it = Intent(Intent.ACTION_VIEW, Uri.parse(uri))
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     ctx.startActivity(it)
-                    "打开成功"
+                    "打开成功" to true
                 }
                 ExportSpec.TYPE_BROADCAST -> {
                     val it = buildIntent(spec, extras)
                     ctx.sendBroadcast(it)
-                    "发送成功"
+                    "发送成功" to true
                 }
                 ExportSpec.TYPE_SERVICE -> {
                     val it = buildIntent(spec, extras)
-                    if (it.component == null) return "启动服务需要填写组件名（如 com.pkg/.Svc）"
+                    if (it.component == null) return "启动服务需要填写组件名（如 com.pkg/.Svc）" to false
                     ctx.startService(it)
-                    "启动成功"
+                    "启动成功" to true
                 }
                 else -> { // activity，以及任何未知类型都按「启动界面」处理
                     val it = buildIntent(spec, extras)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     ctx.startActivity(it)
-                    "启动成功"
+                    "启动成功" to true
                 }
             }
         } catch (e: Exception) {
@@ -90,7 +108,7 @@ object ActionRunner {
                 e is SecurityException -> "被系统拒绝（缺少权限或组件未导出）"
                 else -> e.message ?: e.javaClass.simpleName
             }
-            "$hint；可以勾一个执行身份改用 am 命令"
+            "$hint；可以勾一个执行身份改用 am 命令" to false
         }
     }
 
@@ -180,6 +198,7 @@ object ActionRunner {
     private const val K_EXTRAS = "spec.extras"
     private const val K_EXEC = "spec.exec"
     private const val K_TIMEOUT = "spec.timeout"
+    private const val K_RESULT = "spec.result"
 
     fun writeSpec(intent: Intent, spec: ExportSpec) {
         intent.putExtra(K_TITLE, spec.title)
@@ -191,6 +210,7 @@ object ActionRunner {
         intent.putExtra(K_EXTRAS, spec.extras)
         intent.putExtra(K_EXEC, spec.exec)
         intent.putExtra(K_TIMEOUT, spec.timeoutSec)
+        intent.putExtra(K_RESULT, spec.resultMode)
     }
 
     /** 没带规格（旧版快捷方式）时返回 null，由调用方走兼容路径 */
@@ -206,7 +226,8 @@ object ActionRunner {
             data = intent.getStringExtra(K_DATA).orEmpty(),
             extras = intent.getStringExtra(K_EXTRAS).orEmpty(),
             exec = intent.getStringExtra(K_EXEC).orEmpty(),
-            timeoutSec = intent.getIntExtra(K_TIMEOUT, 30)
+            timeoutSec = intent.getIntExtra(K_TIMEOUT, 30),
+            resultMode = intent.getStringExtra(K_RESULT) ?: ExportSpec.RESULT_TOAST
         )
     }
 

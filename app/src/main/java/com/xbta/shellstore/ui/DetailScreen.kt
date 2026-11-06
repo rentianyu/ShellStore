@@ -152,8 +152,20 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         }
     }
 
+    // 只有选了「通知」才需要：Android 13+ 未授权时通知会被系统直接丢掉
+    val notifPerm = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { }
+
     /** 桌面快捷方式 / 控制中心磁贴：按同一份规格生成，图标现场画好再交出去 */
     fun pinOut(spec: ExportSpec, tile: Boolean) {
+        if (spec.resultMode == ExportSpec.RESULT_NOTIFICATION &&
+            android.os.Build.VERSION.SDK_INT >= 33 &&
+            ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPerm.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
         scope.launch {
             val icon = withContext(Dispatchers.IO) { EntryShortcuts.iconFor(spec) }
             val err = withContext(Dispatchers.IO) {
