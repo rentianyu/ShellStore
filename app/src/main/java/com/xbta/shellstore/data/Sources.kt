@@ -1,5 +1,8 @@
 package com.xbta.shellstore.data
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.xbta.shellstore.core.SourceType
 import org.json.JSONArray
 import org.json.JSONObject
@@ -77,6 +80,20 @@ object Net {
      * 直连 → 上次成功的线路 → 其余 GitHub 代理，每条 10 秒。
      * 具体线路表在 Mirrors 里，这里只做单次请求。
      */
+    /**
+     * 当前是否在不计费的网络上（Wi-Fi / 以太网）。
+     *
+     * 只用来决定「要不要为了一个 9MB 的安装包自动开下载」——
+     * 移动网络下自动下 9MB 是实打实的流量，不该偷偷发生。
+     * 拿不到状态时按 true 处理：宁可多下，也别让更新功能莫名其妙不工作。
+     */
+    fun isUnmetered(ctx: Context): Boolean = runCatching {
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return@runCatching false
+        caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+    }.getOrDefault(true)
+
     fun getWithFallback(url: String, prefer: String = "", validate: (String) -> Boolean = { it.isNotBlank() }): Result =
         Mirrors.fetch(url, prefer = prefer, validate = validate)
 

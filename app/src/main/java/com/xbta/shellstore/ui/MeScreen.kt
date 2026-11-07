@@ -546,6 +546,14 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
                     }
                 )
                 Divider()
+                SettingRow(
+                    "⇣", "仅 Wi-Fi 自动下载",
+                    "移动网络下只提示，不自动下安装包",
+                    trailing = {
+                        Toggle(settings.wifiOnlyUpdate) { update(settings.copy(wifiOnlyUpdate = it)) }
+                    }
+                )
+                Divider()
                 SettingRow("⊘", "清除收藏数据", "不可恢复", danger = true, onClick = { confirmClear = true })
             }
 

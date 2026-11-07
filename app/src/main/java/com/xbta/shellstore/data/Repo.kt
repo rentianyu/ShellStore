@@ -84,6 +84,8 @@ data class AppSettings(
     val copyPrefix: CopyPrefix = CopyPrefix.NONE,
     val confirmDanger: Boolean = true,
     val checkUpdateOnStart: Boolean = true,
+    /** 只在 Wi-Fi / 以太网下自动下载更新包；移动网络下只提示不动手 */
+    val wifiOnlyUpdate: Boolean = true,
     val copyAndReturn: Boolean = false,
     /** 列表只显示标题、收起命令预览 */
     val foldPreview: Boolean = false,
@@ -129,6 +131,7 @@ data class AppSettings(
         put("copyPrefix", copyPrefix.name)
         put("confirmDanger", confirmDanger)
         put("checkUpdateOnStart", checkUpdateOnStart)
+        put("wifiOnlyUpdate", wifiOnlyUpdate)
         put("copyAndReturn", copyAndReturn)
         put("foldPreview", foldPreview)
         put("listStyle", listStyle)
@@ -168,6 +171,7 @@ data class AppSettings(
                 copyPrefix = e(o.optString("copyPrefix"), CopyPrefix.NONE, CopyPrefix.entries.toTypedArray()),
                 confirmDanger = o.optBoolean("confirmDanger", true),
                 checkUpdateOnStart = o.optBoolean("checkUpdateOnStart", true),
+                wifiOnlyUpdate = o.optBoolean("wifiOnlyUpdate", true),
                 copyAndReturn = o.optBoolean("copyAndReturn", false),
                 foldPreview = o.optBoolean("foldPreview", false),
                 listStyle = o.optString("listStyle", ListStyle.CARD),

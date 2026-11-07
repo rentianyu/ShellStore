@@ -28,6 +28,7 @@ import com.xbta.shellstore.BuildConfig
 import com.xbta.shellstore.core.Changelog
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.core.LegalText
+import com.xbta.shellstore.data.Net
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.UpdateCenter
 import com.xbta.shellstore.data.ThemeMode
@@ -182,9 +183,14 @@ private fun Root() {
     // 只有同意协议后才联网：检查更新 + 检查源变化
     LaunchedEffect(Unit) {
         if (!Store.netAllowed) return@LaunchedEffect
+        // 用户关掉「启动时检查更新」就真的不查（以前这个开关只在设置页存了个值，没人读）
+        if (!Store.settings.value.checkUpdateOnStart) return@LaunchedEffect
         delay(2000)
+        val st = Store.settings.value
+        // 移动网络下只检查、不自动下 9MB，交给顶部提示条由用户点
+        val allow = !(st.wifiOnlyUpdate && !Net.isUnmetered(ctx))
         withContext(Dispatchers.IO) {
-            UpdateCenter.checkAndDownload(ctx, BuildConfig.APP_VERSION)
+            UpdateCenter.checkAndDownload(ctx, BuildConfig.APP_VERSION, allow)
         }
     }
     LaunchedEffect(Unit) {
@@ -257,6 +263,20 @@ private fun Root() {
                 total = downloading.total
             )
         }
+        // 移动网络下发现新版本：只提示，不自动耗流量
+        val upAvail = upState as? UpdateCenter.State.Available
+        if (upAvail != null && Store.netAllowed) {
+            UpdateAvailableBar(
+                tag = upAvail.info.version,
+                onDownload = {
+                    backScope.launch {
+                        withContext(Dispatchers.IO) { UpdateCenter.downloadNow(ctx) }
+                    }
+                },
+                onDismiss = { UpdateCenter.dismiss() }
+            )
+        }
+
         // 启动时自动更新下载失败：给一行可重试的提示，不弹窗打断
         val upFailed = upState as? UpdateCenter.State.Failed
         if (upFailed != null && Store.netAllowed) {
