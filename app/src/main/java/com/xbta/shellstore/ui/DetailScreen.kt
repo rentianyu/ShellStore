@@ -421,6 +421,24 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 }
             }
 
+            // url scheme：把 ?a=1&b=2 拆成一行一个参数，可展开看全文、可一键解码/编码
+            if (entry.type == EntryType.URLSCHEME) {
+                item {
+                    val parts = remember(text) { SchemeParse.parse(text) }
+                    if (parts.params.isNotEmpty()) {
+                        Column {
+                            SectionLabel("参数（${parts.params.size} 个）")
+                            SchemeSummary(parts)
+                            SchemeParamList(parts.params) { v ->
+                                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                cm.setPrimaryClip(ClipData.newPlainText("参数值", v))
+                                toast("已复制　" + v.take(24).replace("\n", " "))
+                            }
+                        }
+                    }
+                }
+            }
+
             if (entry.origin.isNotBlank()) {
                 item { SectionLabel("原始写法") }
                 item { CodeBlock(entry.origin, fontSize = 11) }
