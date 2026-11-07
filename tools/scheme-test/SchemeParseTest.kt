@@ -4,7 +4,7 @@ var pass = 0; var fail = 0
 fun ck(n: String, c: Boolean, got: Any? = "") { if (c) pass++ else { fail++; println("  ✗ $n  实际=$got") } }
 
 /**
- * url scheme 解析与编解码的桌面单测（不参与 gradle 构建）。
+ * url scheme 解析、编解码与回写的桌面单测（不参与 gradle 构建）。
  * 运行：见同目录 run.sh
  */
 fun main() {
@@ -76,6 +76,31 @@ fun main() {
     val b64 = "app://x?data=" + "a".repeat(500) + "=="
     p = SchemeParse.parse(b64)
     ck("长值完整", p.params[0].value.length == 502, p.params[0].value.length)
+
+    // 按需编码
+    ck("纯 ASCII 不动", SchemeParse.encodeIfNeeded("abc") == "abc", SchemeParse.encodeIfNeeded("abc"))
+    ck("空格编码", SchemeParse.encodeIfNeeded("a b") == "a%20b", SchemeParse.encodeIfNeeded("a b"))
+    ck("中文编码", SchemeParse.encodeIfNeeded("中文") == "%E4%B8%AD%E6%96%87", SchemeParse.encodeIfNeeded("中文"))
+    ck("已是编码不二次编", SchemeParse.encodeIfNeeded("%E4%B8%AD") == "%E4%B8%AD", SchemeParse.encodeIfNeeded("%E4%B8%AD"))
+    ck("& 编码", SchemeParse.encodeIfNeeded("a&b") == "a%26b", SchemeParse.encodeIfNeeded("a&b"))
+    ck("空串不动", SchemeParse.encodeIfNeeded("") == "")
+    ck("全角空格编码", SchemeParse.encodeIfNeeded("a\u3000b") == "a%E3%80%80b", SchemeParse.encodeIfNeeded("a\u3000b"))
+
+    // 回写
+    val src = "app://host/path?a=1&b=2#frag"
+    var ps = SchemeParse.parse(src).params
+    ck("rebuild 不变", SchemeParse.rebuild(src, ps) == src, SchemeParse.rebuild(src, ps))
+    ps = ps + SchemeParse.Param("c", SchemeParse.encodeIfNeeded("中文"))
+    ck("rebuild 加参数", SchemeParse.rebuild(src, ps) == "app://host/path?a=1&b=2&c=%E4%B8%AD%E6%96%87#frag", SchemeParse.rebuild(src, ps))
+    ps = listOf(SchemeParse.Param("only", "1"))
+    ck("rebuild 减参数", SchemeParse.rebuild(src, ps) == "app://host/path?only=1#frag", SchemeParse.rebuild(src, ps))
+    ck("rebuild 清空参数", SchemeParse.rebuild(src, emptyList()) == "app://host/path#frag", SchemeParse.rebuild(src, emptyList()))
+    ck("rebuild 无 hash", SchemeParse.rebuild("app://x?a=1", listOf(SchemeParse.Param("b", "2"))) == "app://x?b=2")
+    ck("rebuild 保留空值键", SchemeParse.rebuild("app://x?f", listOf(SchemeParse.Param("f", ""))) == "app://x?f")
+
+    // 可读形式
+    ck("readable 解码", SchemeParse.readable("%E4%B8%AD%E6%96%87") == "中文", SchemeParse.readable("%E4%B8%AD%E6%96%87"))
+    ck("readable 纯文本", SchemeParse.readable("abc") == "abc")
 
     println("\n通过 $pass / 失败 $fail")
     if (fail > 0) throw IllegalStateException("$fail 项失败")

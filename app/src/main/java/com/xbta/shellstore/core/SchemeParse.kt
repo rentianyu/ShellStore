@@ -111,4 +111,61 @@ object SchemeParse {
 
     /** 值是不是「含中文/空格等不便于阅读的编码」，用来决定要不要默认显示解码按钮 */
     fun looksEncoded(v: String): Boolean = hasPercent(v) || v.contains('+')
+
+    // ---------------- 回写 ----------------
+
+    /**
+     * 只替换 query 段，其余原样保留（scheme、路径、锚点都不动）。
+     *
+     * [params] 里的值应当是**最终要写进串里的原文**——要不要编码由调用方决定：
+     * 用户没动过的参数保持原样（已经是 `%E4%B8%AD` 的不会被二次编码），
+     * 新输入/改过的值再按需要过 [encodeIfNeeded]。
+     */
+    fun rebuild(raw: String, params: List<Param>): String {
+        val hashIdx = raw.indexOf('#')
+        val head = if (hashIdx >= 0) raw.substring(0, hashIdx) else raw
+        val tail = if (hashIdx >= 0) raw.substring(hashIdx) else ""
+        val qIdx = head.indexOf('?')
+        val base = if (qIdx >= 0) head.substring(0, qIdx) else head
+
+        val query = params
+            .filter { it.key.isNotBlank() }
+            .joinToString("&") { p -> if (p.value.isEmpty()) p.key else "${p.key}=${p.value}" }
+
+        return base + (if (query.isNotEmpty()) "?$query" else "") + tail
+    }
+
+    /**
+     * 按需编码：只有含裸的 `&` `#` `?` 空格或非 ASCII 才编码。
+     *
+     * 刻意**不**因为出现 `%` 就编码 —— 用户很可能自己写好了 `%E4%B8%AD`，
+     * 再编一次会变成 `%25E4%25B8%25AD`，等于把值弄坏。
+     */
+    fun encodeIfNeeded(v: String): String {
+        if (v.isEmpty()) return v
+        val need = v.any { c ->
+            c == '&' || c == '#' || c == '?' || c == ' ' || c == '\u3000' || c.code > 127
+        }
+        return if (need) encode(v) else v
+    }
+
+    /**
+     * 连续解码但**保留 `+`**：编辑框里显示用。
+     *
+     * 展示场景把 `+` 当空格更「像阅读」，但编辑场景不行——
+     * base64 里 `+` 有含义，一改就悄悄改坏了用户的值。
+     */
+    fun prettyDecodeStrict(v: String, rounds: Int = 3): String {
+        var text = v
+        repeat(rounds) {
+            if (!hasPercent(text)) return text
+            val next = decodeStrict(text)
+            if (next == text) return text
+            text = next
+        }
+        return text
+    }
+
+    /** 参数值的可读形式（编辑框里显示用，`+` 不转空格） */
+    fun readable(v: String): String = prettyDecodeStrict(v)
 }

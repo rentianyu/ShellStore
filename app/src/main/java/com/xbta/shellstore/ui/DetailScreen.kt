@@ -350,9 +350,27 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                 }
             }
 
-            if (!entry.type.hasBody && entry.intent != null) {
+            val spec = entry.intent
+            if (!entry.type.hasBody && spec != null) {
                 item { SectionLabel("Intent 字段") }
-                item { IntentFieldTable(entry.intent) }
+                item { IntentFieldTable(spec) }
+                // data 里带 query 的（content:// 带 id、https:// 带参数）同样拆成一行一个参数
+                if (spec.data.contains('?')) {
+                    item {
+                        val dps = remember(spec.data) { SchemeParse.parse(spec.data) }
+                        if (dps.params.isNotEmpty()) {
+                            Column {
+                                SectionLabel("data 参数（${dps.params.size} 个）")
+                                SchemeSummary(dps)
+                                SchemeParamList(dps.params) { v ->
+                                    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    cm.setPrimaryClip(ClipData.newPlainText("参数值", v))
+                                    toast("已复制　" + v.take(24).replace("\n", " "))
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             if (entry.params.isNotEmpty()) {

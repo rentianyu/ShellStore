@@ -206,11 +206,17 @@ fun EntryEditorScreen(
                             fontSize = TypeScale.caption,
                             color = MaterialTheme.colorScheme.outline
                         )
+                        if (type == EntryType.URLSCHEME) {
+                            UrlParamEditor(body = body, onBodyChange = { body = it })
+                        }
                     } else {
                         Field("Action", action, { action = it }, "android.intent.action.VIEW")
                         Field("Component", component, { component = it }, "包名/类名")
                         Field("Package", pkg, { pkg = it }, "com.example.app")
                         Field("Data", data, { data = it }, "https://… 或 content://…")
+                        if (data.contains('?')) {
+                            UrlParamEditor(body = data, onBodyChange = { data = it })
+                        }
                         Field("MIME", mime, { mime = it }, "text/plain")
                         Field("Category", cats, { cats = it }, "用空格分隔，如 HOME DEFAULT")
 
