@@ -629,28 +629,38 @@ object Store {
 
     fun countInCategory(cat: String): Int = entriesInCategory(cat).size
 
+    /**
+     * 搜索：空格分隔的多个关键词是 **AND** 关系（「蓝牙 关闭」两词都要命中），
+     * 支持拼音首字母（「ly」能找到「蓝牙」），命中标题的排前面。
+     */
     fun search(query: String, types: Set<EntryType>, risks: Set<Risk>): List<Entry> {
-        val kw = query.trim().lowercase()
-        if (kw.isEmpty() && types.isEmpty() && risks.isEmpty()) return _entries.value
+        val tokens = SearchText.tokenize(query)
+        if (tokens.isEmpty() && types.isEmpty() && risks.isEmpty()) return _entries.value
 
-        fun match(e: Entry): Boolean =
-            (types.isEmpty() || e.type in types) &&
-                (risks.isEmpty() || e.risk in risks) &&
-                (kw.isEmpty() ||
-                    e.title.lowercase().contains(kw) ||
-                    e.body.lowercase().contains(kw) ||
-                    e.desc.lowercase().contains(kw) ||
-                    e.tags.any { it.lowercase().contains(kw) } ||
-                    e.categoryId.lowercase().contains(kw))
+        fun score(e: Entry): Int? {
+            if (types.isNotEmpty() && e.type !in types) return null
+            if (risks.isNotEmpty() && e.risk !in risks) return null
+            return SearchText.score(e, tokens)
+        }
 
-        val fromSources = _entries.value.filter(::match)
+        val hits = ArrayList<Pair<Entry, Int>>(64)
+        for (e in _entries.value) score(e)?.let { hits.add(e to it) }
         // 本地自建条目不属于任何源，只在搜索里并入，免得混进分类浏览
-        val local = _favs.value.items.asSequence()
-            .filter { isLocal(it.entryId) }
-            .map { it.entry }
-            .filter(::match)
-            .toList()
-        return (fromSources + local).distinctBy { it.id }
+        for (f in _favs.value.items) {
+            if (!isLocal(f.entryId)) continue
+            score(f.entry)?.let { hits.add(f.entry to it) }
+        }
+        val uniq = hits.distinctBy { it.first.id }
+        // 有关键词时按相关度排序（标题命中的优先）；纯筛选时保持原顺序
+        return if (tokens.isEmpty()) {
+            uniq.map { it.first }
+        } else {
+            // 置顶的永远在前（通常是用户最常用的那几条），其次按相关度
+            uniq.sortedWith(
+                compareByDescending<Pair<Entry, Int>> { it.first.pinned }
+                    .thenByDescending { it.second }
+            ).map { it.first }
+        }
     }
 
     // ---------------- 收藏 ----------------

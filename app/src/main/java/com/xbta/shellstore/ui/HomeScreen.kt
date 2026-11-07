@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.Entry
+import com.xbta.shellstore.core.SearchText
 import com.xbta.shellstore.core.EntryType
 import com.xbta.shellstore.data.ListStyle
 import com.xbta.shellstore.data.Store
@@ -93,6 +94,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                 SearchField(
                     query = query,
                     onQueryChange = { query = it },
+                    placeholder = "搜索命令，空格分隔多个关键词",
                     autoFocus = true,
                     onCancel = { searchMode = false; query = "" }
                 )
@@ -183,7 +185,12 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     )
                 }
                 if (results.isEmpty()) {
-                    item { EmptyState("没有找到匹配的命令", "换个关键词，或去「我的 › 订阅源」添加更多来源") }
+                    item {
+                        EmptyState(
+                            "没有找到匹配的命令",
+                            "空格分隔的多个词是「同时包含」；中文可试拼音首字母（如 ly → 蓝牙）；也可去「我的 › 订阅源」添加更多来源"
+                        )
+                    }
                 }
                 items(results, key = { it.id }) { e ->
                     EntryRowAuto(style = settings.listStyle, entry = e,
@@ -372,11 +379,13 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
         if (!listState.isScrollInProgress) scrollEndAt = System.currentTimeMillis()
     }
 
+    // 与全局搜索同一套规则：空格多词 AND、支持拼音首字母、标题命中优先
     val shown = remember(query, list) {
-        if (query.isBlank()) list
-        else list.filter {
-            it.title.contains(query, true) || it.body.contains(query, true) || it.tags.any { t -> t.contains(query, true) }
-        }
+        val tokens = SearchText.tokenize(query)
+        if (tokens.isEmpty()) list
+        else list.mapNotNull { e -> SearchText.score(e, tokens)?.let { e to it } }
+            .sortedByDescending { it.second }
+            .map { it.first }
     }
 
     // 返回键：先把分类内的搜索清掉，再退出页面

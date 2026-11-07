@@ -204,35 +204,35 @@ fun CodeBlock(
 // ---------------- 列表卡片 ----------------
 
 /**
- * 把 text 里命中 keyword 的片段标成主色 + 淡底，用于搜索结果。
- * 大小写不敏感，按下标切原串（不做 lowercase 后的下标换算，中文场景更安全）。
+ * 把 text 里命中关键词的片段标成主色 + 淡底，用于搜索结果。
+ *
+ * 关键词按空格拆成多个（与搜索的 AND 语义一致），命中区间会先合并再着色，
+ * 免得「蓝牙 关闭」两个词挨在一起时叠出两层背景。大小写不敏感，
+ * 按下标切原串（不做 lowercase 后的下标换算，中文场景更安全）。
  */
 @Composable
 fun highlightSpan(text: String, keyword: String): AnnotatedString {
-    val kw = keyword.trim()
-    if (kw.isEmpty() || text.isEmpty()) return AnnotatedString(text)
-    val lowerText = text.lowercase()
-    val lowerKw = kw.lowercase()
+    val kws = keyword.trim().split(' ', '\u3000', '\t').filter { it.isNotBlank() }
+    if (kws.isEmpty() || text.isEmpty()) return AnnotatedString(text)
+    // 区间计算放在 core/SearchText（纯逻辑，有单测）：多词命中重叠时先合并，避免叠色
+    val ranges = SearchText.hitRanges(text, kws)
+    if (ranges.isEmpty()) return AnnotatedString(text)
+
     val hit = MaterialTheme.colorScheme.primary
     return buildAnnotatedString {
-        var i = 0
-        while (i < text.length) {
-            val p = lowerText.indexOf(lowerKw, i)
-            if (p < 0) {
-                append(text.substring(i))
-                break
-            }
-            if (p > i) append(text.substring(i, p))
-            val end = (p + kw.length).coerceAtMost(text.length)
+        var cursor = 0
+        for (r in ranges) {
+            if (r.first > cursor) append(text.substring(cursor, r.first))
             withStyle(
                 SpanStyle(
                     color = hit,
                     fontWeight = FontWeight.Bold,
                     background = hit.copy(alpha = .14f)
                 )
-            ) { append(text.substring(p, end)) }
-            i = end
+            ) { append(text.substring(r.first, r.last + 1)) }
+            cursor = r.last + 1
         }
+        if (cursor < text.length) append(text.substring(cursor))
     }
 }
 
