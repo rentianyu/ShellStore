@@ -243,6 +243,45 @@ fun DownloadBar(pct: Int, line: String = "", index: Int = 0, lines: Int = 0, byt
  * 不弹窗打断用户，只占顶部一行，点「重试」清缓存重拉，「×」本次不再提。
  */
 @Composable
+fun UpdateFailBar(message: String, onRetry: () -> Unit, onDismiss: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(start = Space.page, end = 4.dp, top = 5.dp, bottom = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "更新下载失败：$message",
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(
+            onClick = onRetry,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                "重试",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
+        Text(
+            "×",
+            fontSize = 16.sp,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+                .clickable { onDismiss() }
+        )
+    }
+}
+
 /**
  * 移动网络下发现新版本时的一行提示。
  * 不自动下载是刻意的：安装包 9MB，在 4G 上偷跑流量不合适。
@@ -287,41 +326,3 @@ fun UpdateAvailableBar(tag: String, onDownload: () -> Unit, onDismiss: () -> Uni
     }
 }
 
-fun UpdateFailBar(message: String, onRetry: () -> Unit, onDismiss: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(start = Space.page, end = 4.dp, top = 5.dp, bottom = 5.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            "更新下载失败：$message",
-            fontSize = 11.sp,
-            lineHeight = 15.sp,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-        TextButton(
-            onClick = onRetry,
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-        ) {
-            Text(
-                "重试",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-        }
-        Text(
-            "×",
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-                .clickable { onDismiss() }
-        )
-    }
-}
