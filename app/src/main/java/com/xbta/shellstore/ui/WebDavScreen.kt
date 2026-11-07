@@ -265,7 +265,7 @@ fun CloudBackupScreen(onBack: () -> Unit) {
             GroupCard {
                 SettingRow(
                     "⇧", "立即备份",
-                    if (busy) "正在上传…" else "订阅源 · 收藏夹 · 设置 · 最近使用",
+                    if (busy) "正在上传…" else "订阅源 · 文件夹 · 设置 · 最近使用",
                     enabled = !busy,
                     onClick = {
                         save()
@@ -312,7 +312,7 @@ fun CloudBackupScreen(onBack: () -> Unit) {
             text = {
                 Column {
                     Text(
-                        "云端快照会与你本机的数据合并或覆盖。覆盖会清掉本机现有的收藏夹、订阅源与设置。",
+                        "云端快照会与你本机的数据合并或覆盖。覆盖会清掉本机现有的文件夹、订阅源与设置。",
                         fontSize = TypeScale.small,
                         lineHeight = 20.sp
                     )

@@ -127,7 +127,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     .padding(vertical = Space.md)
             ) {
                 StatCell("${favs.items.size}", "已收藏", Modifier.weight(1f))
-                StatCell("${favs.folders.size}", "收藏夹", Modifier.weight(1f))
+                StatCell("${favs.folders.size}", "文件夹", Modifier.weight(1f))
                 StatCell("${cats.size}", "分类", Modifier.weight(1f))
             }
 

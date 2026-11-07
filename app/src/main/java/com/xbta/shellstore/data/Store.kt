@@ -685,7 +685,7 @@ object Store {
     }
 
     /**
-     * 按给定顺序重排某个收藏夹。位次从大到小赋（第一个最大），与 itemsIn 的降序排序一致。
+     * 按给定顺序重排某个文件夹。位次从大到小赋（第一个最大），与 itemsIn 的降序排序一致。
      * 越界/不存在的 id 自动忽略。
      */
     fun reorderFavs(folderId: String?, orderedIds: List<String>) {
@@ -1191,7 +1191,7 @@ object Store {
     }
 
     /**
-     * 把收藏导出成一份 SMD 源文本，按收藏夹分组。
+     * 把收藏导出成一份 SMD 源文本，按文件夹分组。
      * filter 为 null 导出全部；给定谓词时只导出命中的条目（用于指定文件夹）。
      */
     fun exportFavsSmd(title: String = "我的收藏", filter: ((FavItem) -> Boolean)? = null): String {

@@ -106,6 +106,10 @@ fun FavScreen(onOpen: (Page) -> Unit) {
         searchMode = false
         query = ""
     }
+    // 进了文件夹/切到标签视图后，返回键要回上一层，而不是冒泡到「再按一次退出」
+    BackHandler(enabled = !multiMode && dialog == null && !searchMode && (currentFolder != null || view != 0)) {
+        if (currentFolder != null) currentFolder = null else view = 0
+    }
     val q = query.trim()
     fun hit(fi: FavItem): Boolean {
         if (q.isEmpty()) return true
@@ -415,33 +419,28 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             }
 
             is FavDialog.QuickAdd -> {
-                AlertDialog(
-                    onDismissRequest = { dialog = null },
-                    title = { Text("新建", fontSize = TypeScale.body) },
-                    text = {
-                        Column {
-                            MenuItem("命令 / 脚本 / Scheme / Intent") {
-                                dialog = null
-                                onOpen(Page.Editor(null, currentFolder))
-                            }
-                            MenuItem("收藏夹") {
-                                input = ""
-                                dialog = FavDialog.NewFolder(currentFolder)
-                            }
-                            MenuItem("添加订阅源") {
-                                dialog = null
-                                onOpen(Page.Sources)
-                            }
-                            MenuItem("粘贴导入 SMD / JSON / 命令") {
-                                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val text = cm.primaryClip
-                                    ?.takeIf { it.itemCount > 0 }
-                                    ?.getItemAt(0)?.text?.toString().orEmpty()
-                                dialog = FavDialog.PasteImport(text)
-                            }
-                        }
+                AddMenuDialog(
+                    folderName = favs.folders.firstOrNull { it.id == currentFolder }?.name,
+                    onDismiss = { dialog = null },
+                    onNewEntry = {
+                        dialog = null
+                        onOpen(Page.Editor(null, currentFolder))
                     },
-                    confirmButton = { TextButton(onClick = { dialog = null }) { Text("关闭") } }
+                    onNewFolder = {
+                        input = ""
+                        dialog = FavDialog.NewFolder(currentFolder)
+                    },
+                    onAddSource = {
+                        dialog = null
+                        onOpen(Page.Sources)
+                    },
+                    onPaste = {
+                        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val text = cm.primaryClip
+                            ?.takeIf { it.itemCount > 0 }
+                            ?.getItemAt(0)?.text?.toString().orEmpty()
+                        dialog = FavDialog.PasteImport(text)
+                    }
                 )
             }
 
@@ -894,6 +893,74 @@ fun FavRowAuto(
         FavListRow(item, onOpen, onMenu, multiMode, checked, folded, scrollEndAt)
     } else {
         FavRow(item, onOpen, onMenu, multiMode, checked, folded, scrollEndAt)
+    }
+}
+
+/**
+ * 「新建」菜单：分组 + 每项一句说明 + 更大的行高。
+ *
+ * 之前是一列四个平铺文案、点哪算哪，「新建文件夹」还写成「收藏夹」，
+ * 既容易误触也看不出这几项不是一类事。现在拆成「新建」与「导入」两组，
+ * 取消按钮放在右下角，整行可点区域高 52dp。
+ */
+@Composable
+private fun AddMenuDialog(
+    folderName: String?,
+    onDismiss: () -> Unit,
+    onNewEntry: () -> Unit,
+    onNewFolder: () -> Unit,
+    onAddSource: () -> Unit,
+    onPaste: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("新建", fontSize = TypeScale.body, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                if (!folderName.isNullOrBlank()) {
+                    Text(
+                        "将放进「$folderName」",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+                AddMenuGroup("新建")
+                AddMenuItem("新建命令", "命令 / 脚本 / Scheme / Intent", onNewEntry)
+                AddMenuItem("新建文件夹", "用来分组存放收藏", onNewFolder)
+                Spacer(Modifier.height(10.dp))
+                AddMenuGroup("导入")
+                AddMenuItem("添加订阅源", "从在线地址引入一整套命令", onAddSource)
+                AddMenuItem("粘贴导入", "剪贴板里的 SMD / JSON / 命令", onPaste)
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
+}
+
+@Composable
+private fun AddMenuGroup(title: String) {
+    Text(
+        title,
+        fontSize = 11.sp,
+        color = MaterialTheme.colorScheme.outline,
+        modifier = Modifier.padding(bottom = 2.dp)
+    )
+}
+
+@Composable
+private fun AddMenuItem(title: String, hint: String, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.sm))
+            .clickable { onClick() }
+            .padding(horizontal = 4.dp, vertical = 12.dp)
+    ) {
+        Text(title, fontSize = TypeScale.small, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(2.dp))
+        Text(hint, fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
     }
 }
 

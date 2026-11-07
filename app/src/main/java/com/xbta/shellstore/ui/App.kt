@@ -76,7 +76,7 @@ sealed interface Page {
     data object Help : Page
     data object SourceHelp : Page
     data class Legal(val kind: String) : Page
-    /** entryId 为空 = 新建；folderId 决定新条目落在哪个收藏夹；draft 用于粘贴导入时预填 */
+    /** entryId 为空 = 新建；folderId 决定新条目落在哪个文件夹；draft 用于粘贴导入时预填 */
     data class Editor(
         val entryId: String? = null,
         val folderId: String? = null,
