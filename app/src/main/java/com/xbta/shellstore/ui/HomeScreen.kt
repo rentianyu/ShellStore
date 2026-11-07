@@ -309,7 +309,7 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(if (settings.listStyle == ListStyle.LIST) 0.dp else 5.dp)
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             item {
                 Text(
