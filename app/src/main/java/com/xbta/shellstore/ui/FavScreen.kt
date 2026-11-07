@@ -2,6 +2,7 @@ package com.xbta.shellstore.ui
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
@@ -63,6 +65,8 @@ private sealed interface FavDialog {
     data class FavActions(val item: FavItem) : FavDialog
     data class ConfirmDelete(val item: FavItem) : FavDialog
     data class ConfirmDeleteMany(val ids: Set<String>) : FavDialog
+    /** 拖动松手落在某个文件夹上：确认是否移进去（多选拖动时 ids 是整组） */
+    data class ConfirmDropToFolder(val ids: Set<String>, val folderId: String) : FavDialog
     data class MoveTo(val item: FavItem) : FavDialog
     data class EditNote(val item: FavItem) : FavDialog
     data class EditTags(val item: FavItem) : FavDialog
@@ -87,6 +91,16 @@ fun FavScreen(onOpen: (Page) -> Unit) {
     val settings by Store.settings.collectAsState()
     val exporter = rememberSmdExporter()
     val ctx = LocalContext.current
+
+    // ---- 拖动排序 / 拖到文件夹 ----
+    // dragGroup：本次拖动涉及哪些条目（多选模式下拖任意选中项 = 整组一起动）
+    var dragId by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var dragGroup by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var dropFolder by remember { mutableStateOf<String?>(null) }
+    var lastDragEnd by remember { mutableLongStateOf(0L) }
+    // 文件夹行的窗口坐标范围，用于判断「松手时压在哪个文件夹上」
+    val folderBounds = remember { mutableStateMapOf<String, ClosedFloatingPointRange<Float>>() }
 
     // 滑到底时手指还压在卡片上，容易误触右下角的「执行 / 打开」→ 记住滚动结束时刻，
     // FavRow 内部据此忽略刚停下那一瞬间的点击
@@ -116,6 +130,20 @@ fun FavScreen(onOpen: (Page) -> Unit) {
         val e = fi.entry
         return e.title.contains(q, true) || e.body.contains(q, true) ||
             fi.note.contains(q, true) || e.tags.any { it.contains(q, true) }
+    }
+
+    // 当前层级（含搜索过滤）的条目。拖动时要读到「最新顺序」，所以用 rememberUpdatedState 兜住
+    // ——pointerInput 的闭包在拖动过程中不会重建，直接捕获 here 会拿到拖动开始时的旧列表。
+    val hereItems = favs.itemsIn(currentFolder).filter { hit(it) }
+    val liveHere by rememberUpdatedState(hereItems)
+
+    /** 拖动同层排序：把 from 位置的条目插到 to 位置，并落盘 */
+    fun moveFav(from: Int, to: Int) {
+        val ids = liveHere.map { it.entryId }.toMutableList()
+        if (from !in ids.indices || to !in ids.indices) return
+        val moved = ids.removeAt(from)
+        ids.add(to, moved)
+        Store.reorderFavs(currentFolder, ids)
     }
 
     // 「全选」只作用于当前视图看得见的条目，不跨文件夹
@@ -208,14 +236,33 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                 }
                 val children = favs.childrenOf(currentFolder)
                 items(children, key = { it.id }) { f ->
-                    FolderRow(
-                        folder = f,
-                        count = favs.countOf(f.id),
-                        onClick = { currentFolder = f.id },
-                        onMenu = { dialog = FavDialog.FolderActions(f.id) }
-                    )
+                    val hot = dropFolder == f.id && dragId != null
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coords ->
+                                val b = coords.boundsInWindow()
+                                folderBounds[f.id] = b.top..b.bottom
+                            }
+                            .then(
+                                if (hot) Modifier
+                                    .clip(RoundedCornerShape(Radius.md))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = .10f))
+                                else Modifier
+                            )
+                    ) {
+                        FolderRow(
+                            folder = f,
+                            count = favs.countOf(f.id),
+                            onClick = {
+                                // 拖动刚结束的那一下抬起不算点击
+                                if (System.currentTimeMillis() - lastDragEnd > 300) currentFolder = f.id
+                            },
+                            onMenu = { dialog = FavDialog.FolderActions(f.id) }
+                        )
+                    }
                 }
-                val here = favs.itemsIn(currentFolder).filter { hit(it) }
+                val here = hereItems
                 if (children.isNotEmpty() && here.isNotEmpty()) {
                     item {
                         Text(
@@ -234,20 +281,100 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                         )
                     }
                 }
-                items(here, key = { it.entryId }) { fi ->
-                    FavRowAuto(
-                        style = settings.listStyle,
-                        item = fi,
-                        onOpen = {
-                            if (multiMode) selected = if (fi.entryId in selected) selected - fi.entryId else selected + fi.entryId
-                            else onOpen(Page.Detail(fi.entryId))
-                        },
-                        onMenu = { dialog = FavDialog.FavActions(fi) },
-                        multiMode = multiMode,
-                        checked = fi.entryId in selected,
-                        folded = settings.foldPreview,
-                        scrollEndAt = scrollEndAt
-                    )
+                itemsIndexed(here, key = { _, fi -> fi.entryId }) { _, fi ->
+                    val dragging = fi.entryId == dragId
+                    var myTop by remember { mutableFloatStateOf(0f) }
+                    Box(
+                        Modifier
+                            .zIndex(if (dragging) 1f else 0f)
+                            .graphicsLayer {
+                                translationY = if (dragging) dragOffset else 0f
+                                alpha = if (dragging) 0.96f else 1f
+                                shadowElevation = if (dragging) 8f else 0f
+                            }
+                            .onGloballyPositioned { myTop = it.boundsInWindow().top }
+                            .pointerInput(fi.entryId, multiMode, selected) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        dragId = fi.entryId
+                                        dragOffset = 0f
+                                        dropFolder = null
+                                        dragGroup = if (multiMode && fi.entryId in selected) selected
+                                        else setOf(fi.entryId)
+                                    },
+                                    onDragCancel = {
+                                        dragId = null
+                                        dragOffset = 0f
+                                        dragGroup = emptySet()
+                                        dropFolder = null
+                                        lastDragEnd = System.currentTimeMillis()
+                                    },
+                                    onDragEnd = {
+                                        val target = dropFolder
+                                        val ids = dragGroup
+                                        dragId = null
+                                        dragOffset = 0f
+                                        dragGroup = emptySet()
+                                        dropFolder = null
+                                        lastDragEnd = System.currentTimeMillis()
+                                        if (target != null && ids.isNotEmpty()) {
+                                            dialog = FavDialog.ConfirmDropToFolder(ids, target)
+                                        }
+                                    },
+                                    onDrag = { change, delta ->
+                                        change.consume()
+                                        dragOffset += delta.y
+                                        // 落点是否压在某个文件夹行上（窗口坐标）
+                                        val absY = myTop + change.position.y + dragOffset
+                                        dropFolder = folderBounds.entries
+                                            .firstOrNull { absY in it.value }?.key
+                                        // 单条拖动时顺便支持同层排序；多选整组拖动不做重排，
+                                        // 否则组内相对顺序会被打乱
+                                        if (dragGroup.size <= 1 && dropFolder == null) {
+                                            val cur = liveHere.indexOfFirst { it.entryId == fi.entryId }
+                                            if (cur >= 0) {
+                                                // 按 key 找相邻条目：主页列表前面还有面包屑/文件夹行，
+                                                // 局部下标与 LazyColumn 的全局 index 对不上，不能用 index ± 1
+                                                fun infoOf(id: String) = listState.layoutInfo.visibleItemsInfo
+                                                    .firstOrNull { it.key == id }
+                                                val next = liveHere.getOrNull(cur + 1)
+                                                    ?.let { infoOf(it.entryId) }
+                                                val prev = liveHere.getOrNull(cur - 1)
+                                                    ?.let { infoOf(it.entryId) }
+                                                when {
+                                                    next != null && dragOffset > next.size / 2f -> {
+                                                        moveFav(cur, cur + 1)
+                                                        dragOffset -= next.size
+                                                    }
+                                                    prev != null && dragOffset < -prev.size / 2f -> {
+                                                        moveFav(cur, cur - 1)
+                                                        dragOffset += prev.size
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                    ) {
+                        FavRowAuto(
+                            style = settings.listStyle,
+                            item = fi,
+                            onOpen = {
+                                // 拖动刚结束的那一下抬起不算点击
+                                if (System.currentTimeMillis() - lastDragEnd > 300) {
+                                    if (multiMode) selected =
+                                        if (fi.entryId in selected) selected - fi.entryId else selected + fi.entryId
+                                    else onOpen(Page.Detail(fi.entryId))
+                                }
+                            },
+                            onMenu = { dialog = FavDialog.FavActions(fi) },
+                            multiMode = multiMode,
+                            checked = fi.entryId in selected,
+                            folded = settings.foldPreview,
+                            scrollEndAt = scrollEndAt
+                        )
+                    }
                 }
             }
 
@@ -480,6 +607,36 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     dismissButton = {
                         TextButton(onClick = { dialog = null }) { Text("取消") }
                     }
+                )
+            }
+
+            is FavDialog.ConfirmDropToFolder -> {
+                val folder = favs.folders.firstOrNull { it.id == d.folderId }
+                val n = d.ids.size
+                val one = favs.items.firstOrNull { it.entryId == d.ids.firstOrNull() }?.entry?.title
+                AlertDialog(
+                    onDismissRequest = { dialog = null },
+                    title = { Text("移入文件夹", fontSize = TypeScale.body, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            if (n <= 1) "把「${one ?: "这条收藏"}」移入「${folder?.name ?: "文件夹"}」？"
+                            else "把这 $n 条一起移入「${folder?.name ?: "文件夹"}」？",
+                            fontSize = TypeScale.small,
+                            lineHeight = 19.sp
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            Store.moveFavs(d.ids, d.folderId)
+                            dialog = null
+                            Toast.makeText(
+                                ctx,
+                                "已移入「${folder?.name ?: "文件夹"}」",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }) { Text("移入", fontWeight = FontWeight.Bold) }
+                    },
+                    dismissButton = { TextButton(onClick = { dialog = null }) { Text("取消") } }
                 )
             }
 
