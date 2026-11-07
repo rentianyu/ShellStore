@@ -248,7 +248,14 @@ private fun Root() {
     ) {
         val downloading = upState as? UpdateCenter.State.Downloading
         if (downloading != null) {
-            DownloadBar(downloading.pct)
+            DownloadBar(
+                pct = downloading.pct,
+                line = downloading.line,
+                index = downloading.index,
+                lines = downloading.lines,
+                bytes = downloading.bytes,
+                total = downloading.total
+            )
         }
         // 启动时自动更新下载失败：给一行可重试的提示，不弹窗打断
         val upFailed = upState as? UpdateCenter.State.Failed

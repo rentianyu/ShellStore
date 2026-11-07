@@ -14,7 +14,15 @@ object UpdateCenter {
     sealed interface State {
         data object Idle : State
         data object Checking : State
-        data class Downloading(val tag: String, val pct: Int) : State
+        data class Downloading(
+            val tag: String,
+            val pct: Int,
+            val line: String = "",
+            val index: Int = 0,
+            val lines: Int = 0,
+            val bytes: Long = 0,
+            val total: Long = 0
+        ) : State
         data class Ready(val tag: String) : State
         data class Failed(val message: String) : State
     }
@@ -42,9 +50,21 @@ object UpdateCenter {
         }
 
         _state.value = State.Downloading(info.version, 0)
-        val err = Updater.download(ctx, info) { pct ->
-            _state.value = State.Downloading(info.version, pct)
-        }
+        val err = Updater.download(
+            ctx, info,
+            onProgress = { pct ->
+                val cur = _state.value as? State.Downloading
+                _state.value = (cur ?: State.Downloading(info.version, pct))
+                    .copy(tag = info.version, pct = pct)
+            },
+            onDetail = { line, index, lines, bytes, total ->
+                _state.value = State.Downloading(
+                    tag = info.version,
+                    pct = if (total > 0) (bytes * 100 / total).toInt().coerceIn(0, 99) else 0,
+                    line = line, index = index, lines = lines, bytes = bytes, total = total
+                )
+            }
+        )
         if (err == null) {
             readyInfo = info
             _state.value = State.Ready(info.version)
@@ -70,7 +90,8 @@ object UpdateCenter {
      */
     fun retry(ctx: Context, currentVersion: String) {
         checkedOnce = false
-        readyInfo?.let { Updater.clearCache(ctx, it.version) }
+        // 注意：这里**不清缓存**。半成品文件保留着才能断点续传，
+        // 一清就得从 0 重下——这正是之前「一直重复下载」的成因。
         readyInfo = null
         _state.value = State.Idle
         checkAndDownload(ctx, currentVersion)

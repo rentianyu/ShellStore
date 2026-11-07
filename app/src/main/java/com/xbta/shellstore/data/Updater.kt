@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -109,57 +110,117 @@ object Updater {
         return ApkVerify.check(ctx, f, version)
     }
 
+    /** 一次线路尝试的结果 */
+    private class Attempt(
+        val err: String? = null,
+        val keepPart: Boolean = true,
+        val fatal: Boolean = false
+    )
+
     /**
      * 下载并校验安装包。成功返回 null，失败返回可读原因。
      *
-     * 已有缓存先校验：**通过才复用，不通过直接删**（旧代码只判长度 > 1MB，
-     * 一个坏包会被永远当成「已下载好」，这是之前反复装不上包的根源）。
+     * 两个关键点（都是「一直重复下载」的直接原因）：
+     *
+     * 1. **半成品保留 + 断点续传**。8.9MB 在移动网络下往往要几分钟，以前的实现每换一条
+     *    线路、每次启动 App 都把 `.part.apk` 删掉从 0 开始，用户看到的就是进度条反复归零；
+     *    现在先发 `Range: bytes=<已下>-`，服务端回 206 就接着写。
+     * 2. **确定性失败不重试**。签名与本机不一致这类错误，换 11 条线路下的还是同一个包，
+     *    以前会白下 20 多遍才报错；现在第一遍就停。
      */
-    fun download(ctx: Context, info: Info, onProgress: (Int) -> Unit = {}): String? {
+    fun download(
+        ctx: Context,
+        info: Info,
+        onProgress: (Int) -> Unit = {},
+        onDetail: (line: String, index: Int, lines: Int, bytes: Long, total: Long) -> Unit =
+            { _, _, _, _, _ -> }
+    ): String? {
         val dest = cacheFile(ctx, info.version)
         if (dest.exists()) {
-            if (ApkVerify.check(ctx, dest, info.version) == null) return null
+            if (ApkVerify.check(ctx, dest, info.version) == null) {
+                onProgress(100)
+                return null
+            }
             runCatching { dest.delete() }
         }
-        clearCache(ctx, info.version)
 
         val part = partFile(ctx, info.version)
+        val lines = Mirrors.apkUrls(info.apkUrl)
         val started = System.currentTimeMillis()
         var last = "所有下载线路都失败了"
         var rounds = 0
 
-        while (rounds < 2 && System.currentTimeMillis() - started < TOTAL_BUDGET_MS) {
+        while (rounds < 3 && System.currentTimeMillis() - started < TOTAL_BUDGET_MS) {
             rounds++
-            for ((name, url) in Mirrors.apkUrls(info.apkUrl)) {
+            // 半成品可能已经下完了（上次改名没来得及 / 进程被杀）：先验一次，通过就直接收工
+            if (part.exists() && ApkVerify.check(ctx, part, info.version) == null) {
+                if (part.renameTo(dest)) {
+                    onProgress(100)
+                    return null
+                }
+            }
+            for ((i, entry) in lines.withIndex()) {
                 if (System.currentTimeMillis() - started >= TOTAL_BUDGET_MS) break
-                runCatching { part.delete() }
-                onProgress(0)
+                val name: String = entry.first
+                val url: String = entry.second
+                val have = if (part.exists()) part.length() else 0L
+                onDetail(name, i + 1, lines.size, have, 0)
 
-                val err = fetchTo(url, part, onProgress)
-                if (err != null) {
-                    last = "$name：$err"
-                    continue
-                }
-
-                val why = ApkVerify.check(ctx, part, info.version)
-                if (why == null) {
-                    if (part.renameTo(dest)) {
-                        onProgress(100)
-                        return null
+                val r = fetchTo(url, part, have) { bytes, total ->
+                    if (total > 0) {
+                        onProgress((bytes * 100 / total).toInt().coerceIn(0, 99))
                     }
-                    last = "无法保存安装包到缓存目录"
+                    onDetail(name, i + 1, lines.size, bytes, total)
+                }
+
+                if (r.fatal) {
+                    runCatching { part.delete() }
+                    return r.err
+                }
+                if (r.err != null) {
+                    last = "$name：${r.err}"
+                    if (!r.keepPart) runCatching { part.delete() }
                     continue
                 }
-                last = "$name：$why"
-                runCatching { part.delete() }
+
+                when (val v = ApkVerify.verdict(ctx, part, info.version)) {
+                    ApkVerify.Verdict.Ok -> {
+                        if (part.renameTo(dest)) {
+                            onProgress(100)
+                            return null
+                        }
+                        last = "无法保存安装包到缓存目录"
+                        runCatching { part.delete() }
+                    }
+                    is ApkVerify.Verdict.Fatal -> {
+                        runCatching { part.delete() }
+                        return v.why
+                    }
+                    is ApkVerify.Verdict.Retryable -> {
+                        last = "$name：${v.why}"
+                        // 下完了但内容不对，续传没有意义，删掉重来
+                        runCatching { part.delete() }
+                    }
+                }
             }
         }
-        runCatching { part.delete() }
         return if (rounds > 1) "$last（已重试 $rounds 轮）" else last
     }
 
-    /** 单条线路下到文件；成功返回 null，失败返回原因 */
-    private fun fetchTo(url: String, out: File, onProgress: (Int) -> Unit): String? {
+    /**
+     * 单条线路下载，支持断点续传。
+     *
+     * have > 0 时请求 `Range: bytes=have-`：
+     *   · 回 206 → 追加写，进度接着上次；
+     *   · 回 200 → 该节点不支持 Range，只能从头覆盖（进度会归零，但内容是对的）；
+     *   · 回 416 → 已下的比远端还多，说明残留文件不对，删了重来。
+     */
+    private fun fetchTo(
+        url: String,
+        out: File,
+        have: Long,
+        onBytes: (Long, Long) -> Unit
+    ): Attempt {
         var conn: HttpURLConnection? = null
         return try {
             conn = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -168,37 +229,42 @@ object Updater {
                 instanceFollowRedirects = true
                 setRequestProperty("User-Agent", "ShellStore (Android)")
                 setRequestProperty("Accept", "application/octet-stream, */*")
+                if (have > 0) setRequestProperty("Range", "bytes=$have-")
             }
             val code = conn.responseCode
-            if (code !in 200..299) return "HTTP $code"
+            if (code == 416) return Attempt("已下内容与服务端不一致", keepPart = false)
+            if (code !in 200..299) return Attempt("HTTP $code")
 
-            val total = conn.contentLengthLong
-            var written = 0L
-            var lastPct = -1
+            val append = code == 206 && have > 0
+            val segTotal = conn.contentLengthLong
+            val total = if (append && segTotal > 0) have + segTotal else segTotal
+            var written = if (append) have else 0L
+            var lastTick = written
+            onBytes(written, total)
+
             conn.inputStream.use { input ->
-                out.outputStream().use { o ->
+                FileOutputStream(out, append).use { o ->
                     val buf = ByteArray(64 * 1024)
                     while (true) {
                         val n = input.read(buf)
                         if (n <= 0) break
                         o.write(buf, 0, n)
                         written += n
-                        if (total > 0) {
-                            val pct = (written * 100 / total).toInt().coerceIn(0, 100)
-                            if (pct / 3 != lastPct / 3) {
-                                lastPct = pct
-                                onProgress(pct)
-                            }
+                        if (written - lastTick >= 256 * 1024) {
+                            lastTick = written
+                            onBytes(written, total)
                         }
                     }
+                    o.flush()
                 }
             }
-            // 有 Content-Length 就要求字节数对得上，断了立刻换线路（不必等完整校验）
-            if (total > 0 && written != total) return "下载中断（$written/$total 字节）"
-            if (written < 1_000_000) return "内容太短（$written 字节）"
-            null
+            onBytes(written, total)
+            // 有 Content-Length 就要求字节数对得上，断了保留已下部分等下次续传
+            if (segTotal > 0 && written != total) return Attempt("下载中断（$written/$total 字节）")
+            if (written < 100_000) return Attempt("内容太短（$written 字节）", keepPart = false)
+            Attempt()
         } catch (e: Exception) {
-            e.javaClass.simpleName + (e.message?.let { "：$it" } ?: "")
+            Attempt(e.javaClass.simpleName + (e.message?.let { "：$it" } ?: ""))
         } finally {
             runCatching { conn?.disconnect() }
         }

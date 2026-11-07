@@ -57,6 +57,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** 已下/总大小，用于下载进度展示 */
+private fun mbText(bytes: Long, total: Long): String {
+    if (bytes <= 0L) return ""
+    fun f(b: Long) = String.format("%.1f", b / 1048576.0)
+    return if (total > 0) "　${f(bytes)}/${f(total)} MB" else "　已下 ${f(bytes)} MB"
+}
+
 @Composable
 fun MeScreen(onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
@@ -74,6 +81,12 @@ fun MeScreen(onOpen: (Page) -> Unit) {
     var downloaded by remember { mutableStateOf(false) }
     var dlError by remember { mutableStateOf("") }
     var updateSub by remember { mutableStateOf("v${BuildConfig.VERSION_NAME}") }
+    // 下载详情：当前线路 + 已下字节，用来判断「到底在动还是卡住」
+    var dlLine by remember { mutableStateOf("") }
+    var dlIndex by remember { mutableIntStateOf(0) }
+    var dlLines by remember { mutableIntStateOf(0) }
+    var dlBytes by remember { mutableLongStateOf(0L) }
+    var dlTotal by remember { mutableLongStateOf(0L) }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("我的")
@@ -222,7 +235,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(
-                                    "点「重新下载」会清掉缓存、换线路重新拉一遍。",
+                                    "点「重新下载」会换线路重试；已下载的部分会保留，从断点接着下，不用从头再来。",
                                     fontSize = TypeScale.small,
                                     lineHeight = 17.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -244,7 +257,18 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     }
                     if (progress >= 0) {
                         Spacer(Modifier.height(10.dp))
-                        Text("下载中 $progress%", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            "下载中 $progress%" + mbText(dlBytes, dlTotal),
+                            fontSize = TypeScale.small,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        if (dlLine.isNotBlank()) {
+                            Text(
+                                "线路 $dlIndex/$dlLines · $dlLine（断了会从这里接着下）",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             },
@@ -260,13 +284,26 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                                 showUpdate = false
                             } else {
                                 progress = 0
+                                dlBytes = 0L
+                                dlTotal = 0L
+                                dlLine = ""
                                 val hadError = dlError.isNotBlank()
                                 dlError = ""
                                 updateMsg = ""
                                 scope.launch {
                                     val err = withContext(Dispatchers.IO) {
-                                        if (hadError) Updater.clearCache(ctx, l.version)
-                                        Updater.download(ctx, l) { p -> progress = p }
+                                        // 不清缓存：已下的部分要留着续传，清了就从 0 重下
+                                        Updater.download(
+                                            ctx, l,
+                                            onProgress = { p -> progress = p },
+                                            onDetail = { line, idx, lines, bytes, total ->
+                                                dlLine = line
+                                                dlIndex = idx
+                                                dlLines = lines
+                                                dlBytes = bytes
+                                                dlTotal = total
+                                            }
+                                        )
                                     }
                                     progress = -1
                                     if (err == null) {
@@ -283,7 +320,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                         Text(
                             when {
                                 downloaded -> "立即安装"
-                                dlError.isNotBlank() -> "重新下载"
+                                dlError.isNotBlank() -> "重试下载"
                                 else -> "下载（v${latest!!.version}）"
                             }
                         )

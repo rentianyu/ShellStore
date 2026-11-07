@@ -201,7 +201,7 @@ private fun DeltaBadge(delta: Int) {
 
 /** 下载中的顶部细进度条，不挡内容 */
 @Composable
-fun DownloadBar(pct: Int) {
+fun DownloadBar(pct: Int, line: String = "", index: Int = 0, lines: Int = 0, bytes: Long = 0L, total: Long = 0L) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant)) {
         Box(
             Modifier
@@ -220,7 +220,20 @@ fun DownloadBar(pct: Int) {
             Modifier.fillMaxWidth().padding(horizontal = Space.page, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("新版本下载中 $pct%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            fun f(b: Long) = String.format("%.1f", b / 1048576.0)
+            val size = when {
+                bytes <= 0L -> ""
+                total > 0 -> "　${f(bytes)}/${f(total)} MB"
+                else -> "　已下 ${f(bytes)} MB"
+            }
+            val via = if (line.isNotBlank() && lines > 0) "　$line ($index/$lines)" else ""
+            Text(
+                "新版本下载中 $pct%$size$via",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

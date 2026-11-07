@@ -20,26 +20,46 @@ import java.io.File
  */
 object ApkVerify {
 
-    /** 通过返回 null，失败返回可读原因 */
-    fun check(ctx: Context, f: File, expectVersion: String = ""): String? {
-        ZipCheck.verify(f)?.let { return it }
+    /**
+     * 校验结论。区分「可重试」与「确定性失败」很关键：
+     *
+     *   · Retryable —— 文件没下全 / 代理给了旧包，换线路再下一次有意义；
+     *   · Fatal —— 签名与本机不一致这类问题，同一个 tag 换 11 条线路下的还是同一个包，
+     *     以前会白下 20 多遍才报错，现在第一遍就该停。
+     */
+    sealed interface Verdict {
+        data object Ok : Verdict
+        data class Retryable(val why: String) : Verdict
+        data class Fatal(val why: String) : Verdict
+    }
+
+    fun verdict(ctx: Context, f: File, expectVersion: String = ""): Verdict {
+        ZipCheck.verify(f)?.let { return Verdict.Retryable(it) }
 
         val pm = ctx.packageManager
         val info = runCatching {
             pm.getPackageArchiveInfo(f.absolutePath, archiveFlags())
-        }.getOrNull() ?: return "无法解析安装包（文件损坏或不是 APK）"
+        }.getOrNull() ?: return Verdict.Retryable("无法解析安装包（文件损坏或不是 APK）")
 
-        if (info.packageName.isNullOrBlank()) return "安装包缺少包名信息"
+        if (info.packageName.isNullOrBlank()) return Verdict.Retryable("安装包缺少包名信息")
 
         if (expectVersion.isNotBlank()) {
             val got = info.versionName?.removePrefix("v").orEmpty()
             if (got.isNotBlank() && !sameVersion(got, expectVersion)) {
-                return "下载到的版本是 $got，与目标 $expectVersion 不符"
+                return Verdict.Retryable("下载到的版本是 $got，与目标 $expectVersion 不符")
             }
         }
 
-        return signerProblem(ctx, f)
+        return signerProblem(ctx, f)?.let { Verdict.Fatal(it) } ?: Verdict.Ok
     }
+
+    /** 通过返回 null，失败返回可读原因 */
+    fun check(ctx: Context, f: File, expectVersion: String = ""): String? =
+        when (val v = verdict(ctx, f, expectVersion)) {
+            Verdict.Ok -> null
+            is Verdict.Retryable -> v.why
+            is Verdict.Fatal -> v.why
+        }
 
     /** 安装包签名是否与本机已装版本一致；无法判断时返回 null（不阻断） */
     private fun signerProblem(ctx: Context, f: File): String? {
