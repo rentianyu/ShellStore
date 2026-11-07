@@ -250,7 +250,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                         )
                     }
                 }
-                IconBtn(if (fav) "★" else "☆") { Store.toggleFav(entry) }
+                IconBtn(if (fav) "★" else "☆") { Store.toggleFavSmart(entry) }
             }
         )
 
@@ -654,7 +654,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                     .size(42.dp)
                     .clip(RoundedCornerShape(Radius.md))
                     .background(variant)
-                    .clickable { Store.toggleFav(entry) },
+                    .clickable { Store.toggleFavSmart(entry) },
                 contentAlignment = Alignment.Center
             ) {
                 AppIcon(

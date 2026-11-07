@@ -811,6 +811,43 @@ object Store {
         }
     }
 
+    // ---------------- 收藏到指定文件夹 ----------------
+
+    private val _favPicker = MutableStateFlow<Entry?>(null)
+
+    /** 点星标后等着选文件夹的条目；非空时顶层弹选择框 */
+    val favPicker: StateFlow<Entry?> = _favPicker.asStateFlow()
+
+    fun cancelFavPick() {
+        _favPicker.value = null
+    }
+
+    /**
+     * 星标入口的统一行为，替换原来直接 toggleFav 的六处调用：
+     *   · 已收藏 → 直接取消（不打扰）
+     *   · 一个文件夹都没有 → 直接收藏到默认（没必要弹空框）
+     *   · 用户关掉了「收藏时选择文件夹」→ 直接收藏
+     *   · 其余情况 → 弹框让用户选文件夹
+     */
+    fun toggleFavSmart(entry: Entry) {
+        when {
+            isFav(entry.id) -> removeFav(entry.id)
+            _favs.value.folders.isEmpty() -> addFav(entry)
+            !settings.value.favAskFolder -> addFav(entry)
+            else -> _favPicker.value = entry
+        }
+    }
+
+    /** 选择框点了某一行（folderId = null 表示不放入文件夹） */
+    fun pickFavFolder(entry: Entry, folderId: String?, dontAskAgain: Boolean) {
+        _favPicker.value = null
+        if (dontAskAgain) {
+            val st = settings.value
+            if (st.favAskFolder) updateSettings(st.copy(favAskFolder = false))
+        }
+        if (isFav(entry.id)) moveFavs(listOf(entry.id), folderId) else addFav(entry, folderId)
+    }
+
     fun updateFav(item: FavItem) {
         val c = ctx ?: return
         _favs.value = _favs.value.copy(

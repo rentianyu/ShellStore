@@ -372,6 +372,18 @@ private fun Root() {
         )
     }
 
+    // 点星标后选文件夹（全局只此一处，各列表的星标都走 Store.toggleFavSmart）
+    val favPickEntry by Store.favPicker.collectAsState()
+    val favsData by Store.favs.collectAsState()
+    favPickEntry?.let { e ->
+        FavFolderPickerDialog(
+            entry = e,
+            favs = favsData,
+            onPick = { folderId, dontAsk -> Store.pickFavFolder(e, folderId, dontAsk) },
+            onDismiss = { Store.cancelFavPick() }
+        )
+    }
+
     // 启动检查的两个提示：先自身更新，再订阅源差异
     val st = upState
     if (st is UpdateCenter.State.Ready) {

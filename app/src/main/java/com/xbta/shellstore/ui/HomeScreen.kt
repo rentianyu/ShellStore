@@ -201,7 +201,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                             Store.addSearchHistory(query)
                             onOpen(Page.Detail(e.id))
                         },
-                        onToggleFav = { Store.toggleFav(e) },
+                        onToggleFav = { Store.toggleFavSmart(e) },
                         onEdit = { onOpen(Page.Editor(e.id)) },
                         folded = settings.foldPreview,
                         highlight = query
@@ -239,7 +239,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     EntryRowAuto(style = settings.listStyle, entry = e,
                         fav = favs.isFav(e.id),
                         onClick = { onOpen(Page.Detail(e.id)) },
-                        onToggleFav = { Store.toggleFav(e) },
+                        onToggleFav = { Store.toggleFavSmart(e) },
                         onEdit = { onOpen(Page.Editor(e.id)) },
                         folded = settings.foldPreview
                     )
@@ -410,7 +410,7 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
                     fav = favs.isFav(e.id),
                     scrollEndAt = scrollEndAt,
                     onClick = { onOpen(Page.Detail(e.id)) },
-                    onToggleFav = { Store.toggleFav(e) },
+                    onToggleFav = { Store.toggleFavSmart(e) },
                     onEdit = { onOpen(Page.Editor(e.id)) },
                     showCategory = false,
                     folded = settings.foldPreview,

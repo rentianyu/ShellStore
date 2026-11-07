@@ -86,6 +86,8 @@ data class AppSettings(
     val checkUpdateOnStart: Boolean = true,
     /** 只在 Wi-Fi / 以太网下自动下载更新包；移动网络下只提示不动手 */
     val wifiOnlyUpdate: Boolean = true,
+    /** 点星标收藏时是否弹框选文件夹（关掉就一律收藏到默认位置） */
+    val favAskFolder: Boolean = true,
     val copyAndReturn: Boolean = false,
     /** 列表只显示标题、收起命令预览 */
     val foldPreview: Boolean = false,
@@ -132,6 +134,7 @@ data class AppSettings(
         put("confirmDanger", confirmDanger)
         put("checkUpdateOnStart", checkUpdateOnStart)
         put("wifiOnlyUpdate", wifiOnlyUpdate)
+        put("favAskFolder", favAskFolder)
         put("copyAndReturn", copyAndReturn)
         put("foldPreview", foldPreview)
         put("listStyle", listStyle)
@@ -172,6 +175,7 @@ data class AppSettings(
                 confirmDanger = o.optBoolean("confirmDanger", true),
                 checkUpdateOnStart = o.optBoolean("checkUpdateOnStart", true),
                 wifiOnlyUpdate = o.optBoolean("wifiOnlyUpdate", true),
+                favAskFolder = o.optBoolean("favAskFolder", true),
                 copyAndReturn = o.optBoolean("copyAndReturn", false),
                 foldPreview = o.optBoolean("foldPreview", false),
                 listStyle = o.optString("listStyle", ListStyle.CARD),
@@ -284,6 +288,20 @@ data class FavData(
             childrenOf(id).forEach { walk(it.id) }
         }
         walk(folderId)
+        return out
+    }
+
+    /** 深度优先展开的文件夹列表（带层级），用于「收藏到哪个文件夹」这类平铺选择 */
+    fun orderedFolders(): List<Pair<Folder, Int>> {
+        val out = mutableListOf<Pair<Folder, Int>>()
+        fun walk(parent: String?, depth: Int) {
+            childrenOf(parent).forEach { f ->
+                if (depth > 20) return@forEach
+                out.add(f to depth)
+                walk(f.id, depth + 1)
+            }
+        }
+        walk(null, 0)
         return out
     }
 

@@ -83,7 +83,7 @@ fun RecentScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                     entry = e,
                     fav = favs.isFav(e.id),
                     onClick = { onOpen(Page.Detail(e.id)) },
-                    onToggleFav = { Store.toggleFav(e) },
+                    onToggleFav = { Store.toggleFavSmart(e) },
                     onEdit = { onOpen(Page.Editor(e.id)) }
                 )
             }

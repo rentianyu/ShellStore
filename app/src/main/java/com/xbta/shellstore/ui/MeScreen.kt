@@ -554,6 +554,14 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
                     }
                 )
                 Divider()
+                SettingRow(
+                    "★", "收藏时选择文件夹",
+                    "点星标后先问放到哪个文件夹；关掉则直接收进默认位置",
+                    trailing = {
+                        Toggle(settings.favAskFolder) { update(settings.copy(favAskFolder = it)) }
+                    }
+                )
+                Divider()
                 SettingRow("⊘", "清除收藏数据", "不可恢复", danger = true, onClick = { confirmClear = true })
             }
 
