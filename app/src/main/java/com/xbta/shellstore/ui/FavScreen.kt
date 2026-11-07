@@ -32,12 +32,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.data.FavItem
+import com.xbta.shellstore.data.ListStyle
 import com.xbta.shellstore.data.Folder
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Dimen
@@ -172,7 +174,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             Modifier.weight(1f).fillMaxWidth(),
             state = listState,
             contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 8.dp, bottom = 88.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+            verticalArrangement = Arrangement.spacedBy(if (settings.listStyle == ListStyle.LIST) 0.dp else 7.dp)
         ) {
             if (view == 0) {
                 val path = favs.pathOf(currentFolder)
@@ -229,8 +231,9 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                     }
                 }
                 items(here, key = { it.entryId }) { fi ->
-                    FavRow(
-                        fi,
+                    FavRowAuto(
+                        style = settings.listStyle,
+                        item = fi,
                         onOpen = {
                             if (multiMode) selected = if (fi.entryId in selected) selected - fi.entryId else selected + fi.entryId
                             else onOpen(Page.Detail(fi.entryId))
@@ -282,8 +285,9 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                         )
                     }
                     items(favs.items.sortedByDescending { it.savedAt }.filter { hit(it) }, key = { it.entryId }) { fi ->
-                        FavRow(
-                            fi,
+                        FavRowAuto(
+                            style = settings.listStyle,
+                            item = fi,
                             onOpen = {
                                 if (multiMode) selected = if (fi.entryId in selected) selected - fi.entryId else selected + fi.entryId
                                 else onOpen(Page.Detail(fi.entryId))
@@ -344,7 +348,9 @@ fun FavScreen(onOpen: (Page) -> Unit) {
         ViewOptionsDialog(
             foldPreview = settings.foldPreview,
             onFoldChange = { Store.updateSettings(settings.copy(foldPreview = it)) },
-            onDismiss = { viewOptions = false }
+            onDismiss = { viewOptions = false },
+            listStyle = settings.listStyle,
+            onStyleChange = { Store.updateSettings(settings.copy(listStyle = it)) }
         )
     }
 
@@ -777,6 +783,120 @@ fun FavRow(
     }
 }
 
+/**
+ * 收藏页的紧凑行：与 [com.xbta.shellstore.ui.EntryListRow] 同一套视觉（无卡片、细分隔线），
+ * 但右侧是「⋯」菜单而不是收藏/编辑按钮——收藏页里的条目本来就都已收藏。
+ */
+@Composable
+fun FavListRow(
+    item: FavItem,
+    onOpen: () -> Unit,
+    onMenu: () -> Unit,
+    multiMode: Boolean = false,
+    checked: Boolean = false,
+    folded: Boolean = false,
+    scrollEndAt: Long = 0L,
+    showDivider: Boolean = true
+) {
+    val e: Entry = item.entry
+    fun tapAllowed(): Boolean = System.currentTimeMillis() - scrollEndAt >= 350L
+    val dead = !item.alive && !Store.isAlive(item.entryId) && !Store.isLocal(item.entryId)
+    val preview = when {
+        item.note.isNotBlank() -> "备注：${item.note}"
+        e.body.isNotBlank() -> e.body.replace("\n", " ⏎ ")
+        e.adb.isNotBlank() -> e.adb
+        e.intent?.action?.isNotBlank() == true -> e.intent!!.action
+        else -> ""
+    }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(if (checked) MaterialTheme.colorScheme.primary.copy(alpha = .07f)
+                else Color.Transparent)
+                .clickable { if (tapAllowed()) onOpen() }
+                .padding(start = 12.dp, end = 6.dp, top = 9.dp, bottom = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (multiMode) {
+                CheckCircle(checked)
+                Spacer(Modifier.width(8.dp))
+            }
+            TypeBadge(e.type, size = 22)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        e.title,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (dead) {
+                        Spacer(Modifier.width(6.dp))
+                        Text("失效", fontSize = 9.sp, color = Tones.danger)
+                    }
+                    if (Store.isLocal(item.entryId)) {
+                        Spacer(Modifier.width(5.dp))
+                        Text("本地", fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+                if (!folded && preview.isNotBlank()) {
+                    Text(
+                        preview,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            if (!multiMode) {
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .clickable { if (tapAllowed()) onMenu() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    AppIcon("⋯", size = 16.dp, color = MaterialTheme.colorScheme.outline)
+                }
+            }
+        }
+        if (showDivider) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = if (multiMode) 70.dp else 44.dp)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = .14f))
+            )
+        }
+    }
+}
+
+/** 按设置里的列表样式选一套画法 */
+@Composable
+fun FavRowAuto(
+    style: String,
+    item: FavItem,
+    onOpen: () -> Unit,
+    onMenu: () -> Unit,
+    multiMode: Boolean = false,
+    checked: Boolean = false,
+    folded: Boolean = false,
+    scrollEndAt: Long = 0L
+) {
+    if (style == ListStyle.LIST) {
+        FavListRow(item, onOpen, onMenu, multiMode, checked, folded, scrollEndAt)
+    } else {
+        FavRow(item, onOpen, onMenu, multiMode, checked, folded, scrollEndAt)
+    }
+}
+
 @Composable
 private fun MenuItem(text: String, danger: Boolean = false, onClick: () -> Unit) {
     Text(
@@ -834,6 +954,7 @@ private fun InputDialog(
 @Composable
 fun FavFolderScreen(folderId: String?, onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val favs by Store.favs.collectAsState()
+    val settings by Store.settings.collectAsState()
     val items = favs.itemsIn(folderId)
     // 拖动中列表会因为重排而重组，pointerInput 的闭包必须读到最新顺序，用这个兜住
     val live by rememberUpdatedState(items)
@@ -871,7 +992,7 @@ fun FavFolderScreen(folderId: String?, onBack: () -> Unit, onOpen: (Page) -> Uni
             state = state,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(Space.page),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+            verticalArrangement = Arrangement.spacedBy(if (settings.listStyle == ListStyle.LIST) 0.dp else 7.dp)
         ) {
             itemsIndexed(items, key = { _, fi -> fi.entryId }) { _, fi ->
                 val dragging = fi.entryId == dragId
@@ -921,8 +1042,9 @@ fun FavFolderScreen(folderId: String?, onBack: () -> Unit, onOpen: (Page) -> Uni
                             )
                         }
                 ) {
-                    FavRow(
-                        fi,
+                    FavRowAuto(
+                        style = settings.listStyle,
+                        item = fi,
                         onOpen = {
                             // 松手瞬间的那次抬起不要当成点击打开详情
                             if (System.currentTimeMillis() - lastDragEnd > 300) {
@@ -940,6 +1062,7 @@ fun FavFolderScreen(folderId: String?, onBack: () -> Unit, onOpen: (Page) -> Uni
 @Composable
 fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val favs by Store.favs.collectAsState()
+    val settings by Store.settings.collectAsState()
     var chosen by remember { mutableStateOf<String?>(null) }
 
     // 进入某个标签后，返回键先退回标签列表，而不是直接退出这一页
@@ -957,7 +1080,7 @@ fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 LazyColumn(
                     Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 6.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                    verticalArrangement = Arrangement.spacedBy(if (settings.listStyle == ListStyle.LIST) 0.dp else 7.dp)
                 ) {
                     items(favs.tags, key = { it.id }) { t ->
                         val n = favs.items.count { t.id in it.tags }
@@ -998,10 +1121,10 @@ fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
                 LazyColumn(
                     Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 6.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                    verticalArrangement = Arrangement.spacedBy(if (settings.listStyle == ListStyle.LIST) 0.dp else 7.dp)
                 ) {
                     items(list, key = { it.entryId }) { fi ->
-                        FavRow(fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = { onOpen(Page.Editor(fi.entryId, null)) })
+                        FavRowAuto(style = settings.listStyle, item = fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = { onOpen(Page.Editor(fi.entryId, null)) })
                     }
                 }
             }
@@ -1012,15 +1135,16 @@ fun TagScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
 @Composable
 fun AllFavScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val favs by Store.favs.collectAsState()
+    val settings by Store.settings.collectAsState()
     Column(Modifier.fillMaxSize()) {
         TopBar("全部收藏", onBack = onBack)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(Space.page),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+            verticalArrangement = Arrangement.spacedBy(if (settings.listStyle == ListStyle.LIST) 0.dp else 7.dp)
         ) {
             items(favs.items, key = { it.entryId }) { fi ->
-                FavRow(fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = { onOpen(Page.Editor(fi.entryId, null)) })
+                FavRowAuto(style = settings.listStyle, item = fi, onOpen = { onOpen(Page.Detail(fi.entryId)) }, onMenu = { onOpen(Page.Editor(fi.entryId, null)) })
             }
         }
     }

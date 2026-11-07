@@ -43,6 +43,17 @@ enum class CloudBackend(val label: String) {
     S3("S3")
 }
 
+/** 列表样式：卡片（默认）与紧凑列表（无卡片、行紧挨、细分隔线，一屏能多看到一倍） */
+object ListStyle {
+    const val CARD = "card"
+    const val LIST = "list"
+    val ALL = listOf(CARD, LIST)
+    fun label(s: String): String = when (s) {
+        LIST -> "紧凑列表"
+        else -> "卡片"
+    }
+}
+
 data class AppSettings(
     val theme: ThemeMode = ThemeMode.LIGHT,
     /** 字号档位 0..9，对应 FONT_SCALES */
@@ -76,6 +87,8 @@ data class AppSettings(
     val copyAndReturn: Boolean = false,
     /** 列表只显示标题、收起命令预览 */
     val foldPreview: Boolean = false,
+    /** 列表样式：card / list（紧凑） */
+    val listStyle: String = ListStyle.CARD,
     /** 是否完成过首次初始化（自动加载默认源） */
     val onboarded: Boolean = false,
     /** 上次拉取成功的线路名，空串表示直连。下次优先用它 */
@@ -118,6 +131,7 @@ data class AppSettings(
         put("checkUpdateOnStart", checkUpdateOnStart)
         put("copyAndReturn", copyAndReturn)
         put("foldPreview", foldPreview)
+        put("listStyle", listStyle)
         put("onboarded", onboarded)
         put("sourceMirror", sourceMirror)
         put("xbtaSeries", xbtaSeries)
@@ -156,6 +170,7 @@ data class AppSettings(
                 checkUpdateOnStart = o.optBoolean("checkUpdateOnStart", true),
                 copyAndReturn = o.optBoolean("copyAndReturn", false),
                 foldPreview = o.optBoolean("foldPreview", false),
+                listStyle = o.optString("listStyle", ListStyle.CARD),
                 onboarded = o.optBoolean("onboarded", false),
                 sourceMirror = o.optString("sourceMirror", ""),
                 xbtaSeries = o.optBoolean("xbtaSeries", false),

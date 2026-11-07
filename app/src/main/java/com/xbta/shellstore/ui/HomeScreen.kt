@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.core.EntryType
+import com.xbta.shellstore.data.ListStyle
 import com.xbta.shellstore.data.Store
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -124,7 +125,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
             Modifier.fillMaxSize(),
             state = listState,
             contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(if (settings.listStyle == ListStyle.LIST) 0.dp else 8.dp)
         ) {
             if (searchMode && query.isBlank() && history.isNotEmpty()) {
                 item {
@@ -185,8 +186,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     item { EmptyState("没有找到匹配的命令", "换个关键词，或去「我的 › 订阅源」添加更多来源") }
                 }
                 items(results, key = { it.id }) { e ->
-                    EntryRow(
-                        e,
+                    EntryRowAuto(style = settings.listStyle, entry = e,
                         fav = favs.isFav(e.id),
                         scrollEndAt = scrollEndAt,
                         onClick = {
@@ -229,8 +229,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     }
                 }
                 items(entries, key = { it.id }) { e ->
-                    EntryRow(
-                        e,
+                    EntryRowAuto(style = settings.listStyle, entry = e,
                         fav = favs.isFav(e.id),
                         onClick = { onOpen(Page.Detail(e.id)) },
                         onToggleFav = { Store.toggleFav(e) },
@@ -247,7 +246,9 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
         ViewOptionsDialog(
             foldPreview = settings.foldPreview,
             onFoldChange = { Store.updateSettings(settings.copy(foldPreview = it)) },
-            onDismiss = { viewOptions = false }
+            onDismiss = { viewOptions = false },
+            listStyle = settings.listStyle,
+            onStyleChange = { Store.updateSettings(settings.copy(listStyle = it)) }
         )
     }
 }
@@ -261,6 +262,7 @@ private fun CategoryGrid(
     val shown = cats.take(6)
     // 分类少时用 2 列，避免第二行只剩一个卡片、右边留一大片空白
     val cols = if (shown.size <= 4) 2 else 3
+    // 分类网格与列表样式无关，间距固定
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         shown.chunked(cols).forEach { rowCats ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -307,7 +309,7 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+            verticalArrangement = Arrangement.spacedBy(if (settings.listStyle == ListStyle.LIST) 0.dp else 5.dp)
         ) {
             item {
                 Text(
@@ -389,14 +391,13 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
             Modifier.fillMaxSize(),
             state = listState,
             contentPadding = PaddingValues(start = Space.page, end = Space.page, top = 8.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(if (settings.listStyle == ListStyle.LIST) 0.dp else 8.dp)
         ) {
             item {
                 Text("${shown.size} 条", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             items(shown, key = { it.id }) { e ->
-                EntryRow(
-                    e,
+                EntryRowAuto(style = settings.listStyle, entry = e,
                     fav = favs.isFav(e.id),
                     scrollEndAt = scrollEndAt,
                     onClick = { onOpen(Page.Detail(e.id)) },

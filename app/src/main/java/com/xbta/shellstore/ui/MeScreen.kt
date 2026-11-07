@@ -39,6 +39,7 @@ import com.xbta.shellstore.data.AppSettings
 import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.FONT_SCALES
 import com.xbta.shellstore.data.FontChoice
+import com.xbta.shellstore.data.ListStyle
 import com.xbta.shellstore.data.UI_SCALES
 import com.xbta.shellstore.core.Changelog
 import com.xbta.shellstore.core.LegalText
@@ -416,6 +417,28 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
                     Spacer(Modifier.height(7.dp))
                     Text(
                         "文字与控件一起缩放，屏幕上显示的内容随之增减",
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                Divider()
+                Column(Modifier.padding(Space.md)) {
+                    SliderHeader("列表样式", ListStyle.label(settings.listStyle))
+                    Spacer(Modifier.height(9.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        ListStyle.ALL.forEach { st ->
+                            FilterChip(
+                                ListStyle.label(st),
+                                settings.listStyle == st,
+                                Modifier.weight(1f)
+                            ) { update(settings.copy(listStyle = st)) }
+                        }
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        if (settings.listStyle == ListStyle.LIST)
+                            "无卡片背景、行与行紧挨、只用细分隔线：单条更矮，一屏能多看一倍左右"
+                        else "白色卡片 + 圆角，单条信息更舒展，适合逐条细看",
                         fontSize = TypeScale.caption,
                         color = MaterialTheme.colorScheme.outline
                     )

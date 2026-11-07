@@ -24,6 +24,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.xbta.shellstore.core.*
+import com.xbta.shellstore.data.ListStyle
 import com.xbta.shellstore.data.ShellExec
 import com.xbta.shellstore.data.Store
 import kotlinx.coroutines.Dispatchers
@@ -462,6 +464,166 @@ fun EntryRow(
     }
 }
 
+// ---------------- 紧凑列表样式 ----------------
+
+/**
+ * 紧凑列表行（ima 那种布局）：没有卡片背景、行与行贴在一起、只用 1px 细分隔线。
+ *
+ * 与 [EntryRow] 是同一份数据的两套画法：
+ *   · 卡片样式吃的是「卡片内部的留白」，块与块之间还有 8~12dp 空隙，一屏 5 条左右；
+ *   · 紧凑样式把留白压到最小，一屏能到 10 条出头，扫起来快得多。
+ * 交互（点击进详情、收藏、编辑、右下角快捷动作、滚动防误触）与卡片样式完全一致。
+ */
+@Composable
+fun EntryListRow(
+    entry: Entry,
+    fav: Boolean,
+    onClick: () -> Unit,
+    onToggleFav: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    showCategory: Boolean = true,
+    folded: Boolean = false,
+    highlight: String = "",
+    scrollEndAt: Long = 0L,
+    showDivider: Boolean = true
+) {
+    fun tapAllowed(): Boolean = System.currentTimeMillis() - scrollEndAt >= 350L
+    val preview = when {
+        entry.body.isNotBlank() -> entry.body.replace("\n", " ⏎ ")
+        entry.adb.isNotBlank() -> entry.adb
+        entry.intent?.action?.isNotBlank() == true -> entry.intent!!.action
+        entry.intent?.component?.isNotBlank() == true -> entry.intent!!.component
+        else -> ""
+    }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { if (tapAllowed()) onClick() }
+                .padding(start = 12.dp, end = 6.dp, top = 9.dp, bottom = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TypeBadge(entry.type, size = 22)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        highlightSpan(entry.title, highlight),
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (entry.risk != Risk.SAFE) {
+                        Spacer(Modifier.width(5.dp))
+                        Box(
+                            Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (entry.risk == Risk.DANGER) Tones.danger else Tones.caution
+                                )
+                        )
+                    }
+                    if (Store.isLocal(entry.id)) {
+                        Spacer(Modifier.width(5.dp))
+                        Text("本地", fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+                if (!folded && preview.isNotBlank()) {
+                    Text(
+                        preview,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Spacer(Modifier.width(4.dp))
+            // 收藏
+            Box(
+                Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(Radius.sm))
+                    .clickable { if (tapAllowed()) onToggleFav() },
+                contentAlignment = Alignment.Center
+            ) {
+                AppIcon(
+                    if (fav) "★" else "☆",
+                    size = 17.dp,
+                    contentDescription = if (fav) "取消收藏" else "收藏",
+                    color = if (fav) Color(0xFFF2A93B) else MaterialTheme.colorScheme.outline
+                )
+            }
+            if (onEdit != null) {
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(Radius.sm))
+                        .clickable { if (tapAllowed()) onEdit() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    AppIcon("✎", size = 15.dp, color = MaterialTheme.colorScheme.outline, contentDescription = "编辑")
+                }
+            }
+            EntryQuickAction(entry, scrollEndAt)
+        }
+        if (showDivider) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 44.dp)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = .14f))
+            )
+        }
+    }
+}
+
+/** 按设置里的列表样式选一套画法，调用方不用关心两套实现的差异 */
+@Composable
+fun EntryRowAuto(
+    style: String,
+    entry: Entry,
+    fav: Boolean,
+    onClick: () -> Unit,
+    onToggleFav: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    showCategory: Boolean = true,
+    folded: Boolean = false,
+    highlight: String = "",
+    scrollEndAt: Long = 0L
+) {
+    if (style == ListStyle.LIST) {
+        EntryListRow(
+            entry = entry,
+            fav = fav,
+            onClick = onClick,
+            onToggleFav = onToggleFav,
+            onEdit = onEdit,
+            showCategory = showCategory,
+            folded = folded,
+            highlight = highlight,
+            scrollEndAt = scrollEndAt
+        )
+    } else {
+        EntryRow(
+            entry = entry,
+            fav = fav,
+            onClick = onClick,
+            onToggleFav = onToggleFav,
+            onEdit = onEdit,
+            showCategory = showCategory,
+            folded = folded,
+            highlight = highlight,
+            scrollEndAt = scrollEndAt
+        )
+    }
+}
+
 // ---------------- 顶栏 ----------------
 
 @Composable
@@ -777,7 +939,10 @@ fun CheckCircle(checked: Boolean) {
 fun ViewOptionsDialog(
     foldPreview: Boolean,
     onFoldChange: (Boolean) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** 列表样式（card / list）；传 null 表示这个页面不支持切换 */
+    listStyle: String = ListStyle.CARD,
+    onStyleChange: ((String) -> Unit)? = null
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -807,6 +972,36 @@ fun ViewOptionsDialog(
                 }
                 Spacer(Modifier.width(Space.md))
                 Toggle(foldPreview, onFoldChange)
+            }
+
+            if (onStyleChange != null) {
+                Spacer(Modifier.height(Space.lg))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outline.copy(alpha = .18f))
+                )
+                Spacer(Modifier.height(Space.lg))
+                Text("列表样式", fontSize = TypeScale.body, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    if (listStyle == ListStyle.LIST)
+                        "无卡片、行紧挨、细分隔线，一屏多看一倍"
+                    else "白色卡片 + 圆角，单条更舒展",
+                    fontSize = TypeScale.small,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(9.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    ListStyle.ALL.forEach { st ->
+                        FilterChip(
+                            ListStyle.label(st),
+                            listStyle == st,
+                            Modifier.weight(1f)
+                        ) { onStyleChange.invoke(st) }
+                    }
+                }
             }
 
             Spacer(Modifier.height(Space.lg))
