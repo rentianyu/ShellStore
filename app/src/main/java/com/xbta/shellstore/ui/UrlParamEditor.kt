@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -84,37 +85,25 @@ fun UrlParamEditor(body: String, onBodyChange: (String) -> Unit) {
             )
         }
         parts.params.forEachIndexed { i, p ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 5.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    p.key,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.width(92.dp)
+            if (i > 0) Divider()
+            // 与详情页共用同一套「解码 / 展开」渲染，编辑器里也能点开看 JSON，
+            // 只是行尾多两个编辑按钮（改 / 删）
+            key("ep$i") {
+                ValueLine(
+                    keyName = p.key,
+                    raw = p.value,
+                    depth = 0,
+                    path = "ep$i",
+                    onCopy = null,
+                    trailing = {
+                        MiniBtn("改") { editing = i }
+                        MiniBtn("删") {
+                            val list: MutableList<SchemeParse.Param> =
+                                parts.params.toMutableList().also { it.removeAt(i) }
+                            onBodyChange(SchemeParse.rebuild(body, list))
+                        }
+                    }
                 )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    SchemeParse.readable(p.value).ifEmpty { "（空）" },
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                MiniBtn("改") { editing = i }
-                MiniBtn("删") {
-                    val list: MutableList<SchemeParse.Param> =
-                        parts.params.toMutableList().also { it.removeAt(i) }
-                    onBodyChange(SchemeParse.rebuild(body, list))
-                }
             }
         }
     }

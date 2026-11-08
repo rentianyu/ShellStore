@@ -68,12 +68,14 @@ fun SchemeParamList(
  * 所以这里既渲染「当前行的键值」，也在展开时递归渲染子节点。
  */
 @Composable
-private fun ValueLine(
+fun ValueLine(
     keyName: String,
     raw: String,
-    depth: Int,
-    path: String,
-    onCopy: (String) -> Unit
+    depth: Int = 0,
+    path: String = "p",
+    onCopy: ((String) -> Unit)? = null,
+    /** 行尾追加的按钮（编辑器用「改」「删」；详情页不传） */
+    trailing: (@Composable () -> Unit)? = null
 ) {
     var decoded by remember(raw) { mutableStateOf(false) }
     var expanded by remember(raw) { mutableStateOf(false) }
@@ -93,7 +95,9 @@ private fun ValueLine(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onCopy(text) }
+            .then(
+                if (onCopy != null) Modifier.clickable { onCopy(text) } else Modifier
+            )
             .padding(start = 11.dp + (depth * 12).dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -128,6 +132,10 @@ private fun ValueLine(
         if (canExpand) {
             Spacer(Modifier.width(2.dp))
             MiniAction(if (isOpen) "收起" else "展开") { expanded = !expanded }
+        }
+        if (trailing != null) {
+            Spacer(Modifier.width(2.dp))
+            trailing()
         }
     }
 
