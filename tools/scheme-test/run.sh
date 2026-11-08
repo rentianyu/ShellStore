@@ -20,3 +20,7 @@ java -cp "$OUT1${STDLIB:+:$STDLIB}" SchemeParseTestKt
 OUT2=$(mktemp -d)
 $KOTLINC $CORE/JsonLite.kt tools/scheme-test/JsonLiteTest.kt -d "$OUT2"
 java -cp "$OUT2${STDLIB:+:$STDLIB}" JsonLiteTestKt
+
+OUT3=$(mktemp -d)
+$KOTLINC $CORE/JsonLite.kt tools/scheme-test/JsonSetTest.kt -d "$OUT3"
+java -cp "$OUT3${STDLIB:+:$STDLIB}" JsonSetTestKt

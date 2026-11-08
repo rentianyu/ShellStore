@@ -75,10 +75,14 @@ fun ValueLine(
     path: String = "p",
     onCopy: ((String) -> Unit)? = null,
     /** 行尾追加的按钮（编辑器用「改」「删」；详情页不传） */
-    trailing: (@Composable () -> Unit)? = null
+    trailing: (@Composable () -> Unit)? = null,
+    /** 从根到本行的序号路径，供上层按路径改值 */
+    nodePath: List<Int> = emptyList(),
+    /** 叶子节点可编辑时传：点击「改」回调 (路径, 当前显示文本) */
+    onEdit: ((List<Int>, String) -> Unit)? = null
 ) {
     var decoded by remember(raw) { mutableStateOf(false) }
-    var expanded by remember(raw) { mutableStateOf(false) }
+    var expanded by remember(path) { mutableStateOf(false) }
 
     val text = if (decoded) SchemeParse.prettyDecode(raw) else raw
     val node = remember(text) { JsonLite.parseOrNull(text) }
@@ -133,6 +137,11 @@ fun ValueLine(
             Spacer(Modifier.width(2.dp))
             MiniAction(if (isOpen) "收起" else "展开") { expanded = !expanded }
         }
+        // 只在展开出来的子行放「改」：顶层行的编辑走编辑器自己的「改」（要能改键名）
+        if (onEdit != null && !canExpand && depth > 0) {
+            Spacer(Modifier.width(2.dp))
+            MiniAction("改") { onEdit(nodePath, text) }
+        }
         if (trailing != null) {
             Spacer(Modifier.width(2.dp))
             trailing()
@@ -153,7 +162,9 @@ fun ValueLine(
                             raw = JsonLite.plain(v),
                             depth = depth + 1,
                             path = "$path.$j",
-                            onCopy = onCopy
+                            onCopy = onCopy,
+                            nodePath = nodePath + j,
+                            onEdit = onEdit
                         )
                     }
                 }
@@ -164,7 +175,9 @@ fun ValueLine(
                             raw = JsonLite.plain(v),
                             depth = depth + 1,
                             path = "$path[$j]",
-                            onCopy = onCopy
+                            onCopy = onCopy,
+                            nodePath = nodePath + j,
+                            onEdit = onEdit
                         )
                     }
                 }

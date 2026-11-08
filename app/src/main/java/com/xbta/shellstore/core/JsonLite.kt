@@ -246,4 +246,62 @@ object JsonLite {
             i++
         }
     }
+
+    // ---------------- 按路径改值 ----------------
+
+    /**
+     * 把 [path] 指向的叶子节点替换成 [text]。
+     *
+     * path 是「从根往下每一步的序号」：对象按字段顺序、数组按下标。
+     * 空 path 表示替换根节点本身。
+     *
+     * 类型尽量保持原样：原来是数字且新文本仍是数字就还是数字，
+     * 原来是布尔且新文本是 true/false 就还是布尔，否则降级成字符串——
+     * 免得把 `{"id":1}` 里的 1 改成 `"2"` 之后变成字符串类型。
+     */
+    fun setText(root: Node, path: List<Int>, text: String): Node {
+        if (path.isEmpty()) return leafLike(root, text)
+        return when (root) {
+            is Obj -> {
+                val i = path[0]
+                if (i !in root.fields.indices) return root
+                val list = root.fields.toMutableList()
+                val (k, v) = list[i]
+                list[i] = k to setText(v, path.drop(1), text)
+                Obj(list)
+            }
+            is Arr -> {
+                val i = path[0]
+                if (i !in root.items.indices) return root
+                val list = root.items.toMutableList()
+                list[i] = setText(list[i], path.drop(1), text)
+                Arr(list)
+            }
+            else -> root
+        }
+    }
+
+    /** 按旧节点类型决定新文本该是什么节点 */
+    private fun leafLike(old: Node, text: String): Node {
+        val t = text.trim()
+        return when (old) {
+            is Num -> if (t.toDoubleOrNull() != null) Num(t) else Str(text)
+            is Bool -> when (t.lowercase()) {
+                "true" -> Bool(true)
+                "false" -> Bool(false)
+                else -> Str(text)
+            }
+            Null -> if (t == "null") Null else Str(text)
+            // 结构节点不通过「改值」替换，避免误把一棵树压成字符串
+            is Obj, is Arr -> old
+            is Str -> Str(text)
+        }
+    }
+
+    /** 节点个数（对象=字段数，数组=元素数），用于展示 `{ N 个键 }` */
+    fun size(n: Node): Int = when (n) {
+        is Obj -> n.fields.size
+        is Arr -> n.items.size
+        else -> 0
+    }
 }

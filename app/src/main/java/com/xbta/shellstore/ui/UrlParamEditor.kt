@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xbta.shellstore.core.JsonLite
 import com.xbta.shellstore.core.SchemeParse
 import com.xbta.shellstore.ui.theme.Radius
 import com.xbta.shellstore.ui.theme.Space
@@ -49,6 +50,8 @@ fun UrlParamEditor(body: String, onBodyChange: (String) -> Unit) {
     val parts = remember(body) { SchemeParse.parse(body) }
     // 正在编辑的下标：-1 表示新增
     var editing by remember { mutableStateOf<Int?>(null) }
+    // 正在编辑展开后的某个子值
+    var leafEdit by remember { mutableStateOf<LeafEdit?>(null) }
 
     Column(
         Modifier
@@ -95,6 +98,8 @@ fun UrlParamEditor(body: String, onBodyChange: (String) -> Unit) {
                     depth = 0,
                     path = "ep$i",
                     onCopy = null,
+                    nodePath = emptyList(),
+                    onEdit = { subPath, text -> leafEdit = LeafEdit(i, subPath, text) },
                     trailing = {
                         MiniBtn("改") { editing = i }
                         MiniBtn("删") {
@@ -106,6 +111,36 @@ fun UrlParamEditor(body: String, onBodyChange: (String) -> Unit) {
                 )
             }
         }
+    }
+
+    /**
+     * 改展开后的某个子值：沿路径把新文本写回 JSON，再按**原值的形态**回写参数——
+     * 原来是 `%7B...` 编码的就整体编码回去，原来是明文 JSON 的就保持明文，
+     * 不会因为改一个字段把整个参数从明文变成一长串 `%xx`。
+     */
+    fun editLeaf(paramIndex: Int, subPath: List<Int>, newText: String) {
+        val cur = SchemeParse.parse(body).params.getOrNull(paramIndex) ?: return
+        val root = JsonLite.parseOrNull(SchemeParse.readable(cur.value)) ?: return
+        val newJson = JsonLite.compose(JsonLite.setText(root, subPath, newText))
+        val newRaw = if (SchemeParse.hasPercent(cur.value)) SchemeParse.encode(newJson) else newJson
+        val list: MutableList<SchemeParse.Param> = parts.params.toMutableList()
+        if (paramIndex !in list.indices) return
+        list[paramIndex] = SchemeParse.Param(cur.key, newRaw)
+        onBodyChange(SchemeParse.rebuild(body, list))
+    }
+
+    leafEdit?.let { le ->
+        ParamEditDialog(
+            title = "修改值",
+            initKey = "",
+            initValue = le.text,
+            keyEditable = false,
+            onDismiss = { leafEdit = null },
+            onSave = { _, v ->
+                leafEdit = null
+                editLeaf(le.index, le.path, v)
+            }
+        )
     }
 
     val idx: Int? = editing
@@ -131,6 +166,9 @@ fun UrlParamEditor(body: String, onBodyChange: (String) -> Unit) {
     }
 }
 
+/** 正在编辑的 JSON 叶子：属于哪个参数、路径、当前显示文本 */
+private data class LeafEdit(val index: Int, val path: List<Int>, val text: String)
+
 @Composable
 private fun MiniBtn(text: String, onClick: () -> Unit) {
     Text(
@@ -151,7 +189,8 @@ private fun ParamEditDialog(
     initKey: String,
     initValue: String,
     onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
+    onSave: (String, String) -> Unit,
+    keyEditable: Boolean = true
 ) {
     var k by remember { mutableStateOf(initKey) }
     var v by remember { mutableStateOf(initValue) }
@@ -160,16 +199,18 @@ private fun ParamEditDialog(
         title = { Text(title, fontSize = TypeScale.body) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-                OutlinedTextField(
-                    value = k,
-                    onValueChange = { k = it },
-                    label = { Text("键", fontSize = 11.sp) },
-                    singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp
+                if (keyEditable) {
+                    OutlinedTextField(
+                        value = k,
+                        onValueChange = { k = it },
+                        label = { Text("键", fontSize = 11.sp) },
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        )
                     )
-                )
+                }
                 OutlinedTextField(
                     value = v,
                     onValueChange = { v = it },
@@ -182,7 +223,10 @@ private fun ParamEditDialog(
                     )
                 )
                 Text(
-                    "只会转义必须转义的字符（空格、& # ? 与中文）；已经写好的 %xx 不会再编一次。",
+                    if (keyEditable)
+                        "只会转义必须转义的字符（空格、& # ? 与中文）；已经写好的 %xx 不会再编一次。"
+                    else
+                        "改完会按原参数的形态写回：原来是编码的就重新编码，原来是明文 JSON 的保持明文。",
                     fontSize = 10.5.sp,
                     lineHeight = 15.sp,
                     color = MaterialTheme.colorScheme.outline
