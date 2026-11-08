@@ -101,7 +101,7 @@ fun UrlParamEditor(body: String, onBodyChange: (String) -> Unit) {
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    p.value.ifEmpty { "（空）" },
+                    SchemeParse.readable(p.value).ifEmpty { "（空）" },
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -111,14 +111,15 @@ fun UrlParamEditor(body: String, onBodyChange: (String) -> Unit) {
                 )
                 MiniBtn("改") { editing = i }
                 MiniBtn("删") {
-                    val list = parts.params.toMutableList().also { it.removeAt(i) }
+                    val list: MutableList<SchemeParse.Param> =
+                        parts.params.toMutableList().also { it.removeAt(i) }
                     onBodyChange(SchemeParse.rebuild(body, list))
                 }
             }
         }
     }
 
-    val idx = editing
+    val idx: Int? = editing
     if (idx != null) {
         val origin = parts.params.getOrNull(idx)
         ParamEditDialog(
@@ -130,7 +131,7 @@ fun UrlParamEditor(body: String, onBodyChange: (String) -> Unit) {
             onSave = { k, v ->
                 val key = SchemeParse.encodeIfNeeded(k.trim())
                 if (key.isNotEmpty()) {
-                    val list = parts.params.toMutableList()
+                    val list: MutableList<SchemeParse.Param> = parts.params.toMutableList()
                     val item = SchemeParse.Param(key, SchemeParse.encodeIfNeeded(v))
                     if (idx < 0) list.add(item) else if (idx < list.size) list[idx] = item
                     onBodyChange(SchemeParse.rebuild(body, list))
