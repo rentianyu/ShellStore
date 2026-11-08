@@ -222,6 +222,32 @@ private fun ParamEditDialog(
                         fontSize = 12.sp
                     )
                 )
+                // 一键编解码：编辑器里经常要往 JSON 子值里贴 URL / 拿掉编码看真实内容
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "URL 解码",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(Radius.sm))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = .10f))
+                            .clickable { v = SchemeParse.prettyDecode(v) }
+                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                    )
+                    Text(
+                        "URL 编码",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(Radius.sm))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = .10f))
+                            .clickable { v = SchemeParse.encode(v) }
+                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                    )
+                    Spacer(Modifier.weight(1f))
+                }
                 Text(
                     if (keyEditable)
                         "只会转义必须转义的字符（空格、& # ? 与中文）；已经写好的 %xx 不会再编一次。"
