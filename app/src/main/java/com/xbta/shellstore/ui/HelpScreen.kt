@@ -81,7 +81,7 @@ fun HelpScreen(onBack: () -> Unit) {
 }
 
 @Composable
-internal fun HelpH(text: String) {
+private fun HelpH(text: String) {
     Spacer(Modifier.height(Space.lg))
     Text(
         text,
@@ -93,7 +93,7 @@ internal fun HelpH(text: String) {
 }
 
 @Composable
-internal fun HelpP(text: String) {
+private fun HelpP(text: String) {
     Text(
         text,
         fontSize = TypeScale.small,
@@ -104,7 +104,7 @@ internal fun HelpP(text: String) {
 }
 
 @Composable
-internal fun HelpRow(name: String, desc: String) {
+private fun HelpRow(name: String, desc: String) {
     Row(
         Modifier
             .fillMaxWidth()
