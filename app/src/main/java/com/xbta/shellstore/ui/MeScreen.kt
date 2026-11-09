@@ -1212,6 +1212,8 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
             GroupCard {
                 SettingRow("？", "使用帮助", "离线可用，不联网也能查", onClick = { onOpen(Page.Help) })
                 Divider()
+                SettingRow("⇢", "scheme 用法", "用 shellstore:// 从外部调起所有功能", onClick = { onOpen(Page.SchemeHelp) })
+                Divider()
                 SettingRow("▤", "当前内容", "${cats.size} 个分类 · ${entries.size} 条")
                 Divider()
                 SettingRow(

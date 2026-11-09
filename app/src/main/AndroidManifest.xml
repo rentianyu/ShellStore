@@ -16,14 +16,28 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.App">
 
+        <!--
+            MainActivity 同时是 deep link 的入口：
+              shellstore://<动作>?<参数>
+            singleTask + onNewIntent 保证 App 已在前台时不会新开一个实例，
+            链接直接作用在当前界面上。
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.App">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 全部功能都能从外部用 scheme 调起（协议见 App 内「scheme 用法」页） -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="shellstore" />
             </intent-filter>
         </activity>
 

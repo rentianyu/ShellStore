@@ -61,6 +61,15 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
     var typeSel by rememberSaveable(
         stateSaver = listSaver(save = { it.toList() }, restore = { it.toSet() })
     ) { mutableStateOf<Set<String>>(emptySet()) }
+    // 外部 deep link（shellstore://search?q=）要求搜索：把词灌进搜索框并进入搜索态
+    val pendingSearch by Store.pendingSearch.collectAsState()
+    LaunchedEffect(pendingSearch) {
+        val kw = pendingSearch ?: return@LaunchedEffect
+        query = kw
+        searchMode = true
+        Store.consumePendingSearch()
+    }
+
     var refreshing by remember { mutableStateOf(false) }
     val refreshScope = rememberCoroutineScope()
     val ctx = LocalContext.current

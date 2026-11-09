@@ -26,8 +26,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.BuildConfig
 import com.xbta.shellstore.core.Changelog
+import com.xbta.shellstore.core.DeepLink
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.core.LegalText
+import com.xbta.shellstore.data.DeepLinkBus
+import com.xbta.shellstore.data.DeepLinkHandler
 import com.xbta.shellstore.data.Net
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.data.UpdateCenter
@@ -76,6 +79,8 @@ sealed interface Page {
     data object Changelog : Page
     data object Help : Page
     data object SourceHelp : Page
+    /** shellstore:// 协议说明（内容由 DeepLink.ALL 生成） */
+    data object SchemeHelp : Page
     data class Legal(val kind: String) : Page
     /** entryId 为空 = 新建；folderId 决定新条目落在哪个文件夹；draft 用于粘贴导入时预填 */
     data class Editor(
@@ -201,6 +206,55 @@ private fun Root() {
 
     fun push(p: Page) { stack = stack + p }
     fun pop() { if (stack.isNotEmpty()) stack = stack.dropLast(1) }
+
+    // ---------------- 外部 deep link（shellstore://） ----------------
+    // 导航类在这里直接改 tab 与页面栈；其余动作交给 DeepLinkHandler，结果用 Toast 回执。
+    // singleTask + onNewIntent 保证 App 已在前台时链接作用在当前界面上。
+    fun navForLink(c: DeepLink.Cmd): Pair<Int, List<Page>>? = when (c.name) {
+        "shop" -> 0 to emptyList()
+        "favorite" -> 1 to emptyList()
+        "me" -> 2 to emptyList()
+        "cats" -> 0 to listOf(Page.AllCats)
+        "cat" -> c.s("name")?.takeIf { it.isNotBlank() }?.let { 0 to listOf(Page.CatList(it)) }
+            ?: (0 to listOf(Page.AllCats))
+        "tags" -> 0 to listOf(Page.TagView)
+        "recent" -> 0 to listOf(Page.Recent)
+        "favs" -> 1 to listOf(Page.AllFav)
+        "folder" -> 1 to listOf(Page.FavFolder(c.id()))
+        "entry" -> c.id()?.let { 0 to listOf(Page.Detail(it)) }
+        "new" -> 0 to listOf(Page.Editor(null, c.id()))
+        "edit" -> c.id()?.let { 0 to listOf(Page.Editor(it)) }
+        "search" -> 0 to emptyList()
+        "settings" -> 2 to listOf(Page.Settings)
+        "sources" -> 2 to listOf(Page.Sources)
+        "backup" -> 2 to listOf(Page.Backup)
+        "cloud" -> 2 to listOf(Page.Cloud)
+        "about" -> 2 to listOf(Page.About)
+        "changelog" -> 2 to listOf(Page.Changelog)
+        "help" -> 2 to listOf(Page.Help)
+        "sourcehelp" -> 2 to listOf(Page.SourceHelp)
+        "schemehelp" -> 2 to listOf(Page.SchemeHelp)
+        "legal" -> 2 to listOf(Page.Legal(c.s("kind") ?: "user"))
+        else -> null
+    }
+
+    val linkEvent by DeepLinkBus.events.collectAsState()
+    LaunchedEffect(linkEvent) {
+        val ev = linkEvent ?: return@LaunchedEffect
+        DeepLinkBus.consume(ev)
+        val c = ev.cmd
+        val nav = navForLink(c)
+        if (nav != null) {
+            tab = nav.first
+            stack = nav.second
+            // 搜索词要等 HomeScreen 组合后才吃得进搜索框，用 Store 中转一次
+            if (c.name == "search") c.s("q")?.let { Store.requestSearch(it) }
+            return@LaunchedEffect
+        }
+        val msg = runCatching { DeepLinkHandler.handle(ctx, c) }
+            .getOrElse { "执行失败：${it.message.orEmpty().take(60)}" }
+        if (!msg.isNullOrBlank()) Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+    }
 
     // 更新后首次打开：弹一次「本次更新内容」。
     // 首次安装（lastSeenVersionCode == 0）不弹，免得新用户一进来先看一屏更新说明；
@@ -344,6 +398,7 @@ private fun Root() {
                     is Page.Changelog -> ChangelogScreen(onBack = ::pop)
                     is Page.Help -> HelpScreen(onBack = ::pop)
                     is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)
+                    is Page.SchemeHelp -> SchemeHelpScreen(onBack = ::pop)
                     is Page.Legal -> LegalScreen(p.kind, onBack = ::pop)
                     is Page.Editor -> EntryEditorScreen(p.entryId, p.folderId, p.draft, onBack = ::pop)
                 }

@@ -148,6 +148,22 @@ object Store {
     private val _searchHistory = MutableStateFlow<List<String>>(emptyList())
     val searchHistory: StateFlow<List<String>> = _searchHistory.asStateFlow()
 
+    /**
+     * 外部（deep link `shellstore://search?q=`）要求执行的搜索。
+     * 搜索框状态在 HomeScreen 内部，外部改不到，所以用这个中转一次。
+     */
+    private val _pendingSearch = MutableStateFlow<String?>(null)
+    val pendingSearch: StateFlow<String?> = _pendingSearch.asStateFlow()
+
+    fun requestSearch(q: String) {
+        val kw = q.trim()
+        if (kw.isNotEmpty()) _pendingSearch.value = kw
+    }
+
+    fun consumePendingSearch() {
+        _pendingSearch.value = null
+    }
+
     // ---------------- 初始化 ----------------
 
     fun init(context: Context) {
