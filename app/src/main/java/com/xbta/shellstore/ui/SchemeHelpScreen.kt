@@ -53,11 +53,10 @@ fun SchemeHelpScreen(onBack: () -> Unit) {
             SecP("· Tasker / 自动化：发送 VIEW Intent，data 填上面的地址")
             SecP("· 浏览器地址栏、备忘录里直接点（部分浏览器会拦自定义 scheme，用 adb 最稳）")
 
-            SecH("危险动作要确认")
-            SecP(
-                "会改数据或覆盖内容的动作（取消收藏、删源、清空、导入、云端恢复）" +
-                    "必须显式加 &confirm=1 才执行，避免误触。"
-            )
+            SecH("⚠ 标记与确认")
+            SecP("⚠ 表示这条会执行命令或改动数据。其中这 5 个必须显式加 &confirm=1 才执行，避免误触：")
+            SecP("unfav（取消收藏）、source-del（删源）、clear（清空）、backup-import（导入）、restore-cloud（云端恢复）")
+            SecP("run 带 ⚠ 是提醒它会真的执行命令，但属于自动化用途，不加 confirm 也直接执行。")
 
             for (group in listOf("导航", "动作", "数据", "设置")) {
                 val list = DeepLink.ALL.filter { it.group == group }
