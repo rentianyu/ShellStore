@@ -81,6 +81,8 @@ sealed interface Page {
     data object SourceHelp : Page
     /** shellstore:// 协议说明（内容由 DeepLink.ALL 生成） */
     data object SchemeHelp : Page
+    /** 功能总览：一页看完 App 能做什么 */
+    data object Features : Page
     data class Legal(val kind: String) : Page
     /** entryId 为空 = 新建；folderId 决定新条目落在哪个文件夹；draft 用于粘贴导入时预填 */
     data class Editor(
@@ -234,6 +236,7 @@ private fun Root() {
         "help" -> 2 to listOf(Page.Help)
         "sourcehelp" -> 2 to listOf(Page.SourceHelp)
         "schemehelp" -> 2 to listOf(Page.SchemeHelp)
+        "features" -> 2 to listOf(Page.Features)
         "legal" -> 2 to listOf(Page.Legal(c.s("kind") ?: "user"))
         else -> null
     }
@@ -399,6 +402,7 @@ private fun Root() {
                     is Page.Help -> HelpScreen(onBack = ::pop)
                     is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)
                     is Page.SchemeHelp -> SchemeHelpScreen(onBack = ::pop)
+                    is Page.Features -> FeaturesScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Legal -> LegalScreen(p.kind, onBack = ::pop)
                     is Page.Editor -> EntryEditorScreen(p.entryId, p.folderId, p.draft, onBack = ::pop)
                 }
@@ -419,6 +423,12 @@ private fun Root() {
                 whatsNew = null
                 markVersionSeen()
                 push(Page.Changelog)
+            },
+            onShowFeatures = {
+                whatsNew = null
+                markVersionSeen()
+                tab = 2
+                stack = listOf(Page.Features)
             },
             onDismiss = {
                 whatsNew = null

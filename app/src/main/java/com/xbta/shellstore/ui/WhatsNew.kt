@@ -33,12 +33,14 @@ import com.xbta.shellstore.ui.theme.TypeScale
  * 是同一份数据，不另写一份，避免两边说法不一致。
  *
  * @param version 当前版本那一段；为空说明日志没解析出来，此时直接调用方不弹
- * @param onShowAll 去看全部更新日志（跳到关于页）
+ * @param onShowAll 去看全部更新日志
+ * @param onShowFeatures 去看功能总览（和「全部更新日志」并排，位置一样显眼）
  */
 @Composable
 fun WhatsNewDialog(
     version: Changelog.Version,
     onShowAll: () -> Unit,
+    onShowFeatures: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -125,7 +127,8 @@ fun WhatsNewDialog(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onShowAll) { Text("全部更新日志", fontSize = 13.sp) }
+                TextButton(onClick = onShowAll) { Text("更新日志", fontSize = 13.sp) }
+                TextButton(onClick = onShowFeatures) { Text("全部功能", fontSize = 13.sp) }
                 TextButton(onClick = onDismiss) {
                     Text("知道了", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
