@@ -46,7 +46,7 @@ fun FeaturesScreen(onBack: () -> Unit) {
             for (sec in SECTIONS) {
                 DocH(sec.title)
                 for (p in sec.paras) DocP(p)
-                for (it in sec.items) DocItem(it.name, it.text)
+                for (it in sec.items) DocLine(it.name, it.text)
             }
 
             DocH("联网说明")
@@ -84,7 +84,7 @@ private fun DocP(text: String) {
 
 /** 一条功能：名称加粗 + 说明，同一段落内换行，不带任何交互 */
 @Composable
-private fun DocItem(name: String, text: String) {
+private fun DocLine(name: String, text: String) {
     Text(
         buildAnnotatedString {
             withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)) {
