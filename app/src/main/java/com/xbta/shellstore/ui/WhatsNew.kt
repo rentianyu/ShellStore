@@ -128,7 +128,7 @@ fun WhatsNewDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onShowAll) { Text("更新日志", fontSize = 13.sp) }
-                TextButton(onClick = onShowFeatures) { Text("全部功能", fontSize = 13.sp) }
+                TextButton(onClick = onShowFeatures) { Text("功能说明", fontSize = 13.sp) }
                 TextButton(onClick = onDismiss) {
                     Text("知道了", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }

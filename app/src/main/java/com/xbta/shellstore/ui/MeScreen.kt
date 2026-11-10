@@ -1210,7 +1210,7 @@ fun AboutScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
 
             Spacer(Modifier.height(16.dp))
             GroupCard {
-                SettingRow("✦", "全部功能", "一页看完 App 能做什么", onClick = { onOpen(Page.Features) })
+                SettingRow("✦", "功能说明", "纯文字说明，讲清每项能力", onClick = { onOpen(Page.Features) })
                 Divider()
                 SettingRow("？", "使用帮助", "离线可用，不联网也能查", onClick = { onOpen(Page.Help) })
                 Divider()

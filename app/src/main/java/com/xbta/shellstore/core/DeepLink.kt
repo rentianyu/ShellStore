@@ -58,7 +58,6 @@ object DeepLink {
         Spec("help", "shellstore://help", "使用帮助", "导航"),
         Spec("sourcehelp", "shellstore://sourcehelp", "订阅源格式说明", "导航"),
         Spec("schemehelp", "shellstore://schemehelp", "本页：scheme 用法", "导航"),
-        Spec("features", "shellstore://features", "全部功能总览", "导航"),
         Spec("legal", "shellstore://legal?kind=privacy", "用户协议 / 隐私政策（kind=user|privacy|summary）", "导航"),
 
         // ---------- 动作 ----------

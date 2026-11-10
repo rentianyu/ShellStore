@@ -6,33 +6,26 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xbta.shellstore.BuildConfig
-import com.xbta.shellstore.core.DeepLink
-import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Space
 import com.xbta.shellstore.ui.theme.TypeScale
 
 /**
- * 功能总览：一页把 App 能做的事全列出来，按「你要干什么」分组，不是按代码模块。
+ * 功能说明文档。**纯文字**：只有标题、段落和条目，整页没有一个可点的地方。
  *
- * 入口两个：我的 › 关于 › 全部功能，以及更新完的「本次更新内容」弹窗底部按钮。
- * 带 › 的行可以直接点进对应页面。
+ * 这一页回答「这个 App 能做什么」，不承担导航职责 —— 想用某个功能请到对应页面，
+ * 所以这里刻意不写「点这里去 XX」的入口。
  */
 @Composable
-fun FeaturesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
-    val entries by Store.entries.collectAsState()
-    val cats by Store.categories.collectAsState()
-    val sources by Store.sources.collectAsState()
-    val favs by Store.favs.collectAsState()
-
+fun FeaturesScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
-        TopBar("全部功能", onBack = onBack)
+        TopBar("功能说明", onBack = onBack)
         Column(
             Modifier
                 .fillMaxSize()
@@ -42,151 +35,188 @@ fun FeaturesScreen(onBack: () -> Unit, onOpen: (Page) -> Unit) {
         ) {
             Spacer(Modifier.height(Space.sm))
 
-            // 现状概览：直接给数字，比空话有用
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = Space.sm)
-            ) {
-                Text(
-                    "v${BuildConfig.APP_VERSION} · ${DeepLink.ALL.size} 个 scheme 动作",
-                    fontSize = TypeScale.body,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "${sources.count { it.enabled }} 个源 / ${cats.size} 个分类 / ${entries.size} 条命令" +
-                        " / 收藏 ${favs.items.size} 条",
-                    fontSize = TypeScale.small,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "本页只是导览，带 › 的行可以直接点进去。",
-                    fontSize = TypeScale.small,
-                    color = MaterialTheme.colorScheme.outline
-                )
+            Text(
+                "ShellStore 是一个离线的 shell 命令与 App 快捷方式管理器：把常用命令、URL scheme、" +
+                    "Intent 整理成卡片，需要时一键执行、复制或做成桌面图标。下面按用途说明各项能力。",
+                fontSize = TypeScale.small,
+                lineHeight = 20.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            for (sec in SECTIONS) {
+                DocH(sec.title)
+                for (p in sec.paras) DocP(p)
+                for (it in sec.items) DocItem(it.name, it.text)
             }
 
-            for (g in GROUPS) {
-                GroupTitle(g.name)
-                GroupCard {
-                    g.items.forEachIndexed { i, f ->
-                        if (i > 0) Divider()
-                        SettingRow(
-                            glyph = f.glyph,
-                            title = f.title,
-                            subtitle = f.desc,
-                            onClick = f.page?.let { p -> { onOpen(p()) } }
-                        )
-                    }
-                }
-            }
+            DocH("联网说明")
+            DocP("上述功能全部离线可用。会联网的只有四处：拉取订阅源内容、检查 App 自身更新、云备份的上传与恢复、以及 scheme 中明确涉及网络的动作（加源、刷新、检查更新、备份）。除此之外不发出任何请求。")
 
             Spacer(Modifier.height(Space.lg))
-            Text(
-                "这些功能全部离线可用，只有订阅源更新、检查更新、云备份、scheme 里联网类动作需要网络。",
-                fontSize = TypeScale.small,
-                lineHeight = 18.sp,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(horizontal = Space.xs)
-            )
-            Spacer(Modifier.height(Space.md))
         }
     }
 }
 
-private data class Feat(
-    val glyph: String,
-    val title: String,
-    val desc: String,
-    /** 有值表示这一行能点进去 */
-    val page: (() -> Page)? = null
-)
+private data class DocItem(val name: String, val text: String)
+private data class DocSection(val title: String, val paras: List<String> = emptyList(), val items: List<DocItem>)
 
-private data class FeatGroup(val name: String, val items: List<Feat>)
+@Composable
+private fun DocH(text: String) {
+    Text(
+        text,
+        fontSize = TypeScale.body,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.padding(top = Space.lg, bottom = Space.xs)
+    )
+}
 
-private val GROUPS: List<FeatGroup> = listOf(
-    FeatGroup(
-        "找命令", listOf(
-            Feat("⌕", "全字段搜索", "空格分开多个词是 AND；支持拼音首字母（dc 能搜到「多点」类标题）；标题命中的排在前面，结果里高亮关键词。搜索框留空会显示最近搜过的词。"),
-            Feat("▦", "按分类浏览", "首页直接列出每个分类与条数，点进去看该分类的全部命令。"),
-            Feat("☰", "筛选", "按 7 种类型（shell / script / url scheme / intent / activity / service / broadcast）与 3 档风险过滤。"),
-            Feat("◷", "最近使用", "打开过的条目按时间倒序留在这里，方便回头找。"),
-            Feat("↻", "刷新订阅源", "重拉所有启用的源并重新解析，保留本地收藏与编辑。")
+@Composable
+private fun DocP(text: String) {
+    Text(
+        text,
+        fontSize = TypeScale.small,
+        lineHeight = 20.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = Space.sm)
+    )
+}
+
+/** 一条功能：名称加粗 + 说明，同一段落内换行，不带任何交互 */
+@Composable
+private fun DocItem(name: String, text: String) {
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)) {
+                append("· ")
+                append(name)
+                append("　")
+            }
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(text) }
+        },
+        fontSize = 12.5.sp,
+        lineHeight = 19.sp,
+        modifier = Modifier.padding(bottom = Space.sm)
+    )
+}
+
+private val SECTIONS: List<DocSection> = listOf(
+
+    DocSection(
+        "一、浏览与查找",
+        listOf(
+            "命令来自订阅源，按分类组织。首页纵向列出全部分类与各自的条数，进入分类后是该类的条目列表。"
+        ),
+        listOf(
+            DocItem("搜索", "对标题、命令正文、描述、标签、参数名做全文匹配。多个关键词用空格分隔，需同时命中（AND）；标题命中的排在前面。支持拼音首字母，输入 dc 可命中「多点」这类开头为 dc 的标题。结果中命中的词会高亮。搜索框留空时显示最近搜索过的词。"),
+            DocItem("筛选", "可按条目类型（shell、script、url scheme、intent、activity、service、broadcast 七种）和风险等级（安全、谨慎、危险）组合过滤。"),
+            DocItem("最近使用", "打开过的条目按时间倒序保留，条数有上限，可在设置里清空。"),
+            DocItem("刷新订阅源", "重新拉取所有已启用的源并解析，本地收藏与对收藏条目的编辑不受影响。")
         )
     ),
-    FeatGroup(
-        "看与用一条命令", listOf(
-            Feat(">_", "执行", "shell / script 用 App 自身权限跑 sh（不是 root）；也可以指定走 Shizuku 或 Root 执行。"),
-            Feat("↗", "发 Intent", "url scheme、activity、intent、broadcast、service 五类条目直接发给系统打开，不经过 shell。"),
-            Feat("⧉", "复制", "复制原始内容，或复制成 am 命令（按设置自动加 adb shell / su -c 前缀）。"),
-            Feat("⌘", "参数占位符", "命令里写 {键} 就会出输入框，填完命令实时重算。参数值可以一键解码、展开 JSON 子字段、URL 编码/解码，改子字段会自动写回。"),
-            Feat("≡", "多命令变体", "同一个条目写多个代码块，详情页左右箭头切换，参数各自独立。"),
-            Feat("⚠", "风险与运行条件", "标注安全 / 谨慎 / 危险，以及是否需要 root、是否要装某个 App，避免误执行。"),
-            Feat("⌂", "桌面快捷方式", "把一条命令固定到桌面，点一下直接执行；参数值会用你填过的那份。"),
-            Feat("▣", "控制中心磁贴", "把命令放到下拉快捷开关里，通知栏一划就能点。"),
-            Feat("⇩", "导出成 APK", "把一条命令打包成独立小 App（可改名称、包名、图标、执行身份、结果提示方式），分享给别人也能用。")
+
+    DocSection(
+        "二、查看与使用一条命令",
+        listOf(
+            "条目详情页是主要操作界面。上半部分是命令内容与参数，下半部分是来源、风险、运行条件等属性。"
+        ),
+        listOf(
+            DocItem("执行", "shell 与 script 类型的条目用 App 自身权限调用 sh 执行，不具备 root 权限；需要更高权限时可选 Shizuku（免 root 的授权通道）或 Root。执行输出会按设置以 Toast、通知或弹窗展示。"),
+            DocItem("发送 Intent", "url scheme、activity、intent、broadcast、service 五类条目不经过 shell，直接构造 Intent 交给系统。这类条目通常是「打开某个 App 的某个页面」，用 shell 执行会失败。"),
+            DocItem("复制", "可复制原始内容，也可复制成等价的 adb 命令（am start / am broadcast 形式），便于在电脑上复现。复制时可自动加 adb shell 或 su -c 前缀。"),
+            DocItem("参数占位符", "命令里写 {键} 的地方会在详情页生成输入框，填入后命令实时重算。参数值支持一键解码、展开 JSON 子字段、URL 编码与解码；修改子字段会按原形态写回，原来是编码的仍编码，原来是明文的仍明文。"),
+            DocItem("多命令变体", "同一个条目可以写多个代码块，详情页用左右箭头切换，每个变体有各自的参数。"),
+            DocItem("风险与运行条件", "每条有风险标记（安全 / 谨慎 / 危险）与运行条件（是否需要 root、是否依赖某个 App）。执行危险条目时默认二次确认，可在设置中关闭。"),
+            DocItem("桌面快捷方式", "把一条命令固定到桌面，点击即执行，参数使用填好的值。"),
+            DocItem("控制中心磁贴", "把命令放进下拉快捷开关，从通知栏直接触发。"),
+            DocItem("导出为独立 APK", "把一条命令打包成一个独立的小 App，可自定义名称、包名、图标文字或图片、执行身份（shell / root / shizuku）、结果提示方式与超时时间。导出后可直接安装或分享。")
         )
     ),
-    FeatGroup(
-        "收藏与整理", listOf(
-            Feat("★", "收藏到文件夹", "收藏时可以选文件夹，也可以关掉询问、一律进默认位置。"),
-            Feat("☰", "拖动排序", "长按卡片拖动调整顺序，松手即保存。"),
-            Feat("☑", "多选批量", "批量移动到文件夹、批量删除、批量打标签。"),
-            Feat("▶", "置顶", "常用条目固定在列表最前。"),
-            Feat("▤", "标签", "一条命令可有多个标签，标签视图里交叉检索。"),
-            Feat("⇧", "导出收藏为 SMD", "收藏整理成标准 SMD 文本，可以直接当订阅源发给别人。", { Page.AllFav })
+
+    DocSection(
+        "三、收藏与整理",
+        listOf(
+            "收藏是把源里的条目复制一份到本地，源更新或换源都不会影响已收藏的内容；本地条目也可以直接新建，与其他条目一样使用。"
+        ),
+        listOf(
+            DocItem("收藏文件夹", "收藏时可选择文件夹。若关掉「收藏时询问文件夹」，则一律进入默认位置。"),
+            DocItem("排序", "收藏列表支持长按拖动调整顺序，松手即保存。"),
+            DocItem("多选批量操作", "进入多选后可批量移动到其他文件夹、批量删除、批量打标签。"),
+            DocItem("置顶", "单条收藏可置顶，列表中最前显示。"),
+            DocItem("标签", "一条命令可挂多个标签，标签视图中按标签交叉查看。"),
+            DocItem("导出收藏", "收藏可导出为标准 SMD 文本，直接作为订阅源分享给他人。")
         )
     ),
-    FeatGroup(
-        "订阅源", listOf(
-            Feat("+", "三种添加方式", "填远程 SMD 地址、粘贴一段文本、从本地文件导入。", { Page.Sources }),
-            Feat("✦", "小贝塔订阅源", "内置系列清单，一项一项开关；之前手动加过的同一个源会自动归入系列，不会重复。", { Page.Sources }),
-            Feat("↻", "更新检查", "拉下新内容后先算差异（条数增减）给你确认，同意了才写入，不会悄悄改掉你的库。", { Page.Sources }),
-            Feat("⇅", "多线路加速", "GitHub 地址自动在多个镜像间选快的，失败自动换下一条；记住上次成功的线路下次优先。", { Page.Sources }),
-            Feat("？", "SMD 格式说明", "怎么写自己的源：字段、分类、参数占位符、常见坑。", { Page.SourceHelp })
+
+    DocSection(
+        "四、订阅源",
+        listOf(
+            "订阅源是命令的来源，格式为 SMD（Markdown 的一个子集，代码块正文即命令）。一个源可以有多个分类，每个分类下若干条目。"
+        ),
+        listOf(
+            DocItem("添加方式", "填写远程 SMD 地址、粘贴一段 SMD 文本，或从本地文件导入。远程地址支持 GitHub 链接并自动走镜像加速。"),
+            DocItem("内置系列", "「小贝塔订阅源」是一份可逐项开关的系列清单。此前手动添加过的同一个源会自动归入系列，不会重复出现两条。"),
+            DocItem("更新检查", "启动时会拉取各源的新内容并计算差异（分类与条数的增减），列出来供确认；同意后才写入缓存并重新解析，取消则丢弃候选内容，不会悄悄改动本地库。"),
+            DocItem("多线路加速", "GitHub 地址会在多个公共镜像与自建反代之间选择较快的线路，失败自动换下一条，并记住上次成功的线路供下次优先使用。"),
+            DocItem("格式说明", "App 内另有「订阅源格式说明」一节，讲字段含义、分类写法、参数占位符与常见错误。")
         )
     ),
-    FeatGroup(
-        "备份与恢复", listOf(
-            Feat("⇅", "云备份双通道", "WebDAV 或任意 S3 兼容对象存储（自写签名，不引第三方 SDK），自动按后端单选。", { Page.Cloud }),
-            Feat("↻", "变更后自动备份", "数据一变就重新计时 30 秒，安静下来才上传，避免连续改十几次传十几次。", { Page.Cloud }),
-            Feat("⇧", "导出 / 导入 JSON", "整份收藏与设置导成 JSON；导入可选覆盖或合并。", { Page.Backup }),
-            Feat("⇩", "从云端恢复", "拉回最近一次备份并覆盖本地，恢复前会提示不可撤销。", { Page.Backup })
+
+    DocSection(
+        "五、备份与恢复",
+        listOf(
+            "备份内容为收藏（含本地条目、文件夹、标签）与设置项，不含 WebDAV 密码与 S3 SecretKey —— 这两项单独加密保存在系统密钥库中，不进入备份文件。"
+        ),
+        listOf(
+            DocItem("WebDAV", "填写服务地址、用户名、密码与远端路径即可。密码使用 Android Keystore 加密保存。"),
+            DocItem("S3 兼容存储", "填写 Endpoint、Region、Bucket、AccessKey、SecretKey 与对象键。请求签名由 App 自行实现，不依赖第三方 SDK；支持虚拟主机与路径风格两种寻址方式。"),
+            DocItem("自动备份", "数据变更后重新计时 30 秒，安静下来才上传一次，避免连续修改触发多次上传。只走当前选中的那一个后端。"),
+            DocItem("导出与导入", "整份数据可导出为 JSON 文本（可复制到剪贴板或存为文件）；导入时可选覆盖或合并。"),
+            DocItem("云端恢复", "拉取最近一次备份并覆盖本地数据，此操作不可撤销，执行前会二次确认。")
         )
     ),
-    FeatGroup(
-        "外观与手感", listOf(
-            Feat("字", "字号 10 档", "只放大文字，控件尺寸不变；和界面缩放可以叠加。", { Page.Settings }),
-            Feat("▣", "界面缩放 5 档", "整体放大（dp 与 sp 一起），适合大屏或手抖点不准。", { Page.Settings }),
-            Feat("◍", "深浅色", "浅色 / 深色 / 跟随系统，默认浅色。", { Page.Settings }),
-            Feat("⌨", "字体", "界面与代码可以分别设字体，支持导入自定义字体文件。", { Page.Settings }),
-            Feat("▤", "列表样式", "卡片（默认，信息多）或紧凑列表（一行一条，一屏看得更多）。", { Page.Settings }),
-            Feat("≡", "折叠预览", "列表只显示标题，收起命令预览，扫起来更快。", { Page.Settings })
+
+    DocSection(
+        "六、外观与阅读设置",
+        listOf(),
+        listOf(
+            DocItem("字号", "10 档，只影响文字大小（sp），控件尺寸不变，最大约 140%。"),
+            DocItem("界面缩放", "5 档，同时放大控件与文字（dp 与 sp），适合大屏或点击不便的场景，可与字号叠加。"),
+            DocItem("主题", "浅色、深色、跟随系统三选，默认浅色。"),
+            DocItem("字体", "界面字体与代码字体可分别设置，支持导入自定义字体文件；代码区始终优先使用等宽字体。"),
+            DocItem("列表样式", "卡片样式信息更全；紧凑列表一行一条、仅细分隔线，一屏可见条目更多。"),
+            DocItem("折叠预览", "开启后列表只显示标题，收起命令正文预览。")
         )
     ),
-    FeatGroup(
-        "自动化", listOf(
-            Feat("⇢", "${DeepLink.ALL.size} 个 scheme 动作", "所有功能都能用 shellstore:// 从外部调起：跳页面、执行命令、改设置、加源、备份。", { Page.SchemeHelp }),
-            Feat("⌘", "外部调用方式", "adb shell am start -d \"shellstore://run?id=xxx\"；Tasker 发 VIEW Intent 同理。"),
-            Feat("⚡", "配合 Shizuku", "有 Shizuku 就能免 root 执行需要系统权限的命令，不用每次弹授权。")
+
+    DocSection(
+        "七、自动化",
+        listOf(
+            "App 的每一项功能都可以从外部用 scheme 调起，形式为 shellstore://<动作>?<参数>，覆盖导航、执行、收藏、订阅源管理、备份与设置修改。",
+            "调用方式包括 adb（am start -a android.intent.action.VIEW -d \"shellstore://...\"）、Tasker 等自动化工具的 VIEW Intent，以及在备忘录或浏览器中直接点击。完整动作表见「我的 › 关于 › scheme 用法」，那里每一行都可复制。",
+            "其中会改动数据或覆盖内容的动作（取消收藏、删除订阅源、清空数据、导入备份、云端恢复）必须显式附带 confirm=1 参数才执行，防止误触；执行命令（run）不带该限制，因为它本身就是为自动化准备的。密码类字段不接受通过链接传入。"
+        ),
+        listOf()
+    ),
+
+    DocSection(
+        "八、隐私与安全",
+        listOf(),
+        listOf(
+            DocItem("首次启动协议", "《用户协议》与《隐私政策》为两份独立文本，启动时不默认勾选，须主动同意。不同意则进入离线基础模式：核心的浏览、执行、复制、收藏全部可用，只有联网功能关闭。"),
+            DocItem("数据留存", "App 没有自建服务端，也不含任何第三方统计或广告 SDK。订阅源、收藏、设置、崩溃日志都只存在本机；联网仅发生在你自己配置的源地址与备份目标上。"),
+            DocItem("崩溃日志", "崩溃现场在本地保留最近 5 份，可查看与复制，用于反馈问题。"),
+            DocItem("危险操作保护", "标记为危险的命令执行前二次确认；批量删除、清空收藏、云端恢复等不可逆操作均有确认步骤。")
         )
     ),
-    FeatGroup(
-        "隐私与安全", listOf(
-            Feat("§", "首次启动要同意", "用户协议与隐私政策分开两份，不默认勾选；不同意进离线基础模式，核心功能照常能用。", { Page.Legal("user") }),
-            Feat("⚠", "危险动作确认", "执行标为危险的命令前二次确认，可以按需关掉。"),
-            Feat("⊘", "不收集任何数据", "没有自建服务端、没有第三方统计 SDK，数据全在本机；联网只发生在你自己配置的源与备份上。", { Page.Legal("privacy") }),
-            Feat("?", "崩溃日志", "崩溃现场留在本地（最多 5 份），可查看、复制，方便反馈问题。", { Page.Help })
-        )
-    ),
-    FeatGroup(
-        "其他", listOf(
-            Feat("↻", "检查更新", "多线路并发尝试，下载后做 zip 结构 + 签名 + 版本三重校验，坏包不会装。", { Page.About }),
-            Feat("≡", "更新日志", "每个版本改了什么，按版本分组。", { Page.Changelog }),
-            Feat("？", "使用帮助", "离线可查，只讲 App 怎么用。", { Page.Help }),
-            Feat("ⓘ", "关于", "版本、协议入口、scheme 用法、当前内容统计。", { Page.About })
+
+    DocSection(
+        "九、更新与其他",
+        listOf(),
+        listOf(
+            DocItem("检查更新", "会读取发布页的最新版本号，若高于当前版本则提示；下载时依次尝试多条线路，下载完成后校验 zip 结构、包内版本号与签名，不合格的包会被丢弃重下，不会安装损坏或被替换的安装包。"),
+            DocItem("更新日志", "按版本记录改动内容，更新后首次打开会弹一次当前版本的说明。"),
+            DocItem("使用帮助", "离线可查的操作指引，只讲 App 本身怎么用，不含订阅源格式细节。")
         )
     )
 )

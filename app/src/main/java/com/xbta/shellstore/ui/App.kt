@@ -236,7 +236,6 @@ private fun Root() {
         "help" -> 2 to listOf(Page.Help)
         "sourcehelp" -> 2 to listOf(Page.SourceHelp)
         "schemehelp" -> 2 to listOf(Page.SchemeHelp)
-        "features" -> 2 to listOf(Page.Features)
         "legal" -> 2 to listOf(Page.Legal(c.s("kind") ?: "user"))
         else -> null
     }
@@ -402,7 +401,7 @@ private fun Root() {
                     is Page.Help -> HelpScreen(onBack = ::pop)
                     is Page.SourceHelp -> SourceHelpScreen(onBack = ::pop)
                     is Page.SchemeHelp -> SchemeHelpScreen(onBack = ::pop)
-                    is Page.Features -> FeaturesScreen(onBack = ::pop, onOpen = ::push)
+                    is Page.Features -> FeaturesScreen(onBack = ::pop)
                     is Page.Legal -> LegalScreen(p.kind, onBack = ::pop)
                     is Page.Editor -> EntryEditorScreen(p.entryId, p.folderId, p.draft, onBack = ::pop)
                 }
