@@ -30,3 +30,8 @@ OUT4=$(mktemp -d)
 $KOTLINC $CORE/Model.kt $CORE/SmdPath.kt $CORE/CategoryTree.kt $CORE/SmdParser.kt \
     $CORE/SmdWriter.kt tools/scheme-test/SmdPathTest.kt -d "$OUT4"
 java -cp "$OUT4${STDLIB:+:$STDLIB}" SmdPathTestKt
+
+# 筛选/排序逻辑：类型、风险、权限、分类目录、来源、标签、属性、排序
+OUT5=$(mktemp -d)
+$KOTLINC $CORE/Model.kt $CORE/SmdPath.kt $CORE/SearchText.kt $CORE/EntryFilter.kt tools/scheme-test/EntryFilterTest.kt -d "$OUT5"
+java -cp "$OUT5${STDLIB:+:$STDLIB}" EntryFilterTestKt

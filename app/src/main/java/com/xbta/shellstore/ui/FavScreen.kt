@@ -41,6 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.Entry
+import com.xbta.shellstore.core.EntryFilter
+import com.xbta.shellstore.core.FilterState
 import com.xbta.shellstore.data.FavItem
 import com.xbta.shellstore.data.ListStyle
 import com.xbta.shellstore.data.Folder
@@ -89,6 +91,8 @@ fun FavScreen(onOpen: (Page) -> Unit) {
     var multiMode by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var viewOptions by remember { mutableStateOf(false) }
+    var filterOpen by remember { mutableStateOf(false) }
+    val favFilter by Store.favFilter.collectAsState()
     val settings by Store.settings.collectAsState()
     val exporter = rememberSmdExporter()
     val ctx = LocalContext.current
@@ -126,11 +130,14 @@ fun FavScreen(onOpen: (Page) -> Unit) {
         if (currentFolder != null) currentFolder = null else view = 0
     }
     val q = query.trim()
+    // 文本命中 + 筛选条件（筛选面板里的各维度），两者同时满足
     fun hit(fi: FavItem): Boolean {
+        if (!EntryFilter.match(fi.entry, favFilter, fi.tags, fi.edited, fi.alive) { favs.isFav(it) }) return false
         if (q.isEmpty()) return true
         val e = fi.entry
         return e.title.contains(q, true) || e.body.contains(q, true) ||
-            fi.note.contains(q, true) || e.tags.any { it.contains(q, true) }
+            fi.note.contains(q, true) || e.tags.any { it.contains(q, true) } ||
+            fi.tags.any { it.contains(q, true) }
     }
 
     // 当前层级（含搜索过滤）的条目。拖动时要读到「最新顺序」，所以用 rememberUpdatedState 兜住
@@ -191,6 +198,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             TopBar(
                 title = "收藏",
                 actions = {
+                    IconBtn("▽") { filterOpen = true }
                     IconBtn("☰") { viewOptions = true }
                     IconBtn("⌕") { searchMode = true }
                     IconBtn("☑") { multiMode = true; selected = emptySet() }
@@ -201,6 +209,15 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             FilterChip("文件夹", view == 0) { view = 0; currentFolder = null }
             FilterChip("标签", view == 1) { view = 1 }
             FilterChip("全部", view == 2) { view = 2; currentFolder = null }
+        }
+        Box(Modifier.padding(horizontal = Space.page, vertical = 4.dp)) {
+            FilterBar(
+                state = favFilter,
+                onOpen = { filterOpen = true },
+                onClear = { Store.setFavFilter(FilterState()) },
+                total = favs.items.size,
+                shown = favs.items.count { hit(it) }
+            )
         }
 
         LazyColumn(
@@ -296,7 +313,10 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                             .onGloballyPositioned { myTop = it.boundsInWindow().top }
                             .pointerInput(fi.entryId, multiMode, selected) {
                                 detectDragGesturesAfterLongPress(
-                                    onDragStart = {
+                                    // 筛选生效时列表是子集，拖动排序只覆盖部分条目会把顺序搞乱，
+                                    // 所以此时整个手势直接忽略（改成能滚动、能点开）
+                                    onDragStart = start@{
+                                        if (favFilter.activeCount > 0) return@start
                                         dragId = fi.entryId
                                         dragOffset = 0f
                                         dropFolder = null
@@ -310,7 +330,8 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                                         dropFolder = null
                                         lastDragEnd = System.currentTimeMillis()
                                     },
-                                    onDragEnd = {
+                                    onDragEnd = end@{
+                                        if (favFilter.activeCount > 0) return@end
                                         val target = dropFolder
                                         val ids = dragGroup
                                         dragId = null
@@ -322,7 +343,8 @@ fun FavScreen(onOpen: (Page) -> Unit) {
                                             dialog = FavDialog.ConfirmDropToFolder(ids, target)
                                         }
                                     },
-                                    onDrag = { change, delta ->
+                                    onDrag = drag@{ change, delta ->
+                                        if (favFilter.activeCount > 0) return@drag
                                         change.consume()
                                         dragOffset += delta.y
                                         // 落点是否压在某个文件夹行上（窗口坐标）
@@ -483,6 +505,22 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             onDismiss = { viewOptions = false },
             listStyle = settings.listStyle,
             onStyleChange = { Store.updateSettings(settings.copy(listStyle = it)) }
+        )
+    }
+
+    if (filterOpen) {
+        val cats by Store.categories.collectAsState()
+        val srcs by Store.sources.collectAsState()
+        FilterSheet(
+            state = favFilter,
+            onChange = { Store.setFavFilter(it) },
+            onDismiss = { filterOpen = false },
+            categories = cats,
+            sources = srcs,
+            // 收藏页的标签池要包含收藏自己打的标签
+            tags = EntryFilter.collectTags(favs.items.map { it.entry }, favs.tags.map { it.name }),
+            showFavFlags = true,
+            showFavFlag = false
         )
     }
 

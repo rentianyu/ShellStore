@@ -152,6 +152,29 @@ object Store {
      * 外部（deep link `shellstore://search?q=`）要求执行的搜索。
      * 搜索框状态在 HomeScreen 内部，外部改不到，所以用这个中转一次。
      */
+    // ---------------- 筛选状态（商店页 / 收藏页各自独立，进程内保留） ----------------
+
+    private val _shopFilter = MutableStateFlow(FilterState())
+    val shopFilter: StateFlow<FilterState> = _shopFilter.asStateFlow()
+
+    fun setShopFilter(f: FilterState) {
+        _shopFilter.value = f
+    }
+
+    private val _favFilter = MutableStateFlow(FilterState())
+    val favFilter: StateFlow<FilterState> = _favFilter.asStateFlow()
+
+    fun setFavFilter(f: FilterState) {
+        _favFilter.value = f
+    }
+
+    /** 「最近用过」排序用：entryId → 序号（越小越近） */
+    fun recentRankMap(): Map<String, Int> =
+        _recent.value.mapIndexed { i, r -> r.entryId to i }.toMap()
+
+    fun favItemOf(entryId: String): FavItem? =
+        _favs.value.items.firstOrNull { it.entryId == entryId }
+
     private val _pendingSearch = MutableStateFlow<String?>(null)
     val pendingSearch: StateFlow<String?> = _pendingSearch.asStateFlow()
 

@@ -36,6 +36,7 @@ fun AppIcon(
 fun iconActionLabel(glyph: String): String = when (glyph) {
     "☰" -> "列表显示"
     "⌕" -> "搜索"
+    "▽" -> "筛选"
     "☑" -> "多选"
     "★" -> "取消收藏"
     "☆" -> "收藏"
@@ -78,6 +79,8 @@ private object AppVectors {
     private val plus by lazy { vector("Plus", "M12,4 V20 M4,12 H20") }
     private val more by lazy { vector("More", "M5,11 A1,1 0,1 1,5,13 A1,1 0,1 1,5,11 Z M12,11 A1,1 0,1 1,12,13 A1,1 0,1 1,12,11 Z M19,11 A1,1 0,1 1,19,13 A1,1 0,1 1,19,11 Z", filled = true) }
     private val terminal by lazy { vector("Terminal", "M4,5 L11,12 L4,19 M13,19 H21") }
+    /** 筛选漏斗 */
+    private val funnel by lazy { vector("Funnel", "M3,5 H21 L14,13.5 V20 L10,17.5 V13.5 Z") }
     private val document by lazy { vector("Document", "M5,3 H15 L20,8 V21 H5 Z M15,3 V8 H20 M8,12 H17 M8,16 H17") }
     private val lines by lazy { vector("Lines", "M4,5 H20 M4,10 H20 M4,15 H16 M4,20 H12") }
     private val external by lazy { vector("External", "M14,3 H21 V10 M21,3 L10,14 M10,4 H4 V20 H20 V14") }
@@ -146,6 +149,7 @@ private object AppVectors {
         "⚡" -> bolt
         "✦" -> sparkle
         "⌨" -> keyboard
+        "▽", "⏷" -> funnel
         "⚿" -> key
         else -> square
     }

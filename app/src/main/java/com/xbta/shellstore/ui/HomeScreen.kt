@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.core.CategoryTree
+import com.xbta.shellstore.core.EntryFilter
+import com.xbta.shellstore.core.FilterState
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.core.SmdPath
 import com.xbta.shellstore.core.SearchText
@@ -61,9 +63,9 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
     var searchMode by rememberSaveable { mutableStateOf(false) }
     var viewOptions by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    var typeSel by rememberSaveable(
-        stateSaver = listSaver(save = { it.toList() }, restore = { it.toSet() })
-    ) { mutableStateOf<Set<String>>(emptySet()) }
+    // 筛选状态放在 Store 里：切 Tab 再回来还在，商店页与收藏页各用各的
+    val filter by Store.shopFilter.collectAsState()
+    var filterOpen by remember { mutableStateOf(false) }
     // 外部 deep link（shellstore://search?q=）要求搜索：把词灌进搜索框并进入搜索态
     val pendingSearch by Store.pendingSearch.collectAsState()
     LaunchedEffect(pendingSearch) {
@@ -92,11 +94,26 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
         query = ""
     }
 
-    val results = remember(query, typeSel, entries, favs) {
-        Store.search(
-            query = query,
-            types = typeSel.mapNotNull { EntryType.of(it) }.toSet(),
-            risks = emptySet()
+    // 搜索结果先按关键词排好相关度，再套筛选与排序
+    val results = remember(query, filter, entries, favs) {
+        val hit = Store.search(query = query, types = emptySet(), risks = emptySet())
+        EntryFilter.apply(
+            hit,
+            filter,
+            isFav = { favs.isFav(it) },
+            recentRank = Store.recentRankMap(),
+            keepOrder = true
+        )
+    }
+
+    // 非搜索态「全部命令」也受筛选影响
+    val shownEntries = remember(entries, filter, favs) {
+        EntryFilter.apply(
+            entries,
+            filter,
+            isFav = { favs.isFav(it) },
+            recentRank = Store.recentRankMap(),
+            keepOrder = true
         )
     }
 
@@ -113,6 +130,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
             }
         } else {
             TopBar("Shell 商店", actions = {
+                IconBtn("▽") { filterOpen = true }
                 IconBtn("☰") { viewOptions = true }
                 IconBtn("⌕") { searchMode = true }
             })
@@ -174,18 +192,13 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
             }
             if (searchMode) {
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(top = 4.dp)) {
-                        FilterChip("全部", typeSel.isEmpty()) { typeSel = emptySet() }
-                        FilterChip("shell", "shell" in typeSel) {
-                            typeSel = if ("shell" in typeSel) typeSel - "shell" else typeSel + "shell"
-                        }
-                        FilterChip("intent", "intent" in typeSel) {
-                            typeSel = if ("intent" in typeSel) typeSel - "intent" else typeSel + "intent"
-                        }
-                        FilterChip("activity", "activity" in typeSel) {
-                            typeSel = if ("activity" in typeSel) typeSel - "activity" else typeSel + "activity"
-                        }
-                    }
+                    FilterBar(
+                        state = filter,
+                        onOpen = { filterOpen = true },
+                        onClear = { Store.setShopFilter(FilterState()) },
+                        total = entries.size,
+                        shown = results.size
+                    )
                 }
                 item {
                     Text(
@@ -222,6 +235,17 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
             } else {
                 item { CategoryTreePreview(cats, { c -> CategoryTree.countUnder(entries, c.id) }, { onOpen(Page.CatList(it)) }) }
                 item {
+                    Box(Modifier.padding(top = Space.sm)) {
+                        FilterBar(
+                            state = filter,
+                            onOpen = { filterOpen = true },
+                            onClear = { Store.setShopFilter(FilterState()) },
+                            total = entries.size,
+                            shown = shownEntries.size
+                        )
+                    }
+                }
+                item {
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -244,10 +268,15 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     ) {
                         Text("全部命令", fontSize = TypeScale.title, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.weight(1f))
-                        Text("${entries.size} 条", fontSize = TypeScale.small, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            if (filter.activeCount > 0) "${shownEntries.size} / ${entries.size} 条"
+                            else "${entries.size} 条",
+                            fontSize = TypeScale.small,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
-                items(entries, key = { it.id }) { e ->
+                items(shownEntries, key = { it.id }) { e ->
                     EntryRowAuto(style = settings.listStyle, entry = e,
                         fav = favs.isFav(e.id),
                         onClick = { onOpen(Page.Detail(e.id)) },
@@ -268,6 +297,20 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
             onDismiss = { viewOptions = false },
             listStyle = settings.listStyle,
             onStyleChange = { Store.updateSettings(settings.copy(listStyle = it)) }
+        )
+    }
+
+    if (filterOpen) {
+        val srcs by Store.sources.collectAsState()
+        FilterSheet(
+            state = filter,
+            onChange = { Store.setShopFilter(it) },
+            onDismiss = { filterOpen = false },
+            categories = cats,
+            sources = srcs,
+            tags = EntryFilter.collectTags(entries),
+            showFavFlag = true,
+            showFavFlags = false
         )
     }
 }
