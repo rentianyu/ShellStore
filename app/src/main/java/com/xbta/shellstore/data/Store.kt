@@ -306,7 +306,12 @@ object Store {
                 if (seenIds.add(e.id)) allEntries.add(e) else dupIds++
             }
             r.source.categories.forEach { cat ->
-                if (!allCats.containsKey(cat.name)) allCats[cat.name] = cat
+                // 按完整路径去重：不同源里同名同级目录会合并成同一个
+                val exist = allCats[cat.id]
+                allCats[cat.id] = if (exist == null) cat else exist.copy(
+                    icon = exist.icon.ifBlank { cat.icon },
+                    order = minOf(exist.order, cat.order)
+                )
             }
             warns.addAll(r.warnings)
             if (mainVer.isBlank()) {
@@ -317,7 +322,8 @@ object Store {
         }
 
         _entries.value = allEntries
-        _categories.value = allCats.values.toList()
+        // 补全「只写了深层目录、没写父级」的虚拟父节点，并排成先序树
+        _categories.value = CategoryTree.build(allCats.values)
         _sourceName.value = mainName
         _sourceVersion.value = mainVer
         if (dupIds > 0) {
@@ -640,10 +646,21 @@ object Store {
 
     private fun newLocalId(): String = LOCAL_PREFIX + UUID.randomUUID().toString().take(8)
 
+    /** 该分类下的条目；由于分类是目录，子目录里的条目也算在内 */
     fun entriesInCategory(cat: String): List<Entry> =
+        _entries.value.filter { SmdPath.isUnder(it.categoryId, cat) }
+
+    fun countInCategory(cat: String): Int = CategoryTree.countUnder(_entries.value, cat)
+
+    /** 只要本层、不含子目录 */
+    fun entriesExactlyIn(cat: String): List<Entry> =
         _entries.value.filter { it.categoryId == cat }
 
-    fun countInCategory(cat: String): Int = entriesInCategory(cat).size
+    fun categoryById(id: String): Category? = _categories.value.firstOrNull { it.id == id }
+
+    /** 直接子目录（按树顺序） */
+    fun childCategories(parentId: String): List<Category> =
+        CategoryTree.children(_categories.value, parentId)
 
     /**
      * 搜索：空格分隔的多个关键词是 **AND** 关系（「蓝牙 关闭」两词都要命中），

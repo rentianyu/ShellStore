@@ -88,7 +88,10 @@ object SmdWriter {
         if (desc.isNotBlank()) sb.append("@desc ").append(desc.replace('\n', ' ')).append('\n')
         sb.append('\n')
         groups.forEach { (cat, entries) ->
-            sb.append("## ").append(cat).append("\n\n")
+            // cat 是完整路径（"系统/网络"）；写回时用带空格的 " / " 更易读，
+            // 解析端两种写法等价
+            val shown = SmdPath.split(cat).joinToString(SmdPath.SEP).ifBlank { cat }
+            sb.append("## ").append(shown).append("\n\n")
             entries.forEach { sb.append(it).append('\n') }
         }
         return sb.toString()

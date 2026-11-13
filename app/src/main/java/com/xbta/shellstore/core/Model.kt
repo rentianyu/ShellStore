@@ -88,12 +88,38 @@ data class Param(
 
 data class Variant(val name: String, val body: String)
 
+/**
+ * 分类。SMD 里 `## 系统 / 网络 / DNS` 这种写法表示多级目录，
+ * [path] 就是拆开后的各段，[id] 是拼回来的完整路径（也是 [Entry.categoryId]）。
+ *
+ * 兼容：单层分类 path 只有一段，与旧数据完全一致（id == name）。
+ */
 data class Category(
     val id: String,
     val name: String,
     val icon: String = "",
-    val order: Int = 0
-)
+    val order: Int = 0,
+    /** 完整路径，如 ["系统","网络","DNS"]；旧构造点不传时回退成 [name] */
+    val path: List<String> = emptyList(),
+    /** 源里没有单独写这一级，是由更深的目录自动补出来的（源更新后可能消失） */
+    val synthesized: Boolean = false
+) {
+    /** 实际路径段（保证至少一段） */
+    val segments: List<String> get() = if (path.isNotEmpty()) path else listOf(name)
+
+    /** 0 = 顶层 */
+    val depth: Int get() = (segments.size - 1).coerceAtLeast(0)
+
+    /** 父分类 id，顶层为空串 */
+    val parentId: String get() = if (segments.size <= 1) "" else segments.dropLast(1).joinToString("/")
+
+    /** 展示用的完整路径：`系统 / 网络 / DNS` */
+    val title: String get() = segments.joinToString(" / ")
+
+    /** 是 [ancestor] 本身或其子目录 */
+    fun isUnder(ancestor: String): Boolean =
+        ancestor.isEmpty() || id == ancestor || id.startsWith(ancestor + "/")
+}
 
 data class Entry(
     val id: String,

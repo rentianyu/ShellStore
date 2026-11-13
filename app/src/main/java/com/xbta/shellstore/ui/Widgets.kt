@@ -455,7 +455,7 @@ fun EntryRow(
             }
             if (showCategory && entry.categoryId.isNotBlank()) {
                 Spacer(Modifier.width(Space.xs))
-                MutedBadge(entry.categoryId)
+                MutedBadge(SmdPath.shortLabel(entry.categoryId))
             }
             Spacer(Modifier.weight(1f))
             // 右下角快捷操作：命令类直接执行，Intent 类直接唤起（实现见 EntryQuickAction）

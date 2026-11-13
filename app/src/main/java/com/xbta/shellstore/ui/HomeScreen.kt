@@ -9,6 +9,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,7 +28,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xbta.shellstore.core.CategoryTree
 import com.xbta.shellstore.core.Entry
+import com.xbta.shellstore.core.SmdPath
 import com.xbta.shellstore.core.SearchText
 import com.xbta.shellstore.core.EntryType
 import com.xbta.shellstore.data.ListStyle
@@ -217,7 +220,7 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                     )
                 }
             } else {
-                item { CategoryGrid(cats, entries, onOpen) }
+                item { CategoryTreePreview(cats, { c -> CategoryTree.countUnder(entries, c.id) }, { onOpen(Page.CatList(it)) }) }
                 item {
                     Row(
                         Modifier
@@ -270,55 +273,16 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
 }
 
 @Composable
-private fun CategoryGrid(
-    cats: List<com.xbta.shellstore.core.Category>,
-    entries: List<Entry>,
-    onOpen: (Page) -> Unit
-) {
-    val shown = cats.take(6)
-    // 分类少时用 2 列，避免第二行只剩一个卡片、右边留一大片空白
-    val cols = if (shown.size <= 4) 2 else 3
-    // 分类网格与列表样式无关，间距固定
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        shown.chunked(cols).forEach { rowCats ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                rowCats.forEach { c ->
-                    val idx = cats.indexOf(c)
-                    val count = entries.count { it.categoryId == c.name }
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(Radius.md))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .clickable { onOpen(Page.CatList(c.name)) }
-                            .padding(horizontal = Space.md, vertical = Space.md)
-                    ) {
-                        AppIcon(
-                            catGlyph(idx),
-                            size = 18.dp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.height(Space.sm))
-                        Text(
-                            c.name,
-                            fontSize = TypeScale.body,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text("$count 条", fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
     val cats by Store.categories.collectAsState()
     val entries by Store.entries.collectAsState()
+
+    // 折叠状态：只存被折叠的分类 id（记得住、可保存）
+    var collapsed by rememberSaveable(
+        stateSaver = listSaver(save = { it.toList() }, restore = { it.toSet() })
+    ) { mutableStateOf<Set<String>>(emptySet()) }
+    val shown = remember(cats, collapsed) { CategoryTree.visible(cats, collapsed) }
+    val depthMax = remember(cats) { cats.maxOfOrNull { it.depth } ?: 0 }
 
     Column(Modifier.fillMaxSize()) {
         TopBar("全部分类", onBack = onBack)
@@ -329,47 +293,29 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
         ) {
             item {
                 Text(
-                    "共 ${cats.size} 个分类 · ${entries.size} 条命令",
+                    if (depthMax > 0)
+                        "共 ${cats.size} 个分类（最深 ${depthMax + 1} 层）· ${entries.size} 条命令"
+                    else
+                        "共 ${cats.size} 个分类 · ${entries.size} 条命令",
                     fontSize = TypeScale.small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = Space.xs, start = Space.xs)
                 )
             }
-            items(cats) { c ->
-                val idx = cats.indexOf(c)
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(Radius.md))
-                        .background(MaterialTheme.colorScheme.surface)
-                        .clickable { onOpenCat(c.name) }
-                        .padding(horizontal = Space.md, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier
-                            .size(26.dp)
-                            .clip(RoundedCornerShape(Radius.sm))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AppIcon(
-                            catGlyph(idx),
-                            size = IconSize.card,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Spacer(Modifier.width(Space.md))
-                    Text(c.name, fontSize = TypeScale.body, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    Text(
-                        "${entries.count { it.categoryId == c.name }}",
-                        fontSize = TypeScale.small,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(Space.xs))
-                    AppIcon("›", size = IconSize.chevron, color = MaterialTheme.colorScheme.outline)
-                }
+            items(shown, key = { it.id }) { c ->
+                CategoryRow(
+                    cat = c,
+                    count = CategoryTree.countUnder(entries, c.id),
+                    index = cats.indexOf(c),
+                    hasChild = cats.any { it.parentId == c.id },
+                    collapsed = c.id in collapsed,
+                    onToggle = {
+                        collapsed = if (c.id in collapsed) collapsed - c.id else collapsed + c.id
+                    },
+                    onClick = { onOpenCat(c.id) }
+                )
             }
+            item { Spacer(Modifier.height(Space.sm)) }
         }
     }
 }
@@ -380,7 +326,10 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val favs by Store.favs.collectAsState()
     val settings by Store.settings.collectAsState()
     var viewOptions by remember { mutableStateOf(false) }
-    val list = remember(cat, entries) { entries.filter { it.categoryId == cat } }
+    // 分类即目录：这一层和它下面所有子目录的条目都算
+    val list = remember(cat, entries) { entries.filter { SmdPath.isUnder(it.categoryId, cat) } }
+    val catObj = remember(cat) { Store.categoryById(cat) }
+    val children = remember(cat) { Store.childCategories(cat) }
     var query by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     var scrollEndAt by remember { mutableLongStateOf(0L) }
@@ -401,9 +350,50 @@ fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
     BackHandler(enabled = query.isNotEmpty()) { query = "" }
 
     Column(Modifier.fillMaxSize()) {
-        TopBar(cat, onBack = onBack, actions = { IconBtn("☰") { viewOptions = true } })
+        val catTitle = catObj?.name ?: SmdPath.leaf(cat)
+        TopBar(catTitle, onBack = onBack, actions = { IconBtn("☰") { viewOptions = true } })
+        // 面包屑：说明当前在目录树的哪一层，上几级可点
+        if (catObj != null) {
+            Box(Modifier.padding(horizontal = Space.page, vertical = 2.dp)) {
+                CategoryBreadcrumb(
+                    cat = catObj,
+                    onOpenCat = { onOpen(Page.CatList(it)) },
+                    onOpenAll = { onOpen(Page.AllCats) }
+                )
+            }
+        }
+        // 子目录：横向排列，点了进下一层
+        if (children.isNotEmpty()) {
+            LazyRow(
+                Modifier.fillMaxWidth().padding(horizontal = Space.page),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                items(children, key = { it.id }) { ch ->
+                    val n = CategoryTree.countUnder(entries, ch.id)
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(Radius.md))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { onOpen(Page.CatList(ch.id)) }
+                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AppIcon(
+                            ch.icon.ifBlank { catGlyph(cats.indexOf(ch)) },
+                            size = 12.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(ch.name, fontSize = TypeScale.caption, fontWeight = FontWeight.Medium)
+                        Spacer(Modifier.width(4.dp))
+                        Text("$n", fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+            }
+        }
         Box(Modifier.padding(horizontal = Space.page, vertical = 4.dp)) {
-            SearchField(query = query, onQueryChange = { query = it }, placeholder = "在「$cat」内搜索")
+            SearchField(query = query, onQueryChange = { query = it }, placeholder = "在「${catObj?.name ?: cat}」内搜索")
         }
         LazyColumn(
             Modifier.fillMaxSize(),

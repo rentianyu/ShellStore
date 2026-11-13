@@ -40,7 +40,7 @@ object DeepLink {
         Spec("favorite", "shellstore://favorite", "切到收藏标签页", "导航"),
         Spec("me", "shellstore://me", "切到我的标签页", "导航"),
         Spec("cats", "shellstore://cats", "全部分类", "导航"),
-        Spec("cat", "shellstore://cat?name=软件", "打开某个分类", "导航"),
+        Spec("cat", "shellstore://cat?name=系统/网络", "打开某个分类；支持目录路径（斜杠不用转义）", "导航"),
         Spec("tags", "shellstore://tags", "标签视图", "导航"),
         Spec("recent", "shellstore://recent", "最近使用", "导航"),
         Spec("favs", "shellstore://favs", "全部收藏", "导航"),

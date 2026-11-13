@@ -24,3 +24,9 @@ java -cp "$OUT2${STDLIB:+:$STDLIB}" JsonLiteTestKt
 OUT3=$(mktemp -d)
 $KOTLINC $CORE/JsonLite.kt tools/scheme-test/JsonSetTest.kt -d "$OUT3"
 java -cp "$OUT3${STDLIB:+:$STDLIB}" JsonSetTestKt
+
+# 目录（多级分类）规则：拆分、补父节点、折叠、SMD 解析往返
+OUT4=$(mktemp -d)
+$KOTLINC $CORE/Model.kt $CORE/SmdPath.kt $CORE/CategoryTree.kt $CORE/SmdParser.kt \
+    $CORE/SmdWriter.kt tools/scheme-test/SmdPathTest.kt -d "$OUT4"
+java -cp "$OUT4${STDLIB:+:$STDLIB}" SmdPathTestKt

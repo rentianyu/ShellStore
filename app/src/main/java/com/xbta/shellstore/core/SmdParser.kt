@@ -4,7 +4,7 @@ package com.xbta.shellstore.core
  * SMD（Shell Markdown）解析器。
  *
  * 语法四条：
- *   1. `## 分类名`            → 分类
+ *   1. `## 分类名`            → 分类；`## 系统 / 网络` 表示多级目录（分隔符 / 或 >）
  *   2. `### 标题` 或 `● 标题`  → 条目（● / • 兼容外部清单）
  *   3. `@键 值`               → 元信息
  *   4. 围栏代码块 ``` / ~~~   → 命令体（内容原样，不做任何解析）
@@ -93,10 +93,25 @@ object SmdParser {
             }
 
             // ---- 分类 ----
-            if (trimmed.startsWith("## ") && !trimmed.startsWith("### ")) {
+            if ((trimmed == "##" || trimmed.startsWith("## ")) && !trimmed.startsWith("### ")) {
                 flushEntry()
-                curCategory = trimmed.removePrefix("## ").trim()
-                b.touchCategory(curCategory)
+                val rawCat = if (trimmed == "##") "" else trimmed.removePrefix("## ").trim()
+                val segs = SmdPath.split(rawCat)
+                if (segs.isEmpty()) {
+                    warnings.add(ParseWarning(lineNo, "分类名为空，已忽略：$trimmed"))
+                } else {
+                    // 超过上限的部分会被截掉，提醒一下作者
+                    if (rawCat.count { it == '/' || it == '／' || it == '>' || it == '＞' } >= SmdPath.MAX_DEPTH) {
+                        warnings.add(
+                            ParseWarning(
+                                lineNo,
+                                "目录层数超过 ${SmdPath.MAX_DEPTH} 层，「${SmdPath.display(segs)}」超出部分已截断"
+                            )
+                        )
+                    }
+                    curCategory = SmdPath.join(segs)
+                    b.touchCategory(segs)
+                }
                 idx++
                 continue
             }
@@ -201,12 +216,15 @@ object SmdParser {
         var schema = 1
         val entries = mutableListOf<Entry>()
         private val catOrder = LinkedHashMap<String, Int>()
+        private val catPath = HashMap<String, List<String>>()
         private val catIcon = mutableMapOf<String, String>()
         private var pendingCategoryForIcon: String? = null
 
-        fun touchCategory(name: String) {
-            if (!catOrder.containsKey(name)) catOrder[name] = catOrder.size
-            pendingCategoryForIcon = name
+        fun touchCategory(segments: List<String>) {
+            val id = SmdPath.join(segments)
+            if (!catOrder.containsKey(id)) catOrder[id] = catOrder.size
+            catPath[id] = segments
+            pendingCategoryForIcon = id
         }
 
         fun applyFileMeta(key: String, value: String) {
@@ -221,8 +239,15 @@ object SmdParser {
         }
 
         fun buildCategories(): List<Category> =
-            catOrder.entries.mapIndexed { i, (n, order) ->
-                Category(id = n, name = n, icon = catIcon[n] ?: "", order = order)
+            catOrder.entries.map { (id, order) ->
+                val segs = catPath[id] ?: listOf(id)
+                Category(
+                    id = id,
+                    name = segs.last(),
+                    icon = catIcon[id] ?: "",
+                    order = order,
+                    path = segs
+                )
             }
     }
 
