@@ -198,7 +198,7 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             TopBar(
                 title = "收藏",
                 actions = {
-                    IconBtn("▽") { filterOpen = true }
+                    IconBtn("▽", badge = favFilter.activeCount > 0) { filterOpen = true }
                     IconBtn("☰") { viewOptions = true }
                     IconBtn("⌕") { searchMode = true }
                     IconBtn("☑") { multiMode = true; selected = emptySet() }

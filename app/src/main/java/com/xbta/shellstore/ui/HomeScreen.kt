@@ -94,11 +94,15 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
         query = ""
     }
 
+    // 搜索命中集（未套筛选）：筛选面板的选项从它来推导，避免列出「选了必 0 条」的项
+    val searchHits = remember(query, entries) {
+        Store.search(query = query, types = emptySet(), risks = emptySet())
+    }
+
     // 搜索结果先按关键词排好相关度，再套筛选与排序
-    val results = remember(query, filter, entries, favs) {
-        val hit = Store.search(query = query, types = emptySet(), risks = emptySet())
+    val results = remember(searchHits, filter, favs) {
         EntryFilter.apply(
-            hit,
+            searchHits,
             filter,
             isFav = { favs.isFav(it) },
             recentRank = Store.recentRankMap(),
@@ -119,18 +123,24 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         if (searchMode) {
-            Box(Modifier.padding(12.dp, 8.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 SearchField(
                     query = query,
                     onQueryChange = { query = it },
                     placeholder = "搜索命令，空格分隔多个关键词",
                     autoFocus = true,
-                    onCancel = { searchMode = false; query = "" }
+                    onCancel = { searchMode = false; query = "" },
+                    modifier = Modifier.weight(1f)
                 )
+                // 搜索完照样能筛：入口和首页顶栏那个漏斗是一个东西
+                IconBtn("▽", badge = filter.activeCount > 0) { filterOpen = true }
             }
         } else {
             TopBar("Shell 商店", actions = {
-                IconBtn("▽") { filterOpen = true }
+                IconBtn("▽", badge = filter.activeCount > 0) { filterOpen = true }
                 IconBtn("☰") { viewOptions = true }
                 IconBtn("⌕") { searchMode = true }
             })
@@ -253,6 +263,9 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                 item {
                     Row(
                         Modifier
+                            // 分类预览是「内部 5dp 密排」的一组，这里单独留白分组，
+                            // 否则列表样式（item spacing = 0）下会跟上面的分类行粘成一片
+                            .padding(top = Space.sm)
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(Radius.md))
                             .background(MaterialTheme.colorScheme.surface)
@@ -310,9 +323,11 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
             state = filter,
             onChange = { Store.setShopFilter(it) },
             onDismiss = { filterOpen = false },
-            categories = cats,
+            categories = if (searchMode && query.isNotBlank())
+                cats.filter { c -> searchHits.any { SmdPath.isUnder(it.categoryId, c.id) } }
+            else cats,
             sources = Store.activeSourceConfigs(),
-            tags = EntryFilter.collectTags(entries),
+            tags = EntryFilter.collectTags(if (searchMode) searchHits else entries),
             showFavFlag = true,
             showFavFlags = false
         )

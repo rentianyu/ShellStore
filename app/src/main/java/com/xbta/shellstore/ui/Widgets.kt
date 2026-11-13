@@ -662,7 +662,7 @@ fun TopBar(
 }
 
 @Composable
-fun IconBtn(glyph: String, onClick: () -> Unit) {
+fun IconBtn(glyph: String, badge: Boolean = false, onClick: () -> Unit) {
     Box(
         Modifier
             .size(Dimen.iconButton)
@@ -671,6 +671,17 @@ fun IconBtn(glyph: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         AppIcon(glyph, size = IconSize.top, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .7f), contentDescription = iconActionLabel(glyph))
+        // 右上角小圆点：筛选正在生效（列表不是全部）
+        if (badge) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 7.dp, end = 6.dp)
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+        }
     }
 }
 
@@ -682,13 +693,14 @@ fun SearchField(
     onQueryChange: (String) -> Unit,
     placeholder: String = "搜索命令、脚本、Scheme、Intent",
     autoFocus: Boolean = false,
-    onCancel: (() -> Unit)? = null
+    onCancel: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
 ) {
     val fr = remember { FocusRequester() }
     LaunchedEffect(autoFocus) {
         if (autoFocus) runCatching { fr.requestFocus() }
     }
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Row(
             Modifier
                 .weight(1f)
