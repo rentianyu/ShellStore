@@ -323,6 +323,7 @@ fun AllCatsScreen(onBack: () -> Unit, onOpenCat: (String) -> Unit) {
 @Composable
 fun CatListScreen(cat: String, onBack: () -> Unit, onOpen: (Page) -> Unit) {
     val entries by Store.entries.collectAsState()
+    val cats by Store.categories.collectAsState()
     val favs by Store.favs.collectAsState()
     val settings by Store.settings.collectAsState()
     var viewOptions by remember { mutableStateOf(false) }
