@@ -210,14 +210,16 @@ fun FavScreen(onOpen: (Page) -> Unit) {
             FilterChip("标签", view == 1) { view = 1 }
             FilterChip("全部", view == 2) { view = 2; currentFolder = null }
         }
-        Box(Modifier.padding(horizontal = Space.page, vertical = 4.dp)) {
-            FilterBar(
-                state = favFilter,
-                onOpen = { filterOpen = true },
-                onClear = { Store.setFavFilter(FilterState()) },
-                total = favs.items.size,
-                shown = favs.items.count { hit(it) }
-            )
+        if (favFilter.activeCount > 0) {
+            Box(Modifier.padding(horizontal = Space.page, vertical = 4.dp)) {
+                FilterBar(
+                    state = favFilter,
+                    onOpen = { filterOpen = true },
+                    onClear = { Store.setFavFilter(FilterState()) },
+                    total = favs.items.size,
+                    shown = favs.items.count { hit(it) }
+                )
+            }
         }
 
         LazyColumn(
@@ -510,13 +512,12 @@ fun FavScreen(onOpen: (Page) -> Unit) {
 
     if (filterOpen) {
         val cats by Store.categories.collectAsState()
-        val srcs by Store.sources.collectAsState()
         FilterSheet(
             state = favFilter,
             onChange = { Store.setFavFilter(it) },
             onDismiss = { filterOpen = false },
             categories = cats,
-            sources = srcs,
+            sources = Store.activeSourceConfigs(),
             // 收藏页的标签池要包含收藏自己打的标签
             tags = EntryFilter.collectTags(favs.items.map { it.entry }, favs.tags.map { it.name }),
             showFavFlags = true,

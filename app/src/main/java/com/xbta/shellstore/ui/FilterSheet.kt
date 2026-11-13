@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +51,16 @@ fun FilterSheet(
     /** 商店页才有「已收藏」 */
     showFavFlag: Boolean = true
 ) {
+    // 关闭/已删除的源不产生条目，列出来只会筛出 0 条
+    val liveSources = sources.filter { it.enabled }
+    val liveIds = liveSources.map { it.id }.toSet() + EntryFilter.LOCAL_SOURCE
+
+    // 源被关掉或删掉后，之前选中的来源 id 就悬空了：界面上找不到、也取消不掉，只能整体重置
+    LaunchedEffect(liveIds) {
+        val stale = state.sources - liveIds
+        if (stale.isNotEmpty()) onChange(state.copy(sources = state.sources intersect liveIds))
+    }
+
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             Modifier
@@ -153,10 +164,10 @@ fun FilterSheet(
                     }
                 }
 
-                if (sources.size > 1) {
+                if (liveSources.size > 1) {
                     FSecTitle("来源")
                     ChipFlow {
-                        sources.forEach { s ->
+                        liveSources.forEach { s ->
                             PickChip(s.name, s.id in state.sources) {
                                 onChange(state.copy(sources = state.sources.toggle(s.id)))
                             }

@@ -191,14 +191,16 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                 }
             }
             if (searchMode) {
-                item {
-                    FilterBar(
-                        state = filter,
-                        onOpen = { filterOpen = true },
-                        onClear = { Store.setShopFilter(FilterState()) },
-                        total = entries.size,
-                        shown = results.size
-                    )
+                if (filter.activeCount > 0) {
+                    item {
+                        FilterBar(
+                            state = filter,
+                            onOpen = { filterOpen = true },
+                            onClear = { Store.setShopFilter(FilterState()) },
+                            total = entries.size,
+                            shown = results.size
+                        )
+                    }
                 }
                 item {
                     Text(
@@ -234,15 +236,18 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
                 }
             } else {
                 item { CategoryTreePreview(cats, { c -> CategoryTree.countUnder(entries, c.id) }, { onOpen(Page.CatList(it)) }) }
-                item {
-                    Box(Modifier.padding(top = Space.sm)) {
-                        FilterBar(
-                            state = filter,
-                            onOpen = { filterOpen = true },
-                            onClear = { Store.setShopFilter(FilterState()) },
-                            total = entries.size,
-                            shown = shownEntries.size
-                        )
+                // 没筛选时不占位，入口只在顶栏漏斗；筛了就插一条状态条，免得以为列表是全部
+                if (filter.activeCount > 0) {
+                    item {
+                        Box(Modifier.padding(top = Space.sm)) {
+                            FilterBar(
+                                state = filter,
+                                onOpen = { filterOpen = true },
+                                onClear = { Store.setShopFilter(FilterState()) },
+                                total = entries.size,
+                                shown = shownEntries.size
+                            )
+                        }
                     }
                 }
                 item {
@@ -301,13 +306,12 @@ fun HomeScreen(onOpen: (Page) -> Unit) {
     }
 
     if (filterOpen) {
-        val srcs by Store.sources.collectAsState()
         FilterSheet(
             state = filter,
             onChange = { Store.setShopFilter(it) },
             onDismiss = { filterOpen = false },
             categories = cats,
-            sources = srcs,
+            sources = Store.activeSourceConfigs(),
             tags = EntryFilter.collectTags(entries),
             showFavFlag = true,
             showFavFlags = false

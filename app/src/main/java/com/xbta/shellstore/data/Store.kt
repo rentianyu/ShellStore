@@ -45,6 +45,10 @@ object Store {
     private fun seriesActive(cfg: SourceConfig): Boolean =
         cfg.series.isBlank() || _settings.value.xbtaSeries
 
+    /** 实际生效的源（已启用且系列总开关放行）。关掉的源不产生条目，筛选里也不该出现 */
+    fun activeSourceConfigs(): List<SourceConfig> =
+        _sources.value.filter { it.enabled && seriesActive(it) }
+
     /** 老地址，升级时用来识别需要迁移的已配置源 */
     private const val OFFICIAL_URL_LEGACY =
         "https://raw.githubusercontent.com/rentianyu/ShellStore/main/sources/official.md"
