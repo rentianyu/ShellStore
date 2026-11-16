@@ -93,6 +93,66 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     // 结果对话框要显示「真正执行的命令」（非 shell 条目执行的是生成的 am 命令）
     var executedCmd by remember { mutableStateOf("") }
 
+    // Shizuku 的授权结果从 binder 线程回来，切回主线程再提示
+    // 授权状态缓存一份：组合期每次重组都调 pingBinder 是 IPC，没必要
+    var shizukuReady by remember { mutableStateOf(ShizukuRunner.hasPermission()) }
+
+    val permListener = remember {
+        Shizuku.OnRequestPermissionResultListener { code, grant ->
+            if (code == ShizukuRunner.REQ_CODE) {
+                scope.launch {
+                    toast(
+                        if (grant == PackageManager.PERMISSION_GRANTED) {
+                            shizukuReady = true
+                            "已授权给 Shizuku，再点一次「执行方式」选 Shizuku 就能跑"
+                        } else "Shizuku 授权被拒绝"
+                    )
+                }
+            }
+        }
+    }
+    DisposableEffect(Unit) {
+        runCatching { Shizuku.addRequestPermissionResultListener(permListener) }
+        onDispose { runCatching { Shizuku.removeRequestPermissionResultListener(permListener) } }
+    }
+
+    /**
+     * 提权执行时用的命令：shell/script 直接跑正文；
+     * url scheme / activity / intent / broadcast / service 必须先转成等价的 am 命令，
+     * 否则把 `openapp.jdmobile://...` 当命令丢给 sh 必然失败。
+     */
+    fun privilegedCommand(): String =
+        if (entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT) text
+        else CommandRenderer.toAdb(entry, values)
+
+    /** 用指定的执行方式跑一次（自定义模板也能这么手动指定） */
+    fun runWith(profile: RunProfile) {
+        val cmd = privilegedCommand()
+        if (cmd.isBlank()) {
+            toast("这个条目没有等价的命令，没法用命令通道执行")
+            return
+        }
+        if (profile.host == RunHost.SHIZUKU) {
+            if (!ShizukuRunner.isInstalled(ctx)) { toast("没装 Shizuku：装好并启动后再回来"); return }
+            if (!ShizukuRunner.isRunning()) { toast("Shizuku 服务没在运行，打开 Shizuku 点「启动」"); return }
+            if (!ShizukuRunner.hasPermission()) {
+                ShizukuRunner.requestPermission()
+                toast("已发起授权请求，允许之后再点一次")
+                return
+            }
+            shizukuReady = true
+        }
+        executedCmd = cmd
+        scope.launch {
+            running = true
+            val r = withContext(Dispatchers.IO) {
+                ShellExec.runProfiles(ctx, cmd, listOf(profile))
+            }
+            running = false
+            execResult = r
+        }
+    }
+
     val text = remember(entry, values, variantIndex) {
         CommandRenderer.primaryText(entry, values, variantIndex)
     }
@@ -512,65 +572,6 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         val variant = MaterialTheme.colorScheme.surfaceVariant
         val onVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
-        // Shizuku 的授权结果从 binder 线程回来，切回主线程再提示
-        // 授权状态缓存一份：组合期每次重组都调 pingBinder 是 IPC，没必要
-        var shizukuReady by remember { mutableStateOf(ShizukuRunner.hasPermission()) }
-
-        val permListener = remember {
-            Shizuku.OnRequestPermissionResultListener { code, grant ->
-                if (code == ShizukuRunner.REQ_CODE) {
-                    scope.launch {
-                        toast(
-                            if (grant == PackageManager.PERMISSION_GRANTED) {
-                                shizukuReady = true
-                                "已授权给 Shizuku，再点一次「Shizuku」就能执行"
-                            } else "Shizuku 授权被拒绝"
-                        )
-                    }
-                }
-            }
-        }
-        DisposableEffect(Unit) {
-            runCatching { Shizuku.addRequestPermissionResultListener(permListener) }
-            onDispose { runCatching { Shizuku.removeRequestPermissionResultListener(permListener) } }
-        }
-
-        /**
-         * 提权执行时用的命令：shell/script 直接跑正文；
-         * url scheme / activity / intent / broadcast / service 必须先转成等价的 am 命令，
-         * 否则把 `openapp.jdmobile://...` 当命令丢给 sh 必然失败。
-         */
-        fun privilegedCommand(): String =
-            if (entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT) text
-            else CommandRenderer.toAdb(entry, values)
-
-        /** 用指定的执行方式跑一次（自定义模板也能这么手动指定） */
-        fun runWith(profile: RunProfile) {
-            val cmd = privilegedCommand()
-            if (cmd.isBlank()) {
-                toast("这个条目没有等价的命令，没法用命令通道执行")
-                return
-            }
-            if (profile.host == RunHost.SHIZUKU) {
-                if (!ShizukuRunner.isInstalled(ctx)) { toast("没装 Shizuku：装好并启动后再回来"); return }
-                if (!ShizukuRunner.isRunning()) { toast("Shizuku 服务没在运行，打开 Shizuku 点「启动」"); return }
-                if (!ShizukuRunner.hasPermission()) {
-                    ShizukuRunner.requestPermission()
-                    toast("已发起授权请求，允许之后再点一次")
-                    return
-                }
-                shizukuReady = true
-            }
-            executedCmd = cmd
-            scope.launch {
-                running = true
-                val r = withContext(Dispatchers.IO) {
-                    ShellExec.runProfiles(ctx, cmd, listOf(profile))
-                }
-                running = false
-                execResult = r
-            }
-        }
 
         Column(
             Modifier
