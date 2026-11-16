@@ -35,3 +35,8 @@ java -cp "$OUT4${STDLIB:+:$STDLIB}" SmdPathTestKt
 OUT5=$(mktemp -d)
 $KOTLINC $CORE/Model.kt $CORE/SmdPath.kt $CORE/SearchText.kt $CORE/EntryFilter.kt tools/scheme-test/EntryFilterTest.kt -d "$OUT5"
 java -cp "$OUT5${STDLIB:+:$STDLIB}" EntryFilterTestKt
+
+# 运行模板：$command 替换与 shell 安全引用
+OUT6=$(mktemp -d)
+$KOTLINC $CORE/RunTemplate.kt tools/scheme-test/RunTemplateTest.kt -d "$OUT6"
+java -cp "$OUT6${STDLIB:+:$STDLIB}" RunTemplateTestKt

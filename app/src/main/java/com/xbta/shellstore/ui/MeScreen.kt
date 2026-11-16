@@ -391,6 +391,15 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
                 )
             }
 
+            GroupTitle("运行")
+            GroupCard {
+                SettingRow(
+                    "▶", "运行方式",
+                    "${settings.runProfiles.count { it.enabled }} 种依次尝试 · 模板可改",
+                    onClick = { onOpen(Page.RunProfiles) }
+                )
+            }
+
             GroupTitle("复制")
             GroupCard {
                 Column(Modifier.padding(Space.md)) {

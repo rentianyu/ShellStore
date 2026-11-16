@@ -267,7 +267,9 @@ fun EntryQuickAction(
         )
         scope.launch {
             running = true
-            val r = withContext(Dispatchers.IO) { ShellExec.run(ctx, cmd) }
+            val r = withContext(Dispatchers.IO) {
+                ShellExec.runProfiles(ctx, cmd, Store.runProfilesFor(entry.id))
+            }
             running = false
             execResult = r
             Store.recordRecent(entry.id)

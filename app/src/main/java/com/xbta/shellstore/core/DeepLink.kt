@@ -51,6 +51,7 @@ object DeepLink {
         Spec("search", "shellstore://search?q=蓝牙", "搜索并直接进结果页", "导航"),
         Spec("settings", "shellstore://settings", "设置页", "导航"),
         Spec("appearance", "shellstore://appearance", "界面与显示（主题 / 字号 / 缩放 / 列表样式 / 字体）", "导航"),
+        Spec("runprofiles", "shellstore://runprofiles", "运行方式（执行方式与命令模板）", "导航"),
         Spec("sources", "shellstore://sources", "订阅源管理", "导航"),
         Spec("backup", "shellstore://backup", "备份与恢复", "导航"),
         Spec("cloud", "shellstore://cloud", "云备份配置", "导航"),

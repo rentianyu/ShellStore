@@ -104,7 +104,11 @@ data class AppSettings(
     /** 导出 APK 的保存目录（SAF tree uri），空串 = 只留在应用缓存里供安装/分享 */
     val exportDirUri: String = "",
     /** 上次已经给用户看过的版本号（versionCode）。用来判断「这次更新后要不要弹更新内容」 */
-    val lastSeenVersionCode: Int = 0
+    val lastSeenVersionCode: Int = 0,
+    /** 执行方式（宿主 + 命令模板），列表顺序就是依次尝试的顺序 */
+    val runProfiles: List<RunProfile> = RunProfile.defaults(),
+    /** 条目级覆盖：条目 id → 限定的执行方式 id（空列表 = 用全部启用的） */
+    val perEntryRun: Map<String, List<String>> = emptyMap()
 ) {
     /** 实际生效的字号倍率（只放大 sp） */
     val fontScale: Float get() = FONT_SCALES[fontLevel.coerceIn(0, FONT_SCALES.lastIndex)]
@@ -144,6 +148,21 @@ data class AppSettings(
         put("agreedVersion", agreedVersion)
         put("exportDirUri", exportDirUri)
         put("lastSeenVersionCode", lastSeenVersionCode)
+        put("runProfiles", JSONArray().apply {
+            runProfiles.forEach { p ->
+                put(JSONObject().apply {
+                    put("id", p.id)
+                    put("name", p.name)
+                    put("host", p.host.name)
+                    put("template", p.template)
+                    put("enabled", p.enabled)
+                    put("builtin", p.builtin)
+                })
+            }
+        })
+        put("perEntryRun", JSONObject().apply {
+            perEntryRun.forEach { (k, v) -> put(k, JSONArray(v)) }
+        })
     }
 
     companion object {
@@ -184,7 +203,30 @@ data class AppSettings(
                 xbtaSeries = o.optBoolean("xbtaSeries", false),
                 agreedVersion = o.optInt("agreedVersion", 0),
                 exportDirUri = o.optString("exportDirUri", ""),
-                lastSeenVersionCode = o.optInt("lastSeenVersionCode", 0)
+                lastSeenVersionCode = o.optInt("lastSeenVersionCode", 0),
+                runProfiles = RunProfile.sanitize(
+                    o.optJSONArray("runProfiles")?.let { arr ->
+                        (0 until arr.length()).mapNotNull { i ->
+                            val x = arr.optJSONObject(i) ?: return@mapNotNull null
+                            val id = x.optString("id")
+                            if (id.isBlank()) return@mapNotNull null
+                            RunProfile(
+                                id = id,
+                                name = x.optString("name", id),
+                                host = e(x.optString("host"), RunHost.DIRECT, RunHost.entries.toTypedArray()),
+                                template = x.optString("template", RunProfile.PH),
+                                enabled = x.optBoolean("enabled", true),
+                                builtin = x.optBoolean("builtin", false)
+                            )
+                        }
+                    }.orEmpty()
+                ),
+                perEntryRun = o.optJSONObject("perEntryRun")?.let { jo ->
+                    jo.keys().asSequence().associate { k ->
+                        val a = jo.optJSONArray(k)
+                        k to if (a == null) emptyList() else (0 until a.length()).map { a.optString(it) }
+                    }
+                }.orEmpty()
             )
         }
     }

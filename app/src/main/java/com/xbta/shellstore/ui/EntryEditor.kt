@@ -111,6 +111,11 @@ fun EntryEditorScreen(
     }
 
     val favs by Store.favs.collectAsState()
+    val settings by Store.settings.collectAsState()
+    // 条目级执行方式：空 = 跟随全局。只对命令类条目有意义
+    var runPick by remember {
+        mutableStateOf(entryId?.let { Store.settings.value.perEntryRun[it].orEmpty() } ?: emptyList())
+    }
     val isEditedFav = entryId != null && favs.items.firstOrNull { it.entryId == entryId }?.edited == true
     val canRevert = isEditedFav && entryId != null && !Store.isLocal(entryId) && Store.isAlive(entryId)
 
@@ -122,14 +127,16 @@ fun EntryEditorScreen(
             !e.type.hasBody && e.intent?.isActionable != true ->
                 tip = "Intent 至少要填 Action 或 Component"
             else -> {
-                if (isEditing) {
-                    val id = entryId!!
+                val id = if (isEditing) {
+                    val cur = entryId!!
                     // 未收藏过的源条目：先收藏再写快照，这样改动才留得住
-                    if (!Store.isFav(id)) Store.addFav(e, folderId)
-                    Store.updateFavEntry(id, e)
+                    if (!Store.isFav(cur)) Store.addFav(e, folderId)
+                    Store.updateFavEntry(cur, e)
+                    cur
                 } else {
                     Store.addLocalEntry(e, folderId)
                 }
+                if (id.isNotBlank()) Store.setEntryRunProfiles(id, runPick)
                 onBack()
             }
         }
@@ -345,6 +352,44 @@ fun EntryEditorScreen(
                         }
                     }
                     Field("标签", tagText, { tagText = it }, "空格分隔，如 网络 调试")
+                }
+            }
+
+            // ---------- 执行方式（仅命令类） ----------
+            if (type == EntryType.SHELL || type == EntryType.SCRIPT) {
+                GroupTitle("执行方式")
+                GroupCard {
+                    Column(Modifier.padding(Space.md)) {
+                        Text(
+                            "不勾 = 用全局启用的全部方式；勾了只在这几项里按全局顺序依次尝试",
+                            fontSize = TypeScale.caption,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        settings.runProfiles.forEach { p ->
+                            val on = p.id in runPick
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(Radius.sm))
+                                    .clickable {
+                                        runPick = if (on) runPick - p.id else runPick + p.id
+                                    }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(p.name, fontSize = TypeScale.small, modifier = Modifier.weight(1f))
+                                Text(
+                                    if (p.enabled) p.host.label else p.host.label + "（已关）",
+                                    fontSize = TypeScale.caption,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                if (on) AppIcon("✓", size = 16.dp, color = MaterialTheme.colorScheme.primary)
+                                else Spacer(Modifier.size(16.dp))
+                            }
+                        }
+                    }
                 }
             }
 

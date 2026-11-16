@@ -54,7 +54,7 @@ fun HelpScreen(onBack: () -> Unit) {
             HelpP("命令开头的 adb shell 会被自动剥掉；带 su -c 的会被标成需要 root。")
 
             HelpH("执行与发送")
-            HelpP("shell / script 用 App 自身权限执行 sh，不是 root。改系统设置、访问 /data 这类需要 root 的做不了。")
+            HelpP("shell / script 默认先在本机用 App 自己的权限跑 sh，失败后按「设置 › 运行方式」里的顺序再试 Shizuku、Root。改系统设置、访问 /data 这类命令，得等轮到 Shizuku 或 Root 那一项才能成。")
             HelpP("Intent 类条目在底部有「打开 / 发送 / 启动」按钮，详情页同时显示等价的 adb 命令，方便在电脑上复现。")
 
             HelpH("收藏与备份")

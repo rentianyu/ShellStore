@@ -35,6 +35,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.xbta.shellstore.core.*
 import com.xbta.shellstore.data.ApkExporter
 import com.xbta.shellstore.data.EntryShortcuts
+import com.xbta.shellstore.core.RunHost
+import com.xbta.shellstore.core.RunProfile
 import com.xbta.shellstore.data.ShellExec
 import com.xbta.shellstore.data.ShizukuRunner
 import com.xbta.shellstore.data.CopyPrefix
@@ -80,6 +82,8 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     var actionMode by remember { mutableStateOf("") }
     // 非命令类条目点「复制」时的选择框：复制内容 / 复制为 Shell 命令
     var copyChooser by remember { mutableStateOf(false) }
+    // 「执行方式」选择框：手动指定用哪个模板跑这次
+    var pickRun by remember { mutableStateOf(false) }
     // 导出后自动保存到用户选的目录：成功给路径，失败给原因
     var exportSavedTo by remember { mutableStateOf<String?>(null) }
     var exportSaveErr by remember { mutableStateOf<String?>(null) }
@@ -540,37 +544,33 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
             if (entry.type == EntryType.SHELL || entry.type == EntryType.SCRIPT) text
             else CommandRenderer.toAdb(entry, values)
 
-        fun runVia(kind: String) {
+        /** 用指定的执行方式跑一次（自定义模板也能这么手动指定） */
+        fun runWith(profile: RunProfile) {
             val cmd = privilegedCommand()
             if (cmd.isBlank()) {
-                toast("这个条目没有等价的 am 命令，无法用提权通道执行")
+                toast("这个条目没有等价的命令，没法用命令通道执行")
                 return
+            }
+            if (profile.host == RunHost.SHIZUKU) {
+                if (!ShizukuRunner.isInstalled(ctx)) { toast("没装 Shizuku：装好并启动后再回来"); return }
+                if (!ShizukuRunner.isRunning()) { toast("Shizuku 服务没在运行，打开 Shizuku 点「启动」"); return }
+                if (!ShizukuRunner.hasPermission()) {
+                    ShizukuRunner.requestPermission()
+                    toast("已发起授权请求，允许之后再点一次")
+                    return
+                }
+                shizukuReady = true
             }
             executedCmd = cmd
             scope.launch {
                 running = true
                 val r = withContext(Dispatchers.IO) {
-                    if (kind == "shizuku") ShellExec.runViaShizuku(cmd) else ShellExec.runViaRoot(cmd)
+                    ShellExec.runProfiles(ctx, cmd, listOf(profile))
                 }
                 running = false
                 execResult = r
-                if (r.ok) Store.recordRecent(entry.id)
             }
         }
-
-        fun shizukuRun() {
-            if (!ShizukuRunner.isInstalled(ctx)) { toast("没装 Shizuku：装好并启动后再回来"); return }
-            if (!ShizukuRunner.isRunning()) { toast("Shizuku 服务没在运行，打开 Shizuku 点「启动」"); return }
-            if (!ShizukuRunner.hasPermission()) {
-                ShizukuRunner.requestPermission()
-                toast("已发起授权请求，允许之后再点一次")
-                return
-            }
-            shizukuReady = true
-            runVia("shizuku")
-        }
-
-        fun rootRun() = runVia("root")
 
         Column(
             Modifier
@@ -595,7 +595,9 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                             executedCmd = text
                             scope.launch {
                                 running = true
-                                val r = withContext(Dispatchers.IO) { ShellExec.run(ctx, text) }
+                                val r = withContext(Dispatchers.IO) {
+                                    ShellExec.runProfiles(ctx, text, Store.runProfilesFor(entry.id))
+                                }
                                 running = false
                                 execResult = r
                                 Store.recordRecent(entry.id)
@@ -708,11 +710,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
             ) {
                 ActionChip(
                     glyph = "⚡",
-                    label = "Shizuku",
-                    onClick = { shizukuRun() },
+                    label = "执行方式",
+                    onClick = { pickRun = true },
                     tint = if (shizukuReady) primary else null
                 )
-                ActionChip(glyph = "⚿", label = "Root", onClick = { rootRun() })
                 ActionChip(glyph = "⇩", label = "导出APK", onClick = { actionMode = MODE_APK }, enabled = !exporting)
                 ActionChip(glyph = "⌂", label = "桌面", onClick = { actionMode = MODE_SHORTCUT })
                 ActionChip(glyph = "▣", label = "磁贴", onClick = { actionMode = MODE_TILE })
@@ -748,6 +749,49 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     }
 
     // 非命令类条目点「复制」：先选清楚要复制的是内容还是命令
+    if (pickRun) {
+        val profiles = Store.runProfilesFor(entry.id)
+        AlertDialog(
+            onDismissRequest = { pickRun = false },
+            title = { Text("用哪种方式执行", fontSize = TypeScale.body) },
+            text = {
+                Column {
+                    if (profiles.isEmpty()) {
+                        Text(
+                            "没有可用的执行方式，去「设置 › 运行方式」里启用。",
+                            fontSize = TypeScale.small
+                        )
+                    }
+                    profiles.forEach { p ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(Radius.md))
+                                .clickable {
+                                    pickRun = false
+                                    runWith(p)
+                                }
+                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(p.name, fontSize = TypeScale.small, fontWeight = FontWeight.Medium)
+                                Text(
+                                    p.templateOrPlain,
+                                    fontSize = TypeScale.caption,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    maxLines = 1
+                                )
+                            }
+                            Text(p.host.label, fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pickRun = false }) { Text("取消") } }
+        )
+    }
+
     if (copyChooser) {
         val content = CommandRenderer.contentText(entry, values, variantIndex)
         val shellCmd = CommandRenderer.toAdb(entry, values)
@@ -919,7 +963,7 @@ internal fun ExecResultDialog(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "通道 ${result.channel.label}" + if (!ok) " · 返回码 ${result.code}" else "",
+                    "通道 " + result.profileName.ifBlank { result.channel.label } + if (!ok) " · 返回码 ${result.code}" else "",
                     fontSize = TypeScale.caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

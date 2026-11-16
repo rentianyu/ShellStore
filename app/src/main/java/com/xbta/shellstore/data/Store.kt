@@ -1012,6 +1012,38 @@ object Store {
         Repo.saveSettings(c, s)
     }
 
+    // ---------------- 执行方式（运行模板） ----------------
+
+    /** 依次尝试的执行方式：只取启用的，List 顺序就是尝试顺序 */
+    fun activeRunProfiles(): List<RunProfile> =
+        _settings.value.runProfiles.filter { it.enabled }
+
+    /**
+     * 某条命令实际可用的执行方式。
+     * 条目级覆盖为空 = 跟随全局；覆盖里点名的都被删/被关了 = 退回全部，
+     * 否则这条命令会彻底执行不了，且用户很难意识到是筛选条件失效。
+     */
+    fun runProfilesFor(entryId: String?): List<RunProfile> {
+        val active = activeRunProfiles()
+        if (entryId == null) return active
+        val pick = _settings.value.perEntryRun[entryId].orEmpty()
+        if (pick.isEmpty()) return active
+        val filtered = active.filter { it.id in pick }
+        return filtered.ifEmpty { active }
+    }
+
+    /** 条目级执行方式；传空列表表示恢复「跟随全局」 */
+    fun setEntryRunProfiles(entryId: String, ids: List<String>) {
+        val cur = _settings.value.perEntryRun.toMutableMap()
+        if (ids.isEmpty()) cur.remove(entryId) else cur[entryId] = ids
+        updateSettings(_settings.value.copy(perEntryRun = cur))
+    }
+
+    /** 改执行方式列表（整表替换，顺序即尝试顺序） */
+    fun setRunProfiles(list: List<RunProfile>) {
+        updateSettings(_settings.value.copy(runProfiles = RunProfile.sanitize(list)))
+    }
+
     // ---------------- 云备份（WebDAV / S3） ----------------
 
     data class CloudState(

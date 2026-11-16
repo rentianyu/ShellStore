@@ -3,6 +3,9 @@ package com.xbta.shellstore.data
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.xbta.shellstore.core.RunHost
+import com.xbta.shellstore.core.RunProfile
+import com.xbta.shellstore.core.RunTemplate
 import rikka.shizuku.Shizuku
 import java.util.concurrent.TimeUnit
 
@@ -26,7 +29,9 @@ object ShellExec {
         val code: Int,
         val out: String,
         val err: String,
-        val note: String = ""
+        val note: String = "",
+        /** 实际用的执行方式名（自定义模板时 Channel 只表示宿主，看不出是哪个模板） */
+        val profileName: String = ""
     ) {
         val ok: Boolean get() = code == 0
         val hasOutput: Boolean get() = out.isNotBlank() || err.isNotBlank()
@@ -57,35 +62,56 @@ object ShellExec {
         true
     }.getOrDefault(false)
 
-    /** 阻塞调用，务必放在 IO 线程 */
-    fun run(ctx: Context, cmd: String, timeoutSec: Long = 60L): Result {
-        val direct = exec(arrayOf("sh", "-c", cmd), timeoutSec)
-        if (direct.code == 0) return direct
-
-        // Shizuku 有授权时优先于 root：不必每次弹 su 授权框，权限等同 ADB shell
-        if (ShizukuRunner.hasPermission()) {
-            val s = runViaShizuku(cmd, timeoutSec)
-            if (s.code == 0 || s.err.isNotBlank()) return s
+    /**
+     * 按用户配置的执行方式依次尝试（阻塞调用，务必放在 IO 线程），第一个成功即返回。
+     *
+     * 顺序由「设置 › 运行方式」里的排列决定；每一项都是「宿主 + 命令行模板」，
+     * 所以 `su -c $command`、`/sdcard/bin/python -c $command` 这种都能自己加。
+     */
+    fun runProfiles(
+        ctx: Context,
+        cmd: String,
+        profiles: List<RunProfile>,
+        timeoutSec: Long = 60L
+    ): Result {
+        if (profiles.isEmpty()) {
+            return Result(
+                Channel.DIRECT, -1, "", "没有可用的执行方式",
+                "去「我的 › 设置 › 运行方式」至少启用一项，或检查这条命令是不是把可用方式全排除了。"
+            )
         }
-
-        if (hasRoot()) {
-            val r = exec(arrayOf("su", "-c", cmd), timeoutSec)
-            return r.copy(channel = Channel.ROOT)
+        val tried = ArrayList<String>(profiles.size)
+        var last: Result? = null
+        for (p in profiles) {
+            tried += p.name
+            val line = RunTemplate.render(p.templateOrPlain, cmd)
+            val r = when (p.host) {
+                RunHost.DIRECT -> runLocal(line, timeoutSec)
+                RunHost.SHIZUKU -> shizukuExecLine(line, timeoutSec)
+                RunHost.TERMUX -> {
+                    val e = sendToTermux(ctx, cmd)
+                    if (e == null)
+                        Result(Channel.TERMUX, 0, "", "", "已交给 Termux 在后台执行。本应用拿不到它的输出，请打开 Termux 看结果。")
+                    else Result(Channel.TERMUX, -1, "", e)
+                }
+            }.copy(profileName = p.name)
+            if (r.ok) return r
+            last = r
         }
-
-        if (looksLikePermissionIssue(direct) && hasTermux(ctx)) {
-            val err = sendToTermux(ctx, cmd)
-            if (err == null) {
-                return Result(
-                    Channel.TERMUX, 0, "", "",
-                    "已交给 Termux 在后台执行。本应用拿不到它的输出，请打开 Termux 查看结果。"
-                )
-            }
-            return direct.copy(note = err)
-        }
-
-        return direct.copy(note = hintFor(direct))
+        val base = last ?: Result(Channel.DIRECT, -1, "", "全部执行方式都失败了")
+        val head = if (tried.size > 1) "试过 ${tried.joinToString(" / ")} 都不行。" else ""
+        return base.copy(note = (head + base.note).trim())
     }
+
+    /** 用 App 自己的 sh 执行一行已渲染好的命令 */
+    private fun runLocal(line: String, timeoutSec: Long): Result {
+        val r = exec(arrayOf("sh", "-c", line), timeoutSec)
+        return if (r.ok) r else r.copy(note = hintFor(r))
+    }
+
+    /** 默认执行：用当前配置里启用的执行方式 */
+    fun run(ctx: Context, cmd: String, timeoutSec: Long = 60L): Result =
+        runProfiles(ctx, cmd, Store.activeRunProfiles(), timeoutSec)
 
     private fun looksLikePermissionIssue(r: Result): Boolean {
         val e = r.err.lowercase()
@@ -120,7 +146,16 @@ object ShellExec {
      * 注意：ShizukuRemoteProcess 的 stderr 是独立流，必须两个线程分别读，
      * 单线程顺序读会在缓冲区写满时卡死（实测过）。
      */
-    fun runViaShizuku(cmd: String, timeoutSec: Long = 60L): Result {
+    fun runViaShizuku(cmd: String, timeoutSec: Long = 60L): Result = shizukuExecLine(cmd, timeoutSec)
+
+    /**
+     * 通过 Shizuku 执行一行命令。[line] 是已经渲染好的命令行（可以含自定义模板），
+     * 内部统一用 `sh -c <line>` 交给 Shizuku。
+     *
+     * 注意：ShizukuRemoteProcess 的 stderr 是独立流，必须两个线程分别读，
+     * 单线程顺序读会在缓冲区写满时卡死（实测过）。
+     */
+    private fun shizukuExecLine(line: String, timeoutSec: Long): Result {
         if (!ShizukuRunner.isRunning()) {
             return Result(
                 Channel.SHIZUKU, -1, "", "Shizuku 服务没在运行",
@@ -134,7 +169,7 @@ object ShellExec {
             )
         }
         val process = runCatching {
-            Shizuku.newProcess(arrayOf("sh", "-c", cmd), null, null)
+            Shizuku.newProcess(arrayOf("sh", "-c", line), null, null)
         }.getOrElse { e ->
             return Result(
                 Channel.SHIZUKU, -1, "", e.message ?: e.javaClass.simpleName,
