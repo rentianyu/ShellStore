@@ -93,6 +93,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
     // 结果对话框要显示「真正执行的命令」（非 shell 条目执行的是生成的 am 命令）
     var executedCmd by remember { mutableStateOf("") }
 
+    val text = remember(entry, values, variantIndex) {
+        CommandRenderer.primaryText(entry, values, variantIndex)
+    }
+
     // Shizuku 的授权结果从 binder 线程回来，切回主线程再提示
     // 授权状态缓存一份：组合期每次重组都调 pingBinder 是 IPC，没必要
     var shizukuReady by remember { mutableStateOf(ShizukuRunner.hasPermission()) }
@@ -153,9 +157,6 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         }
     }
 
-    val text = remember(entry, values, variantIndex) {
-        CommandRenderer.primaryText(entry, values, variantIndex)
-    }
     /** 条目类型 → 导出默认动作类型 */
     fun exportType(): String = when (entry.type) {
         EntryType.SHELL, EntryType.SCRIPT -> ExportSpec.TYPE_SHELL
