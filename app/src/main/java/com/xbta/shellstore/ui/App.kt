@@ -408,9 +408,13 @@ private fun Root() {
             }
             }
         }
-        TabBar(current = tab, hasOverlay = stack.isNotEmpty()) {
-            tab = it
-            stack = emptyList()
+        // 底部 tab 只在首页（三个 tab 的根页）显示。进了详情 / 分类 / 设置这类子页面就收起，
+        // 整屏让给内容——子页面本身已有顶部返回，不需要再占一条底栏
+        if (stack.isEmpty()) {
+            TabBar(current = tab) {
+                tab = it
+                stack = emptyList()
+            }
         }
     }
 
@@ -475,7 +479,7 @@ private fun Root() {
 }
 
 @Composable
-private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
+private fun TabBar(current: Int, onSelect: (Int) -> Unit) {
     // 浮动胶囊 dock：不贴边、带阴影，落到页面底色上，才有「浮起来」的层次。
     // 图标与标签共享中心轴，选中态用颜色和导航语义表达。
     Box(
@@ -494,7 +498,7 @@ private fun TabBar(current: Int, hasOverlay: Boolean, onSelect: (Int) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             listOf("▦" to "商店", "☆" to "收藏", "◍" to "我的").forEachIndexed { i, pair ->
-                val on = i == current && !hasOverlay
+                val on = i == current
                 val fg = if (on) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .75f)
                 Column(
