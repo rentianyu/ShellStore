@@ -71,6 +71,8 @@ sealed interface Page {
     data object AllFav : Page
     data object Recent : Page
     data object Settings : Page
+    /** 界面与显示（设置里的二级页：主题 / 字号 / 缩放 / 列表样式 / 字体） */
+    data object Appearance : Page
     data object Sources : Page
     data object Backup : Page
     data object Cloud : Page
@@ -228,6 +230,7 @@ private fun Root() {
         "edit" -> c.id()?.let { 0 to listOf(Page.Editor(it)) }
         "search" -> 0 to emptyList()
         "settings" -> 2 to listOf(Page.Settings)
+        "appearance" -> 2 to listOf(Page.Settings, Page.Appearance)
         "sources" -> 2 to listOf(Page.Sources)
         "backup" -> 2 to listOf(Page.Backup)
         "cloud" -> 2 to listOf(Page.Cloud)
@@ -393,6 +396,7 @@ private fun Root() {
                     is Page.AllFav -> AllFavScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Recent -> RecentScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Settings -> SettingsScreen(onBack = ::pop, onOpen = ::push)
+                    is Page.Appearance -> AppearanceScreen(onBack = ::pop)
                     is Page.Sources -> SourcesScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Backup -> BackupScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Cloud -> CloudBackupScreen(onBack = ::pop)

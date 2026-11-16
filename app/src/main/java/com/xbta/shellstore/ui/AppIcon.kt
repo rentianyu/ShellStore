@@ -107,6 +107,16 @@ private object AppVectors {
     private val keyboard by lazy { vector("Keyboard", "M2,5 H22 V19 H2 Z M6,9 H6.1 M10,9 H10.1 M14,9 H14.1 M18,9 H18.1 M6,12 H6.1 M10,12 H10.1 M14,12 H14.1 M18,12 H18.1 M7,16 H17") }
     private val key by lazy { vector("Key", "M11,8 A5,5 0,1 1,1,8 A5,5 0,1 1,11,8 Z M10,12 L20,22 M16,18 L19,15 M19,21 L22,18") }
     private val square by lazy { vector("Square", "M5,5 H19 V19 H5 Z") }
+    // 界面与显示：三条滑杆 + 滑块（外观类设置）
+    private val sliders by lazy {
+        vector(
+            "Sliders",
+            "M4,7 H20 M4,12 H20 M4,17 H20" +
+                " M8,7 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" +
+                " M15,12 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" +
+                " M9,17 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"
+        )
+    }
 
     fun forGlyph(glyph: String): ImageVector = when (glyph) {
         "▦" -> grid
@@ -150,6 +160,7 @@ private object AppVectors {
         "✦" -> sparkle
         "⌨" -> keyboard
         "▽", "⏷" -> funnel
+        "◐", "◑" -> sliders
         "⚿" -> key
         else -> square
     }

@@ -196,7 +196,7 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     }
                 })
                 Divider()
-                SettingRow("⚙", "设置", "主题 · 字号 · 复制前缀", onClick = { onOpen(Page.Settings) })
+                SettingRow("⚙", "设置", "界面 · 复制 · 安全 · 法律", onClick = { onOpen(Page.Settings) })
                 Divider()
                 SettingRow("ⓘ", "关于", "版本 · 更新日志 · 许可", onClick = { onOpen(Page.About) })
             }
@@ -369,27 +369,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
     val settings by Store.settings.collectAsState()
     val ctx = LocalContext.current
     var confirmClear by remember { mutableStateOf(false) }
-    var fontDialog by remember { mutableStateOf(0) }
-
-    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                val dir = java.io.File(ctx.filesDir, "fonts").apply { mkdirs() }
-                val dest = java.io.File(dir, "custom.ttf")
-                ctx.contentResolver.openInputStream(uri)?.use { input ->
-                    dest.outputStream().use { out -> input.copyTo(out) }
-                }
-                dest.absolutePath
-            }.onSuccess { path ->
-                Store.updateSettings(Store.settings.value.copy(customFontPath = path))
-                Toast.makeText(ctx, "字体已导入", Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                Toast.makeText(ctx, "导入失败：${it.javaClass.simpleName}", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
 
     fun update(s: AppSettings) = Store.updateSettings(s)
 
@@ -402,110 +381,14 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
                 .padding(horizontal = Space.page)
                 .padding(bottom = 20.dp)
         ) {
-            GroupTitle("外观")
-            GroupCard {
-                Column(Modifier.padding(Space.md)) {
-                    Text("主题", fontSize = TypeScale.small)
-                    Spacer(Modifier.height(9.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        ThemeMode.entries.forEach { m ->
-                            FilterChip(m.label, settings.theme == m) { update(settings.copy(theme = m)) }
-                        }
-                    }
-                }
-                Divider()
-                Column(Modifier.padding(Space.md)) {
-                    SliderHeader("字号", "${(settings.fontScale * 100).roundToInt()}%")
-                    Spacer(Modifier.height(9.dp))
-                    // 10 级：拆成两行各 5 个，等宽等距，一眼能扫完也点得准
-                    FONT_SCALES.chunked(5).forEachIndexed { rowIdx, row ->
-                        if (rowIdx > 0) Spacer(Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            row.forEachIndexed { colIdx, f ->
-                                val level = rowIdx * 5 + colIdx
-                                FilterChip(
-                                    "${(f * 100).roundToInt()}",
-                                    settings.fontLevel == level,
-                                    Modifier.weight(1f)
-                                ) { update(settings.copy(fontLevel = level)) }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(7.dp))
-                    Text(
-                        "只放大文字，控件尺寸不变",
-                        fontSize = TypeScale.caption,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Divider()
-                Column(Modifier.padding(Space.md)) {
-                    SliderHeader("界面缩放", "${(settings.uiScale * 100).roundToInt()}%")
-                    Spacer(Modifier.height(9.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        UI_SCALES.forEachIndexed { level, f ->
-                            FilterChip(
-                                "${(f * 100).roundToInt()}",
-                                settings.uiLevel == level,
-                                Modifier.weight(1f)
-                            ) { update(settings.copy(uiLevel = level)) }
-                        }
-                    }
-                    Spacer(Modifier.height(7.dp))
-                    Text(
-                        "文字与控件一起缩放，屏幕上显示的内容随之增减",
-                        fontSize = TypeScale.caption,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-                Divider()
-                Column(Modifier.padding(Space.md)) {
-                    SliderHeader("列表样式", ListStyle.label(settings.listStyle))
-                    Spacer(Modifier.height(9.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        ListStyle.ALL.forEach { st ->
-                            FilterChip(
-                                ListStyle.label(st),
-                                settings.listStyle == st,
-                                Modifier.weight(1f)
-                            ) { update(settings.copy(listStyle = st)) }
-                        }
-                    }
-                    Spacer(Modifier.height(7.dp))
-                    Text(
-                        if (settings.listStyle == ListStyle.LIST)
-                            "无卡片背景、行与行紧挨、只用细分隔线：单条更矮，一屏能多看一倍左右"
-                        else "白色卡片 + 圆角，单条信息更舒展，适合逐条细看",
-                        fontSize = TypeScale.caption,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
-
-            GroupTitle("字体")
+            GroupTitle("界面")
             GroupCard {
                 SettingRow(
-                    "字", "界面字体", settings.uiFont.label,
-                    onClick = { fontDialog = 1 }
+                    "◐", "界面与显示",
+                    "主题 ${settings.theme.label} · 字号 ${(settings.fontScale * 100).roundToInt()}%" +
+                        " · 缩放 ${(settings.uiScale * 100).roundToInt()}% · ${ListStyle.label(settings.listStyle)}",
+                    onClick = { onOpen(Page.Appearance) }
                 )
-                Divider()
-                SettingRow(
-                    ">_", "代码字体", settings.codeFont.label,
-                    onClick = { fontDialog = 2 }
-                )
-                Divider()
-                SettingRow(
-                    "⇩", "导入字体文件",
-                    if (settings.customFontPath.isBlank()) "支持 .ttf / .otf"
-                    else java.io.File(settings.customFontPath).name,
-                    onClick = { picker.launch(arrayOf("*/*")) }
-                )
-                if (settings.customFontPath.isNotBlank()) {
-                    Divider()
-                    SettingRow("✕", "清除自定义字体", "", danger = true, onClick = {
-                        update(settings.copy(customFontPath = ""))
-                    })
-                }
             }
 
             GroupTitle("复制")
@@ -594,57 +477,6 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("取消") } }
         )
     }
-
-    if (fontDialog != 0) {
-        val isUi = fontDialog == 1
-        AlertDialog(
-            onDismissRequest = { fontDialog = 0 },
-            title = { Text(if (isUi) "界面字体" else "代码字体", fontSize = TypeScale.body) },
-            text = {
-                Column {
-                    FontChoice.entries.forEach { fc ->
-                        val cur = if (isUi) settings.uiFont else settings.codeFont
-                        val usable = fc != FontChoice.CUSTOM || settings.customFontPath.isNotBlank()
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable(enabled = usable) {
-                                    if (isUi) update(settings.copy(uiFont = fc))
-                                    else update(settings.copy(codeFont = fc))
-                                    fontDialog = 0
-                                }
-                                .padding(vertical = 11.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                fc.label,
-                                fontSize = TypeScale.small,
-                                color = if (usable) MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.outline
-                            )
-                            if (fc == FontChoice.CUSTOM && settings.customFontPath.isBlank()) {
-                                Spacer(Modifier.width(8.dp))
-                                Text("未导入", fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.outline)
-                            }
-                            Spacer(Modifier.weight(1f))
-                            if (cur == fc) AppIcon("✓", size = 14.dp, color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        if (isUi) "默认跟随手机系统字体，中文显示最稳。导入 .ttf 后界面对中英文同时生效。"
-                        else "代码块默认用系统等宽字体。可导入自己喜欢的等宽 ttf 替换。",
-                        fontSize = TypeScale.caption,
-                        lineHeight = 16.sp,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { fontDialog = 0 }) { Text("关闭") } }
-        )
-    }
-}
 
 // ---------------- 订阅源 ----------------
 

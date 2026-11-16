@@ -178,7 +178,7 @@ private val SECTIONS: List<DocSection> = listOf(
 
     DocSection(
         "六、外观与阅读设置",
-        listOf(),
+        listOf("这些项集中在「我的 › 设置 › 界面与显示」一页里，设置首页只留一个入口。"),
         listOf(
             DocItem("字号", "10 档，只影响文字大小（sp），控件尺寸不变，最大约 140%。"),
             DocItem("界面缩放", "5 档，同时放大控件与文字（dp 与 sp），适合大屏或点击不便的场景，可与字号叠加。"),
