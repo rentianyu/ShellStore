@@ -477,6 +477,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("取消") } }
         )
     }
+}
 
 // ---------------- 订阅源 ----------------
 
