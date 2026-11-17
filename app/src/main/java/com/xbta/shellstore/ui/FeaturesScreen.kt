@@ -122,7 +122,7 @@ private val SECTIONS: List<DocSection> = listOf(
         ),
         listOf(
             DocItem("执行", "shell 与 script 类型的条目按「执行方式」依次尝试：本机 sh → Shizuku → Root，第一个成功即停。执行输出会按设置以 Toast、通知或弹窗展示，详情页底部的「执行方式」还能手动指定用哪一项跑这一次。"),
-            DocItem("执行方式与模板", "「我的 › 设置 › 运行方式」里每一项都是「由谁执行 + 命令模板」，模板中的 \$command 会替换成命令本身并自动做 shell 引用。内置系统 / Shizuku / Root（su -c \$command）/ 交给 Termux 四项，可改名改模板、可新增自己的执行器（例如 /sdcard/bin/python -c \$command）、可调顺序与开关。条目编辑器里还能限定这一条只走某几种方式，不勾则跟随全局。"),
+            DocItem("执行方式与模板", "「我的 › 设置 › 运行方式」里每一项都是「由谁执行 + 命令模板」，模板里只有 \$command 时原样交给 shell 解析（不当成一个词）；写在别的程序后面参与传参时（如 su -c \$command）会自动做 shell 引用。内置系统 / Shizuku / Root（su -c \$command）/ 交给 Termux 四项，可改名改模板、可新增自己的执行器（例如 /sdcard/bin/python -c \$command）、可调顺序与开关。条目编辑器里还能限定这一条只走某几种方式，不勾则跟随全局。"),
             DocItem("发送 Intent", "url scheme、activity、intent、broadcast、service 五类条目不经过 shell，直接构造 Intent 交给系统。这类条目通常是「打开某个 App 的某个页面」，用 shell 执行会失败。"),
             DocItem("复制", "可复制原始内容，也可复制成等价的 adb 命令（am start / am broadcast 形式），便于在电脑上复现。复制时可自动加 adb shell 或 su -c 前缀。"),
             DocItem("参数占位符", "命令里写 {键} 的地方会在详情页生成输入框，填入后命令实时重算。参数值支持一键解码、展开 JSON 子字段、URL 编码与解码；修改子字段会按原形态写回，原来是编码的仍编码，原来是明文的仍明文。"),

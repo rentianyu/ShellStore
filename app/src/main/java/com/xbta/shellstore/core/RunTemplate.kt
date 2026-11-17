@@ -89,14 +89,17 @@ object RunTemplate {
     /**
      * 渲染模板。
      *
-     * - 模板里没有占位符：原样返回（空模板则视为只有命令本身）
-     * - 占位符紧邻双引号（`su -c "$command"`）：按双引号内转义，避免出现 `su -c "'ls'"` 这种
-     *   双重引用——虽然多数情况也能跑，但命令里一旦带 `$` / 反引号就会被外层提前展开
-     * - 其余情况：单引号包裹
+     * - 模板**就是占位符本身**（`$command`，允许首尾空白）：原样替换，不加任何引号。
+     *   这条最关键：结果会交给 `sh -c` 解析，一加引号整条命令就变成一个词，
+     *   `sh -c 'getprop ro.product.device'` 会去找名为「getprop ro.product.device」的程序 → 127。
+     * - 模板里没有占位符：原样返回
+     * - 占位符紧邻双引号（`su -c "$command"`）：按双引号内转义
+     * - 其余情况（命令是别的程序的参数，如 `su -c $command`、`python -c $command`）：单引号包裹
      */
     fun render(template: String, cmd: String): String {
         val ph = RunProfile.PH
         val t = template.ifBlank { ph }
+        if (t.trim() == ph) return cmd
         if (!t.contains(ph)) return t
 
         val sb = StringBuilder()

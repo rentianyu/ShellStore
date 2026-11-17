@@ -32,8 +32,14 @@ fun main() {
     eq("含反斜杠", "a\\\\b", RunTemplate.quoteDoubleInner("a\\b"))
 
     println("== 模板渲染 ==")
-    eq("只有占位符", "'ls'", RunTemplate.render("\$command", "ls"))
-    eq("空模板视作只有命令", "'ls'", RunTemplate.render("", "ls"))
+    eq("只有占位符：原样不加引号", "ls", RunTemplate.render("\$command", "ls"))
+    eq("空模板视作只有命令", "ls", RunTemplate.render("", "ls"))
+    eq("首尾空白也算只有命令", "ls", RunTemplate.render("  \$command  ", "ls"))
+    eq(
+        "整条命令原样交给 sh（关键回归）",
+        "getprop ro.product.device",
+        RunTemplate.render("\$command", "getprop ro.product.device")
+    )
     eq("su -c 裸占位符", "su -c 'ls'", RunTemplate.render("su -c \$command", "ls"))
     eq("su -c 双引号占位符", "su -c \"ls\"", RunTemplate.render("su -c \"\$command\"", "ls"))
     eq(
