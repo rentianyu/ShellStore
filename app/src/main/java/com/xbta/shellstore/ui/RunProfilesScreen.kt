@@ -134,7 +134,8 @@ fun RunProfilesScreen(onBack: () -> Unit) {
                                     ShellExec.runProfiles(
                                         ctx,
                                         "echo ShellStore-ok && id -u",
-                                        Store.activeRunProfiles()
+                                        Store.activeRunProfiles(),
+                                        title = "运行方式测试"
                                     )
                                 }
                                 testResult = r
@@ -166,6 +167,29 @@ fun RunProfilesScreen(onBack: () -> Unit) {
                             fontSize = TypeScale.caption,
                             color = Tones.danger
                         )
+                    }
+                }
+            }
+
+            GroupTitle("执行超时")
+            GroupCard {
+                Column(Modifier.padding(Space.md)) {
+                    Text("超时后强制终止进程", fontSize = TypeScale.small)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "dumpsys、pm list packages 这类大输出命令常常超过 1 分钟，可以调大",
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(Modifier.height(9.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(15, 30, 60, 120, 300).forEach { sec ->
+                            FilterChip(
+                                "$sec 秒",
+                                settings.execTimeoutSec == sec,
+                                Modifier.weight(1f)
+                            ) { Store.updateSettings(settings.copy(execTimeoutSec = sec)) }
+                        }
                     }
                 }
             }

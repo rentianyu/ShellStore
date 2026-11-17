@@ -150,7 +150,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
         scope.launch {
             running = true
             val r = withContext(Dispatchers.IO) {
-                ShellExec.runProfiles(ctx, cmd, listOf(profile))
+                ShellExec.runProfiles(
+                        ctx, cmd, listOf(profile),
+                        entryId = entry.id, title = entry.title
+                    )
             }
             running = false
             execResult = r
@@ -598,7 +601,10 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
                             scope.launch {
                                 running = true
                                 val r = withContext(Dispatchers.IO) {
-                                    ShellExec.runProfiles(ctx, text, Store.runProfilesFor(entry.id))
+                                    ShellExec.runProfiles(
+                                        ctx, text, Store.runProfilesFor(entry.id),
+                                        entryId = entry.id, title = entry.title
+                                    )
                                 }
                                 running = false
                                 execResult = r

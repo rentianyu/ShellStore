@@ -40,3 +40,8 @@ java -cp "$OUT5${STDLIB:+:$STDLIB}" EntryFilterTestKt
 OUT6=$(mktemp -d)
 $KOTLINC $CORE/RunTemplate.kt tools/scheme-test/RunTemplateTest.kt -d "$OUT6"
 java -cp "$OUT6${STDLIB:+:$STDLIB}" RunTemplateTestKt
+
+# 分享导入：前缀清理、类型猜测、草稿生成
+OUT7=$(mktemp -d)
+$KOTLINC $CORE/Model.kt $CORE/ShareDraft.kt tools/scheme-test/ShareDraftTest.kt -d "$OUT7"
+java -cp "$OUT7${STDLIB:+:$STDLIB}" ShareDraftTestKt

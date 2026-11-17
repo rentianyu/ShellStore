@@ -108,7 +108,9 @@ data class AppSettings(
     /** 执行方式（宿主 + 命令模板），列表顺序就是依次尝试的顺序 */
     val runProfiles: List<RunProfile> = RunProfile.defaults(),
     /** 条目级覆盖：条目 id → 限定的执行方式 id（空列表 = 用全部启用的） */
-    val perEntryRun: Map<String, List<String>> = emptyMap()
+    val perEntryRun: Map<String, List<String>> = emptyMap(),
+    /** 执行超时（秒）。大输出命令（dumpsys / pm list packages）60s 常常不够 */
+    val execTimeoutSec: Int = 60
 ) {
     /** 实际生效的字号倍率（只放大 sp） */
     val fontScale: Float get() = FONT_SCALES[fontLevel.coerceIn(0, FONT_SCALES.lastIndex)]
@@ -163,6 +165,7 @@ data class AppSettings(
         put("perEntryRun", JSONObject().apply {
             perEntryRun.forEach { (k, v) -> put(k, JSONArray(v)) }
         })
+        put("execTimeoutSec", execTimeoutSec)
     }
 
     companion object {
@@ -221,6 +224,7 @@ data class AppSettings(
                         }
                     }.orEmpty()
                 ),
+                execTimeoutSec = o.optInt("execTimeoutSec", 60),
                 perEntryRun = o.optJSONObject("perEntryRun")?.let { jo ->
                     jo.keys().asSequence().associate { k ->
                         val a = jo.optJSONArray(k)

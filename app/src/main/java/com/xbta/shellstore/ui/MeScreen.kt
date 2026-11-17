@@ -153,6 +153,12 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                 )
                 Divider()
                 SettingRow(
+                    "≡", "执行历史",
+                    "每条命令的执行结果、耗时与输出",
+                    onClick = { onOpen(Page.History) }
+                )
+                Divider()
+                SettingRow(
                     "◷", "最近使用",
                     if (recent.isEmpty()) "复制、执行过的条目会记在这里" else "${recent.size} 条记录",
                     onClick = { onOpen(Page.Recent) }

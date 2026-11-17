@@ -146,6 +146,10 @@ object Store {
     private val _seriesError = MutableStateFlow("")
     val seriesError: StateFlow<String> = _seriesError.asStateFlow()
 
+    private val _execHistory = MutableStateFlow<List<ExecRecord>>(emptyList())
+    /** 执行历史（最新在前），最多 [ExecRecord.MAX] 条 */
+    val execHistory: StateFlow<List<ExecRecord>> = _execHistory.asStateFlow()
+
     private val _recent = MutableStateFlow<List<RecentItem>>(emptyList())
     val recent: StateFlow<List<RecentItem>> = _recent.asStateFlow()
 
@@ -179,6 +183,10 @@ object Store {
     fun favItemOf(entryId: String): FavItem? =
         _favs.value.items.firstOrNull { it.entryId == entryId }
 
+    /** 「分享到 ShellStore」送进来的待确认条目 */
+    private val _pendingDraft = MutableStateFlow<Entry?>(null)
+    val pendingDraft: StateFlow<Entry?> = _pendingDraft.asStateFlow()
+
     private val _pendingSearch = MutableStateFlow<String?>(null)
     val pendingSearch: StateFlow<String?> = _pendingSearch.asStateFlow()
 
@@ -189,6 +197,15 @@ object Store {
 
     fun consumePendingSearch() {
         _pendingSearch.value = null
+    }
+
+    fun requestDraft(e: Entry) {
+        _pendingDraft.value = e
+    }
+
+    /** App 已把它推进编辑器，清掉免得旋转屏幕再来一次 */
+    fun consumeDraft() {
+        _pendingDraft.value = null
     }
 
     // ---------------- 初始化 ----------------
@@ -258,6 +275,7 @@ object Store {
 
         _recent.value = Repo.loadRecent(c)
         _searchHistory.value = Repo.loadSearchHistory(c)
+        _execHistory.value = ExecHistoryRepo.load(c)
 
         _loaded.value = true
     }
@@ -278,6 +296,38 @@ object Store {
         _recent.value = emptyList()
         ctx?.let { Repo.saveRecent(it, emptyList()) }
     }
+
+    // ---------------- 执行历史 ----------------
+
+    /** 每次 ShellExec 结束时调用（成功失败都记） */
+    fun recordExec(entryId: String, title: String, cmd: String, r: ShellExec.Result, ms: Long) {
+        val c = ctx ?: return
+        val rec = ExecRecord(
+            at = System.currentTimeMillis(),
+            entryId = entryId,
+            title = title,
+            cmd = cmd,
+            profile = r.profileName.ifBlank { r.channel.label },
+            code = r.code,
+            ok = r.ok,
+            ms = ms,
+            out = r.out.take(ExecRecord.OUTPUT_LIMIT),
+            err = r.err.take(ExecRecord.OUTPUT_LIMIT),
+            note = r.note
+        )
+        val next = (listOf(rec) + _execHistory.value).take(ExecRecord.MAX)
+        _execHistory.value = next
+        ExecHistoryRepo.save(c, next)
+    }
+
+    fun clearExecHistory() {
+        _execHistory.value = emptyList()
+        ctx?.let { ExecHistoryRepo.save(it, emptyList()) }
+    }
+
+    /** 执行超时（秒），来自设置 */
+    fun execTimeout(): Long =
+        _settings.value.execTimeoutSec.coerceIn(5, 900).toLong()
 
     // ---------------- 搜索历史 ----------------
 

@@ -75,6 +75,8 @@ sealed interface Page {
     data object Appearance : Page
     /** 运行方式：宿主 + 命令模板，顺序即依次尝试顺序 */
     data object RunProfiles : Page
+    /** 执行历史：跑过什么、结果如何 */
+    data object History : Page
     data object Sources : Page
     data object Backup : Page
     data object Cloud : Page
@@ -234,6 +236,7 @@ private fun Root() {
         "settings" -> 2 to listOf(Page.Settings)
         "appearance" -> 2 to listOf(Page.Settings, Page.Appearance)
         "runprofiles" -> 2 to listOf(Page.Settings, Page.RunProfiles)
+        "history" -> 2 to listOf(Page.History)
         "sources" -> 2 to listOf(Page.Sources)
         "backup" -> 2 to listOf(Page.Backup)
         "cloud" -> 2 to listOf(Page.Cloud)
@@ -262,6 +265,15 @@ private fun Root() {
         val msg = runCatching { DeepLinkHandler.handle(ctx, c) }
             .getOrElse { "执行失败：${it.message.orEmpty().take(60)}" }
         if (!msg.isNullOrBlank()) Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+    }
+
+    // 「分享到 ShellStore」送进来的草稿：直接打开编辑器，标题类型可改
+    val sharedDraft by Store.pendingDraft.collectAsState()
+    LaunchedEffect(sharedDraft) {
+        val d = sharedDraft ?: return@LaunchedEffect
+        Store.consumeDraft()
+        tab = 0
+        stack = listOf(Page.Editor(null, null, d))
     }
 
     // 更新后首次打开：弹一次「本次更新内容」。
@@ -401,6 +413,7 @@ private fun Root() {
                     is Page.Settings -> SettingsScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Appearance -> AppearanceScreen(onBack = ::pop)
                     is Page.RunProfiles -> RunProfilesScreen(onBack = ::pop)
+                    is Page.History -> HistoryScreen(onBack = ::pop, onOpenEntry = { push(Page.Detail(it)) })
                     is Page.Sources -> SourcesScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Backup -> BackupScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Cloud -> CloudBackupScreen(onBack = ::pop)

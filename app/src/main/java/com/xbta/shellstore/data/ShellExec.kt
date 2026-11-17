@@ -72,7 +72,23 @@ object ShellExec {
         ctx: Context,
         cmd: String,
         profiles: List<RunProfile>,
-        timeoutSec: Long = 60L
+        timeoutSec: Long = 0L,
+        entryId: String = "",
+        title: String = ""
+    ): Result {
+        val t0 = System.currentTimeMillis()
+        val to = if (timeoutSec > 0L) timeoutSec else Store.execTimeout()
+        val r = runProfilesInner(ctx, cmd, profiles, to)
+        // 留痕：成功失败都记，历史页才能复盘
+        runCatching { Store.recordExec(entryId, title, cmd, r, System.currentTimeMillis() - t0) }
+        return r
+    }
+
+    private fun runProfilesInner(
+        ctx: Context,
+        cmd: String,
+        profiles: List<RunProfile>,
+        timeoutSec: Long
     ): Result {
         if (profiles.isEmpty()) {
             return Result(
@@ -81,6 +97,8 @@ object ShellExec {
             )
         }
         val tried = ArrayList<String>(profiles.size)
+        // 每项失败原因都留一句：只报最后一条会误导（曾把「模板引号写错」看成「缺权限」）
+        val failures = ArrayList<String>(profiles.size)
         var last: Result? = null
         for (p in profiles) {
             tried += p.name
@@ -96,11 +114,20 @@ object ShellExec {
                 }
             }.copy(profileName = p.name)
             if (r.ok) return r
+            failures += p.name + "：" + briefError(r)
             last = r
         }
         val base = last ?: Result(Channel.DIRECT, -1, "", "全部执行方式都失败了")
-        val head = if (tried.size > 1) "试过 ${tried.joinToString(" / ")} 都不行。" else ""
-        return base.copy(note = (head + base.note).trim())
+        val head = if (tried.size > 1) "试过 ${tried.size} 种方式都不行 —— " else ""
+        val detail = failures.joinToString(" ｜ ")
+        return base.copy(note = (head + detail).trim())
+    }
+
+    /** 一句失败原因：优先 stderr 首行，其次说明，最后返回码 */
+    private fun briefError(r: Result): String {
+        val raw = r.err.ifBlank { r.note }.ifBlank { "返回码 ${r.code}" }
+        val line = raw.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+        return if (line.length > 90) line.take(90) + "…" else line
     }
 
     /** 用 App 自己的 sh 执行一行已渲染好的命令 */
@@ -110,7 +137,7 @@ object ShellExec {
     }
 
     /** 默认执行：用当前配置里启用的执行方式 */
-    fun run(ctx: Context, cmd: String, timeoutSec: Long = 60L): Result =
+    fun run(ctx: Context, cmd: String, timeoutSec: Long = 0L): Result =
         runProfiles(ctx, cmd, Store.activeRunProfiles(), timeoutSec)
 
     private fun looksLikePermissionIssue(r: Result): Boolean {
@@ -124,7 +151,7 @@ object ShellExec {
 
     private fun hintFor(r: Result): String = when {
         r.code == 124 -> "命令超时，可能卡在等待输入。"
-        looksLikePermissionIssue(r) -> "这条命令需要系统权限：Root 或 Termux（并开启 allow-external-apps）任一可用时才能执行。"
+        looksLikePermissionIssue(r) -> "像是权限问题：需要在某个执行方式下才有权限（Shizuku / Root / Termux 任一可用）。可在「设置 › 运行方式」里调整顺序或启用。"
         r.code != 0 && r.err.isBlank() && r.out.isBlank() -> "命令没有输出，返回码 ${r.code}。"
         else -> ""
     }

@@ -19,6 +19,7 @@ class MainActivity : ComponentActivity() {
         Store.init(this)
         // 冷启动带链接：先入队，App() 首次组合时会消费
         handleDeepLink(intent)
+        handleShare(intent)
         setContent { App() }
     }
 
@@ -27,6 +28,21 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleDeepLink(intent)
+        handleShare(intent)
+    }
+
+    /**
+     * 「分享到 ShellStore」：从聊天/网页/教程里选中一段命令直接分享过来，
+     * 生成一条待确认的草稿并打开编辑器（不直接入库，标题类型还能改）。
+     */
+    private fun handleShare(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        if (intent.type?.startsWith("text/") != true) return
+        val raw = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
+        val draft = com.xbta.shellstore.core.ShareDraft.build(raw) ?: return
+        Store.requestDraft(draft)
+        // 消费掉，避免旋转屏幕 / 重回前台重复弹编辑器
+        intent.removeExtra(Intent.EXTRA_TEXT)
     }
 
     private fun handleDeepLink(intent: Intent?) {

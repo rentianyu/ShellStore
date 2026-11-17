@@ -42,7 +42,7 @@ object EntryRunner {
         return when (entry.type) {
             EntryType.SHELL, EntryType.SCRIPT -> {
                 val cmd = CommandRenderer.primaryText(entry, values, -1)
-                val r = ShellExec.runProfiles(ctx, cmd, Store.runProfilesFor(entry.id))
+                val r = ShellExec.runProfiles(ctx, cmd, Store.runProfilesFor(entry.id), entryId = entry.id, title = entry.title)
                 if (r.ok) {
                     val first = r.out.lineSequence().firstOrNull().orEmpty().trim()
                     if (first.isNotBlank()) "已执行：${first.take(50)}" else "已执行"
@@ -70,7 +70,7 @@ object EntryRunner {
                 "已打开"
             }.getOrElse { "条目已失效，且没有应用能处理这个链接" }
         }
-        val r = ShellExec.runProfiles(ctx, cmd, Store.activeRunProfiles())
+        val r = ShellExec.runProfiles(ctx, cmd, Store.activeRunProfiles(), title = "（失效条目）")
         return if (r.ok) "已执行"
         else "执行失败：" + r.err.ifBlank { r.note.ifBlank { "返回码 ${r.code}" } }.take(80)
     }
