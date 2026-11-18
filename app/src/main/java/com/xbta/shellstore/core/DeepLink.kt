@@ -53,6 +53,8 @@ object DeepLink {
         Spec("appearance", "shellstore://appearance", "界面与显示（主题 / 字号 / 缩放 / 列表样式 / 字体）", "导航"),
         Spec("runprofiles", "shellstore://runprofiles", "运行方式（执行方式与命令模板）", "导航"),
         Spec("history", "shellstore://history", "执行历史", "导航"),
+        Spec("vars", "shellstore://vars", "全局变量（命令里用 {{名字}} 引用）", "导航"),
+        Spec("widgets", "shellstore://widgets", "桌面小部件管理", "导航"),
         Spec("sources", "shellstore://sources", "订阅源管理", "导航"),
         Spec("backup", "shellstore://backup", "备份与恢复", "导航"),
         Spec("cloud", "shellstore://cloud", "云备份配置", "导航"),

@@ -3,6 +3,7 @@ package com.xbta.shellstore.data
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.xbta.shellstore.core.GlobalVars
 import com.xbta.shellstore.core.RunHost
 import com.xbta.shellstore.core.RunProfile
 import com.xbta.shellstore.core.RunTemplate
@@ -78,9 +79,11 @@ object ShellExec {
     ): Result {
         val t0 = System.currentTimeMillis()
         val to = if (timeoutSec > 0L) timeoutSec else Store.execTimeout()
-        val r = runProfilesInner(ctx, cmd, profiles, to)
-        // 留痕：成功失败都记，历史页才能复盘
-        runCatching { Store.recordExec(entryId, title, cmd, r, System.currentTimeMillis() - t0) }
+        // 全局变量在执行前替换：条目本身保持 {{name}} 原样，便于跨设备复用
+        val finalCmd = GlobalVars.apply(cmd, Store.globalVars())
+        val r = runProfilesInner(ctx, finalCmd, profiles, to)
+        // 留痕：成功失败都记，历史页才能复盘（存替换后的命令，方便对照实际执行内容）
+        runCatching { Store.recordExec(entryId, title, finalCmd, r, System.currentTimeMillis() - t0) }
         return r
     }
 

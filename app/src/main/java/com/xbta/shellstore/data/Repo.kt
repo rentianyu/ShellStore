@@ -110,7 +110,11 @@ data class AppSettings(
     /** 条目级覆盖：条目 id → 限定的执行方式 id（空列表 = 用全部启用的） */
     val perEntryRun: Map<String, List<String>> = emptyMap(),
     /** 执行超时（秒）。大输出命令（dumpsys / pm list packages）60s 常常不够 */
-    val execTimeoutSec: Int = 60
+    val execTimeoutSec: Int = 60,
+    /** 全局变量：命令里用 {{name}} 引用，执行前替换 */
+    val globalVars: Map<String, String> = emptyMap(),
+    /** 桌面小部件绑定：widgetId（字符串）→ 条目 id */
+    val widgetEntries: Map<String, String> = emptyMap()
 ) {
     /** 实际生效的字号倍率（只放大 sp） */
     val fontScale: Float get() = FONT_SCALES[fontLevel.coerceIn(0, FONT_SCALES.lastIndex)]
@@ -166,6 +170,8 @@ data class AppSettings(
             perEntryRun.forEach { (k, v) -> put(k, JSONArray(v)) }
         })
         put("execTimeoutSec", execTimeoutSec)
+        put("globalVars", JSONObject().apply { globalVars.forEach { (k, v) -> put(k, v) } })
+        put("widgetEntries", JSONObject().apply { widgetEntries.forEach { (k, v) -> put(k, v) } })
     }
 
     companion object {
@@ -225,6 +231,12 @@ data class AppSettings(
                     }.orEmpty()
                 ),
                 execTimeoutSec = o.optInt("execTimeoutSec", 60),
+                globalVars = o.optJSONObject("globalVars")?.let { jo ->
+                    jo.keys().asSequence().associateWith { jo.optString(it) }
+                }.orEmpty(),
+                widgetEntries = o.optJSONObject("widgetEntries")?.let { jo ->
+                    jo.keys().asSequence().associateWith { jo.optString(it) }
+                }.orEmpty(),
                 perEntryRun = o.optJSONObject("perEntryRun")?.let { jo ->
                     jo.keys().asSequence().associate { k ->
                         val a = jo.optJSONArray(k)

@@ -45,3 +45,8 @@ java -cp "$OUT6${STDLIB:+:$STDLIB}" RunTemplateTestKt
 OUT7=$(mktemp -d)
 $KOTLINC $CORE/Model.kt $CORE/ShareDraft.kt tools/scheme-test/ShareDraftTest.kt -d "$OUT7"
 java -cp "$OUT7${STDLIB:+:$STDLIB}" ShareDraftTestKt
+
+# 全局变量：{{name}} 替换、引用检查、名称校验
+OUT8=$(mktemp -d)
+$KOTLINC $CORE/GlobalVars.kt tools/scheme-test/GlobalVarsTest.kt -d "$OUT8"
+java -cp "$OUT8${STDLIB:+:$STDLIB}" GlobalVarsTestKt

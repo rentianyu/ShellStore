@@ -325,6 +325,23 @@ object Store {
         ctx?.let { ExecHistoryRepo.save(it, emptyList()) }
     }
 
+    /** 桌面小部件绑定 */
+    fun widgetEntryOf(widgetId: Int): String =
+        _settings.value.widgetEntries[widgetId.toString()].orEmpty()
+
+    fun setWidgetEntry(widgetId: Int, entryId: String) {
+        val m = _settings.value.widgetEntries.toMutableMap()
+        m[widgetId.toString()] = entryId
+        updateSettings(_settings.value.copy(widgetEntries = m))
+    }
+
+    /** 全局变量（跨条目共享） */
+    fun globalVars(): Map<String, String> = _settings.value.globalVars
+
+    fun setGlobalVars(m: Map<String, String>) {
+        updateSettings(_settings.value.copy(globalVars = m))
+    }
+
     /** 执行超时（秒），来自设置 */
     fun execTimeout(): Long =
         _settings.value.execTimeoutSec.coerceIn(5, 900).toLong()

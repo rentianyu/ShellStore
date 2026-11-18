@@ -77,6 +77,10 @@ sealed interface Page {
     data object RunProfiles : Page
     /** 执行历史：跑过什么、结果如何 */
     data object History : Page
+    /** 全局变量：{{name}} 跨条目引用 */
+    data object Vars : Page
+    /** 桌面小部件管理 */
+    data object Widgets : Page
     data object Sources : Page
     data object Backup : Page
     data object Cloud : Page
@@ -237,6 +241,8 @@ private fun Root() {
         "appearance" -> 2 to listOf(Page.Settings, Page.Appearance)
         "runprofiles" -> 2 to listOf(Page.Settings, Page.RunProfiles)
         "history" -> 2 to listOf(Page.History)
+        "vars" -> 2 to listOf(Page.Settings, Page.Vars)
+        "widgets" -> 2 to listOf(Page.Widgets)
         "sources" -> 2 to listOf(Page.Sources)
         "backup" -> 2 to listOf(Page.Backup)
         "cloud" -> 2 to listOf(Page.Cloud)
@@ -414,6 +420,8 @@ private fun Root() {
                     is Page.Appearance -> AppearanceScreen(onBack = ::pop)
                     is Page.RunProfiles -> RunProfilesScreen(onBack = ::pop)
                     is Page.History -> HistoryScreen(onBack = ::pop, onOpenEntry = { push(Page.Detail(it)) })
+                    is Page.Vars -> VarsScreen(onBack = ::pop)
+                    is Page.Widgets -> WidgetsScreen(onBack = ::pop)
                     is Page.Sources -> SourcesScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Backup -> BackupScreen(onBack = ::pop, onOpen = ::push)
                     is Page.Cloud -> CloudBackupScreen(onBack = ::pop)

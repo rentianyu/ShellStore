@@ -20,6 +20,8 @@ class MainActivity : ComponentActivity() {
         // 冷启动带链接：先入队，App() 首次组合时会消费
         handleDeepLink(intent)
         handleShare(intent)
+        // 条目标题/命令可能刚被改过，顺手把桌面小部件刷新一遍
+        runCatching { ShellWidgetProvider.updateAll(this) }
         setContent { App() }
     }
 

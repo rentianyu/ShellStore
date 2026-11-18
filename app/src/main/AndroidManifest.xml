@@ -47,6 +47,28 @@
             </intent-filter>
         </activity>
 
+        <!-- 桌面小部件：一个格子绑一条命令，点一下执行 -->
+        <receiver
+            android:name=".ShellWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+
+        <!-- 添加小部件时系统调起，用来选命令 -->
+        <activity
+            android:name=".WidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.App">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- 桌面快捷方式的执行入口：透明、无界面，执行完自己关闭 -->
         <activity
             android:name=".RunCommandActivity"

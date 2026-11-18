@@ -164,6 +164,11 @@ fun MeScreen(onOpen: (Page) -> Unit) {
                     onClick = { onOpen(Page.Recent) }
                 )
                 Divider()
+                SettingRow(
+                    "▣", "桌面小部件", "把命令钉在桌面，点一下就跑",
+                    onClick = { onOpen(Page.Widgets) }
+                )
+                Divider()
                 SettingRow("⇅", "备份与恢复", "本地导出 · 云备份（WebDAV / S3）", onClick = { onOpen(Page.Backup) })
             }
 
@@ -403,6 +408,13 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
                     "▶", "运行方式",
                     "${settings.runProfiles.count { it.enabled }} 种依次尝试 · 模板可改",
                     onClick = { onOpen(Page.RunProfiles) }
+                )
+                Divider()
+                SettingRow(
+                    "⌘", "全局变量",
+                    if (settings.globalVars.isEmpty()) "命令里用 {{名字}} 引用，一次改处处生效"
+                    else "${settings.globalVars.size} 个 · {{${settings.globalVars.keys.min()}}} 等",
+                    onClick = { onOpen(Page.Vars) }
                 )
             }
 
