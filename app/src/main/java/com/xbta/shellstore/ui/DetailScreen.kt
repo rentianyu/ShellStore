@@ -39,7 +39,6 @@ import com.xbta.shellstore.core.RunHost
 import com.xbta.shellstore.core.RunProfile
 import com.xbta.shellstore.data.ShellExec
 import com.xbta.shellstore.data.ShizukuRunner
-import com.xbta.shellstore.data.CopyPrefix
 import com.xbta.shellstore.data.Store
 import com.xbta.shellstore.ui.theme.Radius
 import com.xbta.shellstore.ui.theme.IconSize
