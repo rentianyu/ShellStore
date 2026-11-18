@@ -42,6 +42,8 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
 
+        // Compose 的 lambda 里 this 是 BoxScope/Composer，拿 Activity 得先存一份
+        val activity = this
         setContent {
             AppTheme(darkTheme = false) {
                 Box(
@@ -54,7 +56,7 @@ class WidgetConfigActivity : ComponentActivity() {
                         title = "小部件执行哪条命令",
                         onPick = { entryId ->
                             Store.setWidgetEntry(widgetId, entryId)
-                            ShellWidgetProvider.update(this, widgetId)
+                            ShellWidgetProvider.update(activity, widgetId)
                             setResult(
                                 RESULT_OK,
                                 Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
