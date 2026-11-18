@@ -1312,7 +1312,8 @@ object Store {
                 theme = st.theme,
                 fontLevel = st.fontLevel,
                 uiLevel = st.uiLevel,
-                copyPrefix = st.copyPrefix,
+                copyPrefixes = st.copyPrefixes,
+                copyPrefixId = st.copyPrefixId,
                 confirmDanger = st.confirmDanger
             )
             Repo.saveSettings(c, _settings.value)

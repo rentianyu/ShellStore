@@ -106,7 +106,7 @@ object DeepLink {
         "uiLevel" to "界面缩放档位 0-4",
         "listStyle" to "card / list",
         "foldPreview" to "true / false（列表收起命令预览）",
-        "copyPrefix" to "none / adb / su",
+        "copyPrefix" to "none / adb / su，或自定义前缀的 id",
         "confirmDanger" to "true / false（危险动作二次确认）",
         "copyAndReturn" to "true / false（复制后自动返回）",
         "favAskFolder" to "true / false（收藏时问文件夹）",

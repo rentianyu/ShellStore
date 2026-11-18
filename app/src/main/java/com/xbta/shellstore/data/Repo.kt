@@ -15,12 +15,6 @@ enum class FontChoice(val label: String) {
     CUSTOM("自定义字体")
 }
 
-enum class CopyPrefix(val label: String, val fn: (String) -> String) {
-    NONE("无", { it }),
-    ADB_SHELL("adb shell", { "adb shell ${if (it.contains('\n')) "\"$it\"" else it}" }),
-    SU("su -c", { "su -c '${it.replace("'", "'\\''")}'" })
-}
-
 /**
  * 字号 10 级（仅放大 sp，不影响 dp），第 4 级 = 100%。
  * 取等差数列 0.80 → 1.40，每级约 +6.7%，相邻级肉眼可辨、又不会一步跳太多。
@@ -81,7 +75,10 @@ data class AppSettings(
     val uiFont: FontChoice = FontChoice.SYSTEM,
     val codeFont: FontChoice = FontChoice.SYSTEM,
     val customFontPath: String = "",
-    val copyPrefix: CopyPrefix = CopyPrefix.NONE,
+    /** 复制前缀清单（可自定义，模板里用 $command 代表命令本身） */
+    val copyPrefixes: List<CopyPrefixItem> = CopyPrefixes.defaults(),
+    /** 当前选中的复制前缀 id */
+    val copyPrefixId: String = CopyPrefixes.ID_NONE,
     val confirmDanger: Boolean = true,
     val checkUpdateOnStart: Boolean = true,
     /** 只在 Wi-Fi / 以太网下自动下载更新包；移动网络下只提示不动手 */
@@ -121,6 +118,9 @@ data class AppSettings(
     /** 实际生效的界面倍率（dp 与 sp 一起放大） */
     val uiScale: Float get() = UI_SCALES[uiLevel.coerceIn(0, UI_SCALES.lastIndex)]
 
+    /** 当前选中的复制前缀；id 失效时回退到内置「无」 */
+    val copyPrefixItem: CopyPrefixItem? get() = CopyPrefixes.pick(copyPrefixes, copyPrefixId)
+
     fun toJson(): JSONObject = JSONObject().apply {
         put("theme", theme.name)
         put("fontLevel", fontLevel)
@@ -140,7 +140,17 @@ data class AppSettings(
         put("uiFont", uiFont.name)
         put("codeFont", codeFont.name)
         put("customFontPath", customFontPath)
-        put("copyPrefix", copyPrefix.name)
+        put("copyPrefixes", JSONArray().apply {
+            copyPrefixes.forEach { p ->
+                put(JSONObject().apply {
+                    put("id", p.id)
+                    put("name", p.name)
+                    put("template", p.template)
+                    put("builtin", p.builtin)
+                })
+            }
+        })
+        put("copyPrefixId", copyPrefixId)
         put("confirmDanger", confirmDanger)
         put("checkUpdateOnStart", checkUpdateOnStart)
         put("wifiOnlyUpdate", wifiOnlyUpdate)
@@ -199,7 +209,24 @@ data class AppSettings(
                 uiFont = e(o.optString("uiFont"), FontChoice.SYSTEM, FontChoice.entries.toTypedArray()),
                 codeFont = e(o.optString("codeFont"), FontChoice.SYSTEM, FontChoice.entries.toTypedArray()),
                 customFontPath = o.optString("customFontPath"),
-                copyPrefix = e(o.optString("copyPrefix"), CopyPrefix.NONE, CopyPrefix.entries.toTypedArray()),
+                copyPrefixes = CopyPrefixes.sanitize(
+                    o.optJSONArray("copyPrefixes")?.let { arr ->
+                        (0 until arr.length()).mapNotNull { i ->
+                            val x = arr.optJSONObject(i) ?: return@mapNotNull null
+                            val id = x.optString("id")
+                            if (id.isBlank()) return@mapNotNull null
+                            CopyPrefixItem(
+                                id = id,
+                                name = x.optString("name", id),
+                                template = x.optString("template", ""),
+                                builtin = x.optBoolean("builtin", false)
+                            )
+                        }
+                    }
+                ),
+                // 老版本只存了枚举名（NONE / ADB_SHELL / SU），迁移到新 id
+                copyPrefixId = if (o.has("copyPrefixId")) o.optString("copyPrefixId", CopyPrefixes.ID_NONE)
+                else CopyPrefixes.fromLegacy(o.optString("copyPrefix", "NONE")),
                 confirmDanger = o.optBoolean("confirmDanger", true),
                 checkUpdateOnStart = o.optBoolean("checkUpdateOnStart", true),
                 wifiOnlyUpdate = o.optBoolean("wifiOnlyUpdate", true),

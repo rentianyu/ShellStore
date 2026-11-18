@@ -263,7 +263,7 @@ fun DetailScreen(entryId: String, onBack: () -> Unit, onOpen: (Page) -> Unit = {
             CommandRenderer.contentText(entry, values, variantIndex).ifBlank { text }
         }
         // 只有「当命令用」的文本才加前缀（sudo / termux 之类），原始内容不加
-        val out = if (asShell) settings.copyPrefix.fn(raw) else raw
+        val out = if (asShell) CopyPrefixes.render(settings.copyPrefixItem, raw) else raw
         val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText(if (asShell) "命令" else "内容", out))
         // Toast 把复制到的内容回显出来：一眼能确认复制的是什么

@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -36,7 +38,8 @@ import androidx.compose.ui.unit.sp
 import com.xbta.shellstore.BuildConfig
 import com.xbta.shellstore.R
 import com.xbta.shellstore.data.AppSettings
-import com.xbta.shellstore.data.CopyPrefix
+import com.xbta.shellstore.core.CopyPrefixItem
+import com.xbta.shellstore.core.CopyPrefixes
 import com.xbta.shellstore.data.FONT_SCALES
 import com.xbta.shellstore.data.FontChoice
 import com.xbta.shellstore.data.ListStyle
@@ -380,6 +383,9 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
     val settings by Store.settings.collectAsState()
     val ctx = LocalContext.current
     var confirmClear by remember { mutableStateOf(false) }
+    // 复制前缀：null = 没在编辑；addingPrefix = 正在新增
+    var editingPrefix by remember { mutableStateOf<CopyPrefixItem?>(null) }
+    var addingPrefix by remember { mutableStateOf(false) }
 
     fun update(s: AppSettings) = Store.updateSettings(s)
 
@@ -424,15 +430,47 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
                     Text("复制前缀", fontSize = TypeScale.small)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "贴到电脑终端时选 adb shell；手机上用 Shizuku / Termux 保持「无」",
+                        "复制成 Shell 命令时加在命令前面，贴到哪都能直接用。选「无」则原样复制",
                         fontSize = TypeScale.caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(9.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        CopyPrefix.entries.forEach { p ->
-                            FilterChip(p.label, settings.copyPrefix == p) { update(settings.copy(copyPrefix = p)) }
-                        }
+                    settings.copyPrefixes.forEach { p ->
+                        CopyPrefixRow(
+                            item = p,
+                            selected = settings.copyPrefixItem?.id == p.id,
+                            onSelect = { update(settings.copy(copyPrefixId = p.id)) },
+                            onEdit = { editingPrefix = p }
+                        )
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        "预览：" + CopyPrefixes.render(settings.copyPrefixItem, CopyPrefixes.EXAMPLE),
+                        fontSize = TypeScale.caption,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = { addingPrefix = true },
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) { Text("+ 新增前缀", fontSize = TypeScale.caption) }
+                        Spacer(Modifier.weight(1f))
+                        TextButton(
+                            onClick = {
+                                val merged = CopyPrefixes.syncFromRunProfiles(settings.copyPrefixes, settings.runProfiles)
+                                val added = merged.size - settings.copyPrefixes.size
+                                if (added == 0) {
+                                    Toast.makeText(ctx, "运行方式里没有可补充的前缀", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    update(settings.copy(copyPrefixes = merged))
+                                    Toast.makeText(ctx, "已从运行方式补充 $added 条", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) { Text("从运行方式同步", fontSize = TypeScale.caption) }
                     }
                 }
             }
@@ -504,6 +542,156 @@ fun SettingsScreen(onBack: () -> Unit, onOpen: (Page) -> Unit = {}) {
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("取消") } }
         )
     }
+
+    if (addingPrefix || editingPrefix != null) {
+        val cur = editingPrefix
+        PrefixDialog(
+            initial = cur,
+            onDismiss = { addingPrefix = false; editingPrefix = null },
+            onSave = { item ->
+                val list = if (cur == null) settings.copyPrefixes + item
+                else settings.copyPrefixes.map { if (it.id == item.id) item else it }
+                // 新建的那条直接设为当前，省一次点击
+                update(settings.copy(copyPrefixes = list, copyPrefixId = if (cur == null) item.id else settings.copyPrefixId))
+                addingPrefix = false
+                editingPrefix = null
+            },
+            onDelete = cur?.takeIf { !it.builtin }?.let { p ->
+                {
+                    val list = settings.copyPrefixes.filterNot { it.id == p.id }
+                    val safe = list.ifEmpty { CopyPrefixes.defaults() }
+                    update(
+                        settings.copy(
+                            copyPrefixes = safe,
+                            copyPrefixId = if (settings.copyPrefixId == p.id) CopyPrefixes.ID_NONE else settings.copyPrefixId
+                        )
+                    )
+                    editingPrefix = null
+                    Toast.makeText(ctx, "已删除「${p.name}」", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+}
+
+// ---------------- 复制前缀 ----------------
+
+@Composable
+private fun CopyPrefixRow(
+    item: CopyPrefixItem,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onEdit: () -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.sm))
+            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = .10f) else Color.Transparent)
+            .clickable { onSelect() }
+            .padding(start = 9.dp, end = 2.dp, top = 7.dp, bottom = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            if (selected) "◉" else "○",
+            fontSize = TypeScale.small,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+        )
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.name,
+                fontSize = TypeScale.small,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+            )
+            Text(
+                item.summary,
+                fontSize = TypeScale.caption,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        TextButton(onClick = onEdit, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Text("改", fontSize = TypeScale.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun PrefixDialog(
+    initial: CopyPrefixItem?,
+    onDismiss: () -> Unit,
+    onSave: (CopyPrefixItem) -> Unit,
+    onDelete: (() -> Unit)? = null
+) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var template by remember { mutableStateOf(initial?.template ?: "") }
+    val valid = name.isNotBlank()
+    val preview = CopyPrefixItem(initial?.id ?: "preview", name, template)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initial == null) "新增复制前缀" else "编辑复制前缀", fontSize = TypeScale.body) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("名称") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = template,
+                    onValueChange = { template = it },
+                    label = { Text("前缀模板") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "留空 = 原样复制；\$command 代表命令本身，如 adb -s 123456 shell \$command",
+                    fontSize = TypeScale.caption,
+                    lineHeight = 17.sp,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "预览：" + CopyPrefixes.render(preview, CopyPrefixes.EXAMPLE),
+                    fontSize = TypeScale.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = valid,
+                onClick = {
+                    val t = template.trim()
+                    onSave(
+                        initial?.copy(name = name.trim(), template = t)
+                            ?: CopyPrefixItem(
+                                id = "c" + System.currentTimeMillis().toString(36),
+                                name = name.trim(),
+                                template = t
+                            )
+                    )
+                }
+            ) { Text("保存") }
+        },
+        dismissButton = {
+            Row {
+                if (onDelete != null) {
+                    TextButton(onClick = onDelete) { Text("删除", color = Tones.danger) }
+                }
+                TextButton(onClick = onDismiss) { Text("取消") }
+            }
+        }
+    )
 }
 
 // ---------------- 订阅源 ----------------

@@ -50,3 +50,8 @@ java -cp "$OUT7${STDLIB:+:$STDLIB}" ShareDraftTestKt
 OUT8=$(mktemp -d)
 $KOTLINC $CORE/GlobalVars.kt tools/scheme-test/GlobalVarsTest.kt -d "$OUT8"
 java -cp "$OUT8${STDLIB:+:$STDLIB}" GlobalVarsTestKt
+
+# 复制前缀：渲染（$command 引用）、老配置迁移、清洗、从运行方式同步
+OUT9=$(mktemp -d)
+$KOTLINC $CORE/RunTemplate.kt $CORE/CopyPrefix.kt tools/scheme-test/CopyPrefixTest.kt -d "$OUT9"
+java -cp "$OUT9${STDLIB:+:$STDLIB}" CopyPrefixTestKt

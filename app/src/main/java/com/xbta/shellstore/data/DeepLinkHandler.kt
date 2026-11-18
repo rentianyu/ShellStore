@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import com.xbta.shellstore.BuildConfig
 import com.xbta.shellstore.core.CommandRenderer
+import com.xbta.shellstore.core.CopyPrefixes
 import com.xbta.shellstore.core.DeepLink
 import com.xbta.shellstore.core.Entry
 import com.xbta.shellstore.core.EntryType
@@ -310,10 +311,16 @@ object DeepLinkHandler {
             }
             "foldpreview" -> s.copy(foldPreview = on() ?: return "foldPreview 需要 true/false")
             "copyprefix" -> when (value.lowercase()) {
-                "none", "无" -> s.copy(copyPrefix = CopyPrefix.NONE)
-                "adb", "adb_shell", "adb shell" -> s.copy(copyPrefix = CopyPrefix.ADB_SHELL)
-                "su", "root" -> s.copy(copyPrefix = CopyPrefix.SU)
-                else -> return "copyPrefix 只能是 none / adb / su"
+                "none", "无", "system", "系统" -> s.copy(copyPrefixId = CopyPrefixes.ID_NONE)
+                "adb", "adb_shell", "adb shell", "shizuku" -> s.copy(copyPrefixId = CopyPrefixes.ID_ADB)
+                "su", "root", "su -c" -> s.copy(copyPrefixId = CopyPrefixes.ID_SU)
+                else -> {
+                    // 也允许直接传自定义前缀的 id / 名称
+                    val hit = s.copyPrefixes.firstOrNull { it.id == value }
+                        ?: s.copyPrefixes.firstOrNull { it.name == value }
+                        ?: return "copyPrefix 只能是 none / adb / su，或自定义前缀的 id"
+                    s.copy(copyPrefixId = hit.id)
+                }
             }
             "confirmdanger" -> s.copy(confirmDanger = on() ?: return "confirmDanger 需要 true/false")
             "copyandreturn" -> s.copy(copyAndReturn = on() ?: return "copyAndReturn 需要 true/false")
